@@ -25,22 +25,35 @@ function newDay(date = "") {
   };
 }
 
-function newTrip(template = "rundreise") {
+function newTrip(template = "reise") {
   return {
-    format: 1, template, theme: "meer", title: "", subtitle: "", travelers: "", currency: "EUR", start: "",
-    startPlace: blankPlace(), destination: blankPlace(), roundTrip: false,
+    format: 1, template: TEMPLATES[template] ? template : "reise", theme: "meer", title: "", subtitle: "", travelers: "", currency: "EUR", start: "",
+    startPlace: blankPlace(), roundTrip: false,
     days: [], summary: "", summaryAuto: true,
     route: { auto: true, road: true, points: [], km: null, legs: [], mapSig: "" },
     mapImg: "", mapSource: "", mapUser: false, coverPhoto: "", projData: true, embed: "original", capWeather: true, wxLine: false, capNum: false, capDate: false, capPlace: false, capGps: false, capNote: true, capMarks: true, capFile: false, hashes: false, dpi: "150", placeMode: "auto", stripN: "auto", photoStyle: "shadow", ruled: true, costPage: true,
   };
 }
 
+/* Frühere Fassungen kannten die Vorlagen „Kurztrip“ und „Rundreise“ (Kurztrip mit einem Reiseziel für alle Tage).
+   Beides ist jetzt die Vorlage „Reise“; das Reiseziel wandert als Ort in die Tage ohne Ortsangabe. */
+function migrateTrip(t) {
+  if (!t || typeof t !== "object") return t;
+  const o = { ...t }, dest = o.destination;
+  o.template = TEMPLATES[o.template] ? o.template : "reise";
+  if (dest && typeof dest === "object" && typeof dest.name === "string" && dest.name && Array.isArray(o.days)) {
+    o.days = o.days.map((d) => (d && typeof d === "object" && !(d.place && d.place.name) ? { ...d, place: { name: dest.name, lat: dest.lat, lon: dest.lon } } : d));
+  }
+  delete o.destination;
+  return o;
+}
+
 /* Fehlende Felder ergänzen (beim Laden älterer oder fremder Dateien). */
 function normalizeTrip(t) {
-  const base = newTrip(TEMPLATES[t && t.template] ? t.template : "rundreise");
+  t = migrateTrip(t);
+  const base = newTrip(t.template);
   const out = { ...base, ...t };
   out.startPlace = { ...blankPlace(), ...(t.startPlace || {}) };
-  out.destination = { ...blankPlace(), ...(t.destination || {}) };
   out.route = { ...base.route, ...(t.route || {}) };
   if (!THEMES[out.theme]) out.theme = "meer";
   if (out.embed === "work") out.embed = "1600"; // frühere Bezeichnung
@@ -64,13 +77,18 @@ function normPhoto(p) {
 const dayCosts = (d) => d.costs.reduce((s, c) => s + parseNum(c.a), 0);
 const dayHighlights = (d) => String(d.highlights || "").split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
 
+/* Ort eines Tages; ohne Eintrag gilt der Ort des letzten Tages davor (mehrere Tage am selben Ort) */
+function dayPlaceName(t, d) {
+  if (d.place.name) return d.place.name;
+  for (let k = t.days.indexOf(d) - 1; k >= 0; k--) if (t.days[k].place.name) return t.days[k].place.name;
+  return "";
+}
 function dayFrom(t, i) {
   const d = t.days[i];
   if (d.from.trim()) return d.from.trim();
-  if (i > 0) return t.days[i - 1].place.name || "";
+  for (let k = i - 1; k >= 0; k--) if (t.days[k].place.name) return t.days[k].place.name;
   return t.startPlace.name || "";
 }
-const dayPlaceName = (t, d) => (TEMPLATES[t.template].fixedPlace ? t.destination.name || d.place.name : d.place.name);
 
 function tripStats(t) {
   const days = t.days, n = days.length;
@@ -81,15 +99,10 @@ function tripStats(t) {
     name = (name || "").trim();
     if (name && !seen.has(name.toLowerCase())) { seen.add(name.toLowerCase()); places.push(name); }
   };
-  if (TEMPLATES[t.template].fixedPlace) addP(t.destination.name);
-  else days.forEach((d) => addP(d.place.name));
+  days.forEach((d) => addP(d.place.name));
+  // Strecke nur aus eingetragenen Kilometern oder der berechneten Straßenroute, keine Schätzung aus der Luftlinie
   let km = days.reduce((s, d) => s + parseNum(d.km), 0), kmEst = false;
   if (!km && t.route.km) km = t.route.km;
-  if (!km) {
-    const pts = t.route.points.filter(hasGeo);
-    for (let i = 1; i < pts.length; i++) km += haversine(pts[i - 1], pts[i]) * 1.25;
-    kmEst = km > 0;
-  }
   const byCat = {}; let cost = 0;
   days.forEach((d) => d.costs.forEach((c) => { const a = parseNum(c.a); cost += a; byCat[c.cat] = (byCat[c.cat] || 0) + a; }));
   const temps = days.filter((d) => hasNum(d.tmin) || hasNum(d.tmax)).map((d) => (hasNum(d.tmin) && hasNum(d.tmax) ? (parseNum(d.tmin) + parseNum(d.tmax)) / 2 : parseNum(hasNum(d.tmin) ? d.tmin : d.tmax)));
@@ -111,16 +124,13 @@ function routeFromDays(t) {
     pts.push({ id: uid(), name: p.name, lat: hasGeo(p) ? p.lat : null, lon: hasGeo(p) ? p.lon : null, day });
   };
   push(t.startPlace);
-  if (TEMPLATES[t.template].fixedPlace) push(t.destination);
-  else {
-    for (const [di, d] of t.days.entries()) {
-      let p = d.place;
-      if (p.name && !hasGeo(p)) {
-        const g = d.photos.find((x) => x.gps);
-        if (g) p = { name: p.name, lat: g.gps.lat, lon: g.gps.lon };
-      }
-      push(p, false, di);
+  for (const [di, d] of t.days.entries()) {
+    let p = d.place;
+    if (p.name && !hasGeo(p)) {
+      const g = d.photos.find((x) => x.gps);
+      if (g) p = { name: p.name, lat: g.gps.lat, lon: g.gps.lon };
     }
+    push(p, false, di);
   }
   if (t.roundTrip && t.startPlace.name) push(t.startPlace, pts.length > 1 && pts[pts.length - 1].name !== t.startPlace.name);
   return pts;
@@ -135,22 +145,17 @@ function suggestSummary(t) {
   const st = tripStats(t), out = [];
   const days = `${st.nDays} ${st.nDays === 1 ? "Tag" : "Tage"}`;
   if (!st.nDays) return "";
-  if (TEMPLATES[t.template].fixedPlace) {
-    const dest = t.destination.name || st.places[0] || "unser Ziel";
-    out.push(`${st.nDays > 1 ? "Kurztrip" : "Ausflug"} nach ${dest}: ${days}${st.range ? " (" + st.range + ")" : ""}.`);
-  } else {
-    const start = t.startPlace.name || "", seq = [...new Set([start, ...st.places].filter(Boolean))];
-    let route = "";
-    const back = t.roundTrip && start ? " und zurück nach " + start : "";
-    if (seq.length >= 3) route = ` von ${seq[0]} über ${listDe(seq.slice(1, back ? undefined : -1))}${back ? "" : " nach " + seq[seq.length - 1]}${back}`;
-    else if (seq.length === 2) route = ` von ${seq[0]} nach ${seq[1]}${back}`;
-    else if (seq.length === 1) route = ` in ${seq[0]}`;
-    out.push(`Rundreise${route}: ${days}${st.range ? " (" + st.range + ")" : ""}.`);
-    const bits = [];
-    if (st.places.length) bits.push(`${st.places.length} ${st.places.length === 1 ? "Station" : "Stationen"}`);
-    if (st.km) bits.push(`${st.kmEst ? "etwa " : ""}${fmtNum(st.km)} km`);
-    if (bits.length) out.push("Unterwegs: " + bits.join(", ") + ".");
-  }
+  const start = t.startPlace.name || "", seq = [...new Set([start, ...st.places].filter(Boolean))];
+  const back = t.roundTrip && start ? " und zurück nach " + start : "";
+  let route = "";
+  if (st.places.length <= 1 && seq.length) route = ` nach ${st.places[0] || seq[0]}`;
+  else if (seq.length >= 3) route = ` von ${seq[0]} über ${listDe(seq.slice(1, back ? undefined : -1))}${back ? "" : " nach " + seq[seq.length - 1]}${back}`;
+  else if (seq.length === 2) route = ` von ${seq[0]} nach ${seq[1]}${back}`;
+  out.push(`Reise${route}: ${days}${st.range ? " (" + st.range + ")" : ""}.`);
+  const bits = [];
+  if (st.places.length > 1) bits.push(`${st.places.length} Stationen`);
+  if (st.km) bits.push(`${st.kmEst ? "etwa " : ""}${fmtNum(st.km)} km`);
+  if (bits.length) out.push("Unterwegs: " + bits.join(", ") + ".");
   const hl = t.days.flatMap(dayHighlights).slice(0, 4);
   if (hl.length) out.push("Highlights: " + listDe(hl) + ".");
   if (st.cost > 0) out.push(`Gesamtkosten ${money(st.cost, t.currency)}, durchschnittlich ${money(st.perDay, t.currency)} pro Tag.`);
@@ -169,10 +174,10 @@ function demoTrip(kind) {
   const P = (name, lat, lon) => ({ name, lat, lon });
   const C = (l, cat, a) => ({ id: uid(), l, cat, a: String(a) });
   if (kind === "kurztrip") {
-    const t = newTrip("kurztrip");
+    const t = newTrip();
     Object.assign(t, {
       title: "Wochenende in Lissabon", subtitle: "Drei Tage Altstadt, Tram und Pastel de Nata", theme: "herbst", travelers: "Anna & Ben",
-      start: "2026-06-12", startPlace: P("Berlin", 52.52, 13.405), destination: P("Lissabon", 38.7223, -9.1393), roundTrip: true,
+      start: "2026-06-12", startPlace: P("Berlin", 52.52, 13.405), roundTrip: true,
     });
     const mk = (i, o) => Object.assign(newDay(addDays("2026-06-12", i)), { place: P("Lissabon", 38.7223, -9.1393) }, o);
     t.days = [
@@ -183,7 +188,7 @@ function demoTrip(kind) {
     refreshDerived(t);
     return t;
   }
-  const t = newTrip("rundreise");
+  const t = newTrip();
   Object.assign(t, {
     title: "Alpenrundreise 2026", subtitle: "Von München über Salzburg und das Salzkammergut nach Wien und zurück", theme: "meer", travelers: "Familie Mustermann",
     currency: "EUR", start: "2026-05-14", startPlace: P("München", 48.1351, 11.582), roundTrip: true,

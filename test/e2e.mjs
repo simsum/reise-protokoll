@@ -95,13 +95,19 @@ blockOsm = false; blockEsri = false; blockDe = false; stripeDe = true;
 ok((await regen()) === "esri", "Sperrkachel mit Status 200 (gelb-schwarz) wird am Bild erkannt");
 stripeDe = false;
 
-console.log("Vorlagen");
+console.log("Eine Vorlage für alle Reisen");
+await page.evaluate(() => loadTrip(demoTrip("rundreise")));
 await page.click('[data-tab="trip"]');
-await page.click('[data-act="tpl"][data-id="kurztrip"]');
+ok((await page.evaluate(() => S.trip.template)) === "reise" && (await page.locator('[data-act="tpl"]').count()) === 0, "nur noch die Vorlage „Reise“ (keine Auswahl)");
+ok(await page.evaluate(() => { const t = S.trip, tpl = TEMPLATES.reise; return tpl.strip(t, 0) !== null && tpl.strip(t, 3) === null; }), "Streckenleiste nur an Tagen mit Kilometern (Tag 4 ohne km: keine)");
+await page.evaluate(() => { const t = S.trip; t.days[1].plan = ""; t.days[1].highlights = ""; t.days[2].plan = "09:00 Frühstück\n12:00 Stift Melk"; changed(); });
 await page.waitForTimeout(400);
-ok((await page.evaluate(() => S.trip.template)) === "kurztrip", "Vorlage Kurztrip aktiv");
-await page.click('[data-tab="trip"]');
-await page.click('[data-act="tpl"][data-id="rundreise"]');
+const dayText = (n) => page.locator("#pages .sheet").nth(n).innerText();
+ok(!(await dayText(2)).includes("HIGHLIGHTS") && !(await dayText(2)).includes("TAGESPLAN"), "ohne Eintrag: keine Highlights, kein Tagesplan");
+ok((await dayText(1)).includes("HIGHLIGHTS") && (await dayText(3)).includes("TAGESPLAN") && (await dayText(3)).includes("Stift Melk"), "mit Eintrag: Highlights und Tagesplan erscheinen");
+const mig = await page.evaluate(() => { const t = normalizeTrip({ template: "kurztrip", destination: { name: "Rom", lat: 41.9, lon: 12.5 }, days: [{ date: "2026-05-01" }, { date: "2026-05-02", place: { name: "Tivoli" } }] }); return [t.template, t.days[0].place.name, t.days[0].place.lat, t.days[1].place.name, "destination" in t]; });
+ok(mig.join() === "reise,Rom,41.9,Tivoli,false", "alte Kurztrip-Daten: Reiseziel wird zum Ort der Tage");
+ok(await page.evaluate(() => { const t = newTrip(); t.days = [newDay("2026-05-01"), newDay("2026-05-02")]; t.days[0].place = { name: "Rom", lat: null, lon: null }; return dayPlaceName(t, t.days[1]) === "Rom" && tripStats(t).places.length === 1; }), "Tag ohne Ortsangabe übernimmt den Ort des Vortags (mehrere Tage am selben Ort)");
 
 await page.evaluate(() => loadTrip(demoTrip("kurztrip")));
 await page.waitForTimeout(400);

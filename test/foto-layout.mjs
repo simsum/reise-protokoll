@@ -62,7 +62,7 @@ for (const st of ["shadow", "frame", "plain"]) {
   await page.evaluate((st) => { S.trip.photoStyle = st; changed(); }, st);
   await page.waitForTimeout(300);
   const c = await page.evaluate(() => { const ops = layoutTrip(S.trip).pages[1].ops; return { shadow: ops.filter((o) => o.k === "rect" && o.fo != null).length, round: ops.filter((o) => o.k === "img" && o.r > 0).length, white: ops.filter((o) => o.k === "rect" && o.fill === "#FFFFFF").length }; });
-  ok(st === "shadow" ? c.shadow >= 7 && c.round === 1 : st === "frame" ? c.shadow >= 7 && c.white === 2 && c.round === 0 : c.shadow === 0 && c.round === 0, `${st}: ${JSON.stringify(c)}`);
+  ok(st === "shadow" ? c.shadow >= 7 && c.round === 1 : st === "frame" ? c.shadow >= 7 && c.white === 1 && c.round === 0 : c.shadow === 0 && c.round === 0, `${st}: ${JSON.stringify(c)}`);
 }
 await page.evaluate(() => { S.trip.photoStyle = "shadow"; changed(); });
 await page.waitForTimeout(400);

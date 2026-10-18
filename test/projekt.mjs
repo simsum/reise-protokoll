@@ -102,7 +102,7 @@ const re = await page.evaluate(() => {
   return { tpl: t.template, days: t.days.length, photos: t.days.map((d) => d.photos.length), summary: t.summary, sumAuto: t.summaryAuto, place: t.days[0].place, text: t.days[0].text,
     note: p.note, marks: p.marks.length, markNote: p.marks.find((m) => m.t === "num").note, qrot: q.rot, qcrop: q.crop, qnote: q.note, cover: !!t.coverPhoto, theme: t.theme, embed: t.embed };
 });
-ok(re.tpl === "rundreise" && re.days === 3 && re.photos.join() === "2,2,1", "Vorlage, Tage und Foto-Anzahl wiederhergestellt");
+ok(re.tpl === "reise" && re.days === 3 && re.photos.join() === "2,2,1", "Vorlage, Tage und Foto-Anzahl wiederhergestellt");
 ok(re.summary === "Eigene Zusammenfassung" && re.sumAuto === false, "Zusammenfassung (von Hand) bleibt erhalten");
 ok(re.place.name === "Teststadt" && re.text === "Tagebuch eins", "Ort mit Position und Tagebuchtext");
 ok(re.note === "Schöner Blick" && re.marks === 3 && re.markNote === "Hier lang", "Bildunterschrift, Markierungen und Notiz");
@@ -138,7 +138,7 @@ const evil = await page.evaluate(async () => {
     days: t.days.length, day0: { id: t.days[0].id, date: t.days[0].date, name: t.days[0].place.name, lat: t.days[0].place.lat, weather: t.days[0].weather, text: t.days[0].text, costs: t.days[0].costs.length, cat: t.days[0].costs[0].cat },
     photo: { att: p.att, marks: p.marks.length, rot: p.rot, crop: p.crop, gps: p.gps, src: p.src, day: p.day }, viaPdf: r.trip.days.length, viaPdfTitle: r.trip.title.length };
 });
-ok(evil.tpl === "rundreise" && evil.theme === "meer" && evil.title === 200 && evil.cur === "EUR" && evil.start === "" && evil.round === true, "Vorlage, Design, Titel, Währung, Datum geprüft");
+ok(evil.tpl === "reise" && evil.theme === "meer" && evil.title === 200 && evil.cur === "EUR" && evil.start === "" && evil.round === true, "Vorlage, Design, Titel, Währung, Datum geprüft");
 ok(evil.sp.lat === null && evil.sp.lon === null, "ungültige Koordinaten verworfen");
 ok(evil.pts === 1 && evil.ptId !== "../../x" && evil.km === null && evil.legs === 0, "Route bereinigt");
 ok(evil.days === 400 && evil.day0.id !== "__proto__" && evil.day0.date === "" && evil.day0.lat === null && evil.day0.weather === "" && evil.day0.text === "" && evil.day0.cat === "sonstiges", "Tage: höchstens 400, Felder geprüft");

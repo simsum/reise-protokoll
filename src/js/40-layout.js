@@ -34,12 +34,14 @@ class Pg {
 /* ---------- Text in Spalten fließen lassen ---------- */
 /* blocks: [{label, paras[]}]. Liefert die neue y-Position und die Blöcke, die nicht mehr passten. */
 function flow(pg, blocks, x, y, w, yMax, o) {
-  const { T, ruled } = o, lh = 16, s = 11, multi = blocks.length > 1;
+  const { T, ruled } = o, lh = 16, s = 11;
   const hasText = (b) => (b.items ? b.items.length > 0 : b.paras.some((p) => p.trim()));
+  const shows = (b) => hasText(b) || (ruled && !b.items); // leere Zeitleiste entfällt, ein leeres Tagebuch bekommt Schreiblinien
+  const multi = blocks.filter(shows).length > 1;
   const rule = (yy) => pg.line(x, yy + lh - 2, x + w, yy + lh - 2, T.rule, 0.5);
   for (let bi = 0; bi < blocks.length; bi++) {
     const b = blocks[bi], has = hasText(b);
-    if (!has && !ruled) continue;
+    if (!shows(b)) continue;
     if (y + 16 + lh * 2 > yMax) return { y, rest: blocks.slice(bi).filter(hasText) };
     pg.label(x, y, b.label + (b.cont ? " · Fortsetzung" : ""));
     y += 16;
@@ -125,7 +127,7 @@ function coverPage(t, st, T, warns) {
 
   /* Kennzahlen */
   const stats = (tpl.stats ? tpl.stats(t, st) : defaultStats(t, st)).slice(0, 4);
-  const gap = 12, cw = (CW - gap * 3) / 4, sy = BAND + 22;
+  const gap = 12, cw = (CW - gap * (stats.length - 1)) / stats.length, sy = BAND + 22;
   stats.forEach((c, k) => {
     const x = MX + k * (cw + gap);
     pg.rect(x, sy, cw, 64, { fill: T.soft, r: 8 });
@@ -163,14 +165,16 @@ function coverPage(t, st, T, warns) {
   return pg;
 }
 
+/* Kennzahlen der Deckseite: Dauer immer, dann was vorhanden ist (Ziel/Stationen, Strecke, Kosten, Fotos, Temperatur), höchstens vier */
 function defaultStats(t, st) {
-  const cost = st.cost > 0 ? money(st.cost, t.currency) : "–";
-  return [
-    { v: `${st.nDays} ${st.nDays === 1 ? "Tag" : "Tage"}`, l: st.nDays > 1 ? `Dauer · ${st.nights} Nächte` : "Dauer" },
-    { v: String(st.places.length || "–"), l: "Orte" },
-    { v: st.km ? (st.kmEst ? "~" : "") + fmtNum(st.km) + " km" : "–", l: "Strecke" },
-    { v: cost, l: "Kosten" },
-  ];
+  const list = [{ v: `${st.nDays} ${st.nDays === 1 ? "Tag" : "Tage"}`, l: st.nDays > 1 ? `Dauer · ${st.nights} Nächte` : "Dauer" }];
+  if (st.places.length === 1) list.push({ v: st.places[0], l: "Reiseziel" });
+  else if (st.places.length > 1) list.push({ v: String(st.places.length), l: "Stationen" });
+  if (st.km) list.push({ v: (st.kmEst ? "~" : "") + fmtNum(st.km) + " km", l: "Strecke" });
+  if (st.cost > 0) list.push({ v: money(st.cost, t.currency), l: "Kosten" });
+  if (st.photos) list.push({ v: String(st.photos), l: st.photos === 1 ? "Foto" : "Fotos" });
+  if (st.avgT != null) list.push({ v: fmtNum(st.avgT) + " °C", l: "Ø Temperatur" });
+  return list;
 }
 
 /* ---------- Tagesseite ---------- */
@@ -376,7 +380,7 @@ function fitPhotos(t, photos, x, y, w, h) {
   return null;
 }
 
-/* Streckenleiste (Rundreise): Start – Ziel mit Kilometern in der Mitte */
+/* Streckenleiste: Start – Ziel mit Kilometern in der Mitte (nur wenn Kilometer oder Fahrzeit eingetragen sind) */
 function routeStrip(pg, sp, T, y) {
   const ly = y + 30;
   if (sp.from) pg.text(MX, y, fitT(sp.from, "B", 10.5, CW / 2 - 40), { f: "B", s: 10.5 });

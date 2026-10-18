@@ -44,12 +44,12 @@ function cleanPhotoMeta(g, seen) {
 }
 function cleanTrip(j) {
   if (!j || typeof j !== "object" || j.app !== "Reise-Protokoll" || !j.trip || typeof j.trip !== "object") return null;
-  const t = j.trip, base = newTrip(oneOf(t.template, Object.keys(TEMPLATES), "rundreise")), seen = new Set(), photoIds = new Set();
+  const t = migrateTrip(j.trip), base = newTrip(oneOf(t.template, Object.keys(TEMPLATES), "reise")), seen = new Set(), photoIds = new Set();
   const r = t.route && typeof t.route === "object" ? t.route : {};
   const out = {
     ...base, theme: oneOf(t.theme, Object.keys(THEMES), "meer"), title: clipStr(t.title, 200), subtitle: clipStr(t.subtitle, 300), travelers: clipStr(t.travelers, 300),
     currency: typeof t.currency === "string" && /^[A-Z]{3}$/.test(t.currency) ? t.currency : "EUR", start: cleanIso(t.start),
-    startPlace: cleanPlace(t.startPlace), destination: cleanPlace(t.destination), roundTrip: !!t.roundTrip,
+    startPlace: cleanPlace(t.startPlace), roundTrip: !!t.roundTrip,
     summary: clipStr(t.summary, 4000), summaryAuto: t.summaryAuto !== false, mapUser: !!t.mapUser, ruled: t.ruled !== false, costPage: t.costPage !== false,
     projData: t.projData !== false, capWeather: t.capWeather !== false, wxLine: !!t.wxLine,
     capNum: !!t.capNum, capDate: !!t.capDate, capPlace: !!t.capPlace, capGps: !!t.capGps, capNote: t.capNote !== false, capMarks: t.capMarks !== false, capFile: !!t.capFile, hashes: !!t.hashes,

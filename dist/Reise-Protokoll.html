@@ -138,12 +138,12 @@ body.dragging::after { content: "Fotos hier ablegen (oder ein Projekt-PDF zum Ö
 
 <div id="app">
   <header class="top">
-    <div class="brand"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s6.5-5.7 6.5-11a6.5 6.5 0 1 0-13 0C5.5 15.3 12 21 12 21z"/><circle cx="12" cy="10" r="2.4"/></svg> Reise-Protokoll <span class="ver">v0.7.0</span></div>
+    <div class="brand"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s6.5-5.7 6.5-11a6.5 6.5 0 1 0-13 0C5.5 15.3 12 21 12 21z"/><circle cx="12" cy="10" r="2.4"/></svg> Reise-Protokoll <span class="ver">v0.8.0</span></div>
     <div class="grow"></div>
     <select id="demo" title="Beispielreise laden">
       <option value="">Beispiel laden …</option>
-      <option value="rundreise">Beispiel Rundreise</option>
-      <option value="kurztrip">Beispiel Kurztrip</option>
+      <option value="rundreise">Beispiel: Rundreise mit Strecken</option>
+      <option value="kurztrip">Beispiel: Kurztrip mit Tagesplan</option>
     </select>
     <button data-act="new">Neu</button>
     <button data-act="addPhotos" title="Mehrere Fotos auf einmal: Tage entstehen aus den Aufnahmedaten">Fotos hinzufügen</button>
@@ -314,22 +314,35 @@ function newDay(date = "") {
   };
 }
 
-function newTrip(template = "rundreise") {
+function newTrip(template = "reise") {
   return {
-    format: 1, template, theme: "meer", title: "", subtitle: "", travelers: "", currency: "EUR", start: "",
-    startPlace: blankPlace(), destination: blankPlace(), roundTrip: false,
+    format: 1, template: TEMPLATES[template] ? template : "reise", theme: "meer", title: "", subtitle: "", travelers: "", currency: "EUR", start: "",
+    startPlace: blankPlace(), roundTrip: false,
     days: [], summary: "", summaryAuto: true,
     route: { auto: true, road: true, points: [], km: null, legs: [], mapSig: "" },
     mapImg: "", mapSource: "", mapUser: false, coverPhoto: "", projData: true, embed: "original", capWeather: true, wxLine: false, capNum: false, capDate: false, capPlace: false, capGps: false, capNote: true, capMarks: true, capFile: false, hashes: false, dpi: "150", placeMode: "auto", stripN: "auto", photoStyle: "shadow", ruled: true, costPage: true,
   };
 }
 
+/* Frühere Fassungen kannten die Vorlagen „Kurztrip“ und „Rundreise“ (Kurztrip mit einem Reiseziel für alle Tage).
+   Beides ist jetzt die Vorlage „Reise“; das Reiseziel wandert als Ort in die Tage ohne Ortsangabe. */
+function migrateTrip(t) {
+  if (!t || typeof t !== "object") return t;
+  const o = { ...t }, dest = o.destination;
+  o.template = TEMPLATES[o.template] ? o.template : "reise";
+  if (dest && typeof dest === "object" && typeof dest.name === "string" && dest.name && Array.isArray(o.days)) {
+    o.days = o.days.map((d) => (d && typeof d === "object" && !(d.place && d.place.name) ? { ...d, place: { name: dest.name, lat: dest.lat, lon: dest.lon } } : d));
+  }
+  delete o.destination;
+  return o;
+}
+
 /* Fehlende Felder ergänzen (beim Laden älterer oder fremder Dateien). */
 function normalizeTrip(t) {
-  const base = newTrip(TEMPLATES[t && t.template] ? t.template : "rundreise");
+  t = migrateTrip(t);
+  const base = newTrip(t.template);
   const out = { ...base, ...t };
   out.startPlace = { ...blankPlace(), ...(t.startPlace || {}) };
-  out.destination = { ...blankPlace(), ...(t.destination || {}) };
   out.route = { ...base.route, ...(t.route || {}) };
   if (!THEMES[out.theme]) out.theme = "meer";
   if (out.embed === "work") out.embed = "1600"; // frühere Bezeichnung
@@ -353,13 +366,18 @@ function normPhoto(p) {
 const dayCosts = (d) => d.costs.reduce((s, c) => s + parseNum(c.a), 0);
 const dayHighlights = (d) => String(d.highlights || "").split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
 
+/* Ort eines Tages; ohne Eintrag gilt der Ort des letzten Tages davor (mehrere Tage am selben Ort) */
+function dayPlaceName(t, d) {
+  if (d.place.name) return d.place.name;
+  for (let k = t.days.indexOf(d) - 1; k >= 0; k--) if (t.days[k].place.name) return t.days[k].place.name;
+  return "";
+}
 function dayFrom(t, i) {
   const d = t.days[i];
   if (d.from.trim()) return d.from.trim();
-  if (i > 0) return t.days[i - 1].place.name || "";
+  for (let k = i - 1; k >= 0; k--) if (t.days[k].place.name) return t.days[k].place.name;
   return t.startPlace.name || "";
 }
-const dayPlaceName = (t, d) => (TEMPLATES[t.template].fixedPlace ? t.destination.name || d.place.name : d.place.name);
 
 function tripStats(t) {
   const days = t.days, n = days.length;
@@ -370,15 +388,10 @@ function tripStats(t) {
     name = (name || "").trim();
     if (name && !seen.has(name.toLowerCase())) { seen.add(name.toLowerCase()); places.push(name); }
   };
-  if (TEMPLATES[t.template].fixedPlace) addP(t.destination.name);
-  else days.forEach((d) => addP(d.place.name));
+  days.forEach((d) => addP(d.place.name));
+  // Strecke nur aus eingetragenen Kilometern oder der berechneten Straßenroute, keine Schätzung aus der Luftlinie
   let km = days.reduce((s, d) => s + parseNum(d.km), 0), kmEst = false;
   if (!km && t.route.km) km = t.route.km;
-  if (!km) {
-    const pts = t.route.points.filter(hasGeo);
-    for (let i = 1; i < pts.length; i++) km += haversine(pts[i - 1], pts[i]) * 1.25;
-    kmEst = km > 0;
-  }
   const byCat = {}; let cost = 0;
   days.forEach((d) => d.costs.forEach((c) => { const a = parseNum(c.a); cost += a; byCat[c.cat] = (byCat[c.cat] || 0) + a; }));
   const temps = days.filter((d) => hasNum(d.tmin) || hasNum(d.tmax)).map((d) => (hasNum(d.tmin) && hasNum(d.tmax) ? (parseNum(d.tmin) + parseNum(d.tmax)) / 2 : parseNum(hasNum(d.tmin) ? d.tmin : d.tmax)));
@@ -400,16 +413,13 @@ function routeFromDays(t) {
     pts.push({ id: uid(), name: p.name, lat: hasGeo(p) ? p.lat : null, lon: hasGeo(p) ? p.lon : null, day });
   };
   push(t.startPlace);
-  if (TEMPLATES[t.template].fixedPlace) push(t.destination);
-  else {
-    for (const [di, d] of t.days.entries()) {
-      let p = d.place;
-      if (p.name && !hasGeo(p)) {
-        const g = d.photos.find((x) => x.gps);
-        if (g) p = { name: p.name, lat: g.gps.lat, lon: g.gps.lon };
-      }
-      push(p, false, di);
+  for (const [di, d] of t.days.entries()) {
+    let p = d.place;
+    if (p.name && !hasGeo(p)) {
+      const g = d.photos.find((x) => x.gps);
+      if (g) p = { name: p.name, lat: g.gps.lat, lon: g.gps.lon };
     }
+    push(p, false, di);
   }
   if (t.roundTrip && t.startPlace.name) push(t.startPlace, pts.length > 1 && pts[pts.length - 1].name !== t.startPlace.name);
   return pts;
@@ -424,22 +434,17 @@ function suggestSummary(t) {
   const st = tripStats(t), out = [];
   const days = `${st.nDays} ${st.nDays === 1 ? "Tag" : "Tage"}`;
   if (!st.nDays) return "";
-  if (TEMPLATES[t.template].fixedPlace) {
-    const dest = t.destination.name || st.places[0] || "unser Ziel";
-    out.push(`${st.nDays > 1 ? "Kurztrip" : "Ausflug"} nach ${dest}: ${days}${st.range ? " (" + st.range + ")" : ""}.`);
-  } else {
-    const start = t.startPlace.name || "", seq = [...new Set([start, ...st.places].filter(Boolean))];
-    let route = "";
-    const back = t.roundTrip && start ? " und zurück nach " + start : "";
-    if (seq.length >= 3) route = ` von ${seq[0]} über ${listDe(seq.slice(1, back ? undefined : -1))}${back ? "" : " nach " + seq[seq.length - 1]}${back}`;
-    else if (seq.length === 2) route = ` von ${seq[0]} nach ${seq[1]}${back}`;
-    else if (seq.length === 1) route = ` in ${seq[0]}`;
-    out.push(`Rundreise${route}: ${days}${st.range ? " (" + st.range + ")" : ""}.`);
-    const bits = [];
-    if (st.places.length) bits.push(`${st.places.length} ${st.places.length === 1 ? "Station" : "Stationen"}`);
-    if (st.km) bits.push(`${st.kmEst ? "etwa " : ""}${fmtNum(st.km)} km`);
-    if (bits.length) out.push("Unterwegs: " + bits.join(", ") + ".");
-  }
+  const start = t.startPlace.name || "", seq = [...new Set([start, ...st.places].filter(Boolean))];
+  const back = t.roundTrip && start ? " und zurück nach " + start : "";
+  let route = "";
+  if (st.places.length <= 1 && seq.length) route = ` nach ${st.places[0] || seq[0]}`;
+  else if (seq.length >= 3) route = ` von ${seq[0]} über ${listDe(seq.slice(1, back ? undefined : -1))}${back ? "" : " nach " + seq[seq.length - 1]}${back}`;
+  else if (seq.length === 2) route = ` von ${seq[0]} nach ${seq[1]}${back}`;
+  out.push(`Reise${route}: ${days}${st.range ? " (" + st.range + ")" : ""}.`);
+  const bits = [];
+  if (st.places.length > 1) bits.push(`${st.places.length} Stationen`);
+  if (st.km) bits.push(`${st.kmEst ? "etwa " : ""}${fmtNum(st.km)} km`);
+  if (bits.length) out.push("Unterwegs: " + bits.join(", ") + ".");
   const hl = t.days.flatMap(dayHighlights).slice(0, 4);
   if (hl.length) out.push("Highlights: " + listDe(hl) + ".");
   if (st.cost > 0) out.push(`Gesamtkosten ${money(st.cost, t.currency)}, durchschnittlich ${money(st.perDay, t.currency)} pro Tag.`);
@@ -458,10 +463,10 @@ function demoTrip(kind) {
   const P = (name, lat, lon) => ({ name, lat, lon });
   const C = (l, cat, a) => ({ id: uid(), l, cat, a: String(a) });
   if (kind === "kurztrip") {
-    const t = newTrip("kurztrip");
+    const t = newTrip();
     Object.assign(t, {
       title: "Wochenende in Lissabon", subtitle: "Drei Tage Altstadt, Tram und Pastel de Nata", theme: "herbst", travelers: "Anna & Ben",
-      start: "2026-06-12", startPlace: P("Berlin", 52.52, 13.405), destination: P("Lissabon", 38.7223, -9.1393), roundTrip: true,
+      start: "2026-06-12", startPlace: P("Berlin", 52.52, 13.405), roundTrip: true,
     });
     const mk = (i, o) => Object.assign(newDay(addDays("2026-06-12", i)), { place: P("Lissabon", 38.7223, -9.1393) }, o);
     t.days = [
@@ -472,7 +477,7 @@ function demoTrip(kind) {
     refreshDerived(t);
     return t;
   }
-  const t = newTrip("rundreise");
+  const t = newTrip();
   Object.assign(t, {
     title: "Alpenrundreise 2026", subtitle: "Von München über Salzburg und das Salzkammergut nach Wien und zurück", theme: "meer", travelers: "Familie Mustermann",
     currency: "EUR", start: "2026-05-14", startPlace: P("München", 48.1351, 11.582), roundTrip: true,
@@ -517,68 +522,47 @@ const ICONS = {
 };
 
 /* ===== 30-templates.js ===== */
-/* ---------- Vorlagen nach Reiseart ----------
-   Eine Vorlage legt fest, welche Felder ein Tag hat und wie die Tagesseite
-   inhaltlich aufgebaut ist. Das Seitenlayout (Deckseite, Tagesseite, Kosten)
-   liegt in 40-layout.js und ist für alle Vorlagen gleich gebaut.
+/* ---------- Vorlagen ----------
+   Es gibt eine Vorlage „Reise“ für alle Reisearten (Kurztrip mit einem Ziel, Rundreise mit vielen Orten, Mischformen):
+   Ein Tag zeigt nur, was eingetragen ist. Streckenleiste (nur mit Kilometern oder Fahrzeit), Tagesplan als Zeitleiste,
+   Tagebuch, Highlights, Ausgaben und Fotos. Das Seitenlayout (Deckseite, Tagesseite, Kosten) liegt in 40-layout.js.
 
-   Neue Reiseart = ein Eintrag mehr:
+   Weitere Vorlage = ein Eintrag mehr (die Auswahl erscheint in der Oberfläche, sobald es mehr als eine gibt):
      id, name, label     Kennung, Anzeigename, Beschriftung auf der Deckseite
      desc                Beschreibung in der Auswahl
-     fixedPlace          true: ein Zielort für die ganze Reise (Kurztrip)
-     defaultDays         Anzahl Tage bei „Tage erzeugen“
+     defaultDays         Anzahl Tage bei „Tage anlegen“
      dayFields           Felder im Tages-Editor (siehe DAY_FIELDS in 80-ui.js)
      dayHeader(t, i)     Unterzeile unter dem Tagestitel
      sections(d)         Textabschnitte der Tagesseite: [{label, paras[]}] oder Zeitleiste [{label, kind:"timeline", items:[{time,text}]}]
-     strip               optional: Streckenleiste unter dem Kopf; strip(t, i) → {from, to, mid}
+     strip(t, i)         optional: Streckenleiste unter dem Kopf → {from, to, mid} oder null
      info(t, i)          bis zu drei Infokästen [{label, value, ico}]
      stats(t, st)        optional: vier Kennzahlen der Deckseite [{v, l}] (sonst Standard)  */
 const TEMPLATES = {
-  kurztrip: {
-    id: "kurztrip", name: "Kurztrip", label: "Kurztrip",
-    desc: "Ein Ziel, wenige Tage. Tagesplan als Zeitleiste mit Uhrzeiten, dazu Notizen.",
-    fixedPlace: true, defaultDays: 3,
-    stats: (t, st) => [
-      { v: `${st.nDays} ${st.nDays === 1 ? "Tag" : "Tage"}`, l: st.nDays > 1 ? `Dauer · ${st.nights} Nächte` : "Dauer" },
-      { v: t.destination.name || st.places[0] || "–", l: "Reiseziel" },
-      { v: st.cost > 0 ? money(st.cost, t.currency) : "–", l: "Kosten" },
-      { v: st.cost > 0 ? money(st.perDay, t.currency) : String(st.photos || "–"), l: st.cost > 0 ? "Pro Tag" : "Fotos" },
-    ],
-    dayFields: ["title", "weather", "lodging", "plan", "text", "highlights", "costs", "photos"],
-    dayHeader: (t) => t.destination.name || "",
+  reise: {
+    id: "reise", name: "Reise", label: "Reise",
+    desc: "Für jede Reise: Kurztrip oder Rundreise. Tage zeigen nur, was eingetragen ist.",
+    defaultDays: 5,
+    dayFields: ["place", "from", "km", "drive", "title", "weather", "lodging", "plan", "text", "highlights", "costs", "photos"],
+    dayHeader: (t, i) => {
+      const d = t.days[i], from = dayFrom(t, i), to = dayPlaceName(t, d);
+      return from && to && from !== to ? from + " – " + to : to || from;
+    },
     sections: (d) => [
       { label: "Tagesplan", kind: "timeline", items: parsePlan(d.plan) },
-      { label: "Notizen", paras: String(d.text || "").split(/\r?\n/) },
+      { label: "Tagebuch", paras: String(d.text || "").split(/\r?\n/) },
     ],
     info: (t, i) => {
       const d = t.days[i];
       return [weatherInfo(d), { label: "Unterkunft", value: d.lodging, ico: "bed" },
         { label: "Tageskosten", value: dayCosts(d) ? money(dayCosts(d), t.currency) : "", ico: "euro" }];
     },
-  },
-
-  rundreise: {
-    id: "rundreise", name: "Rundreise", label: "Rundreise",
-    desc: "Mehrere Tage an einem oder an verschiedenen Orten. Tagebuch mit Streckenleiste (von – nach), Kilometern und Unterkunft.",
-    fixedPlace: false, defaultDays: 7, strip: true,
-    dayFields: ["place", "from", "km", "drive", "title", "weather", "lodging", "text", "highlights", "costs", "photos"],
-    dayHeader: (t, i) => {
-      const d = t.days[i], from = dayFrom(t, i), to = d.place.name;
-      if (!to) return from;
-      return !from || from === to ? to : from + " – " + to;
-    },
-    sections: (d) => [{ label: "Tagebuch", paras: String(d.text || "").split(/\r?\n/) }],
-    info: (t, i) => {
-      const d = t.days[i];
-      return [weatherInfo(d), { label: "Unterkunft", value: d.lodging, ico: "bed" },
-        { label: "Tageskosten", value: dayCosts(d) ? money(dayCosts(d), t.currency) : "", ico: "euro" }];
-    },
-    /* Streckenleiste unter dem Kopf: von – nach, Kilometer, Fahrzeit */
+    /* Streckenleiste unter dem Kopf: von – nach, Kilometer, Fahrzeit. Ohne Kilometer und Fahrzeit entfällt sie. */
     strip: (t, i) => {
       const d = t.days[i], bits = [];
       if (hasNum(d.km) && parseNum(d.km) > 0) bits.push(fmtNum(parseNum(d.km)) + " km");
       if (d.drive.trim()) bits.push(d.drive.trim() + " h");
-      return { from: dayFrom(t, i), to: d.place.name, mid: bits.join("  ·  ") };
+      if (!bits.length) return null;
+      return { from: dayFrom(t, i), to: dayPlaceName(t, d), mid: bits.join("  ·  ") };
     },
   },
 };
@@ -722,12 +706,14 @@ class Pg {
 /* ---------- Text in Spalten fließen lassen ---------- */
 /* blocks: [{label, paras[]}]. Liefert die neue y-Position und die Blöcke, die nicht mehr passten. */
 function flow(pg, blocks, x, y, w, yMax, o) {
-  const { T, ruled } = o, lh = 16, s = 11, multi = blocks.length > 1;
+  const { T, ruled } = o, lh = 16, s = 11;
   const hasText = (b) => (b.items ? b.items.length > 0 : b.paras.some((p) => p.trim()));
+  const shows = (b) => hasText(b) || (ruled && !b.items); // leere Zeitleiste entfällt, ein leeres Tagebuch bekommt Schreiblinien
+  const multi = blocks.filter(shows).length > 1;
   const rule = (yy) => pg.line(x, yy + lh - 2, x + w, yy + lh - 2, T.rule, 0.5);
   for (let bi = 0; bi < blocks.length; bi++) {
     const b = blocks[bi], has = hasText(b);
-    if (!has && !ruled) continue;
+    if (!shows(b)) continue;
     if (y + 16 + lh * 2 > yMax) return { y, rest: blocks.slice(bi).filter(hasText) };
     pg.label(x, y, b.label + (b.cont ? " · Fortsetzung" : ""));
     y += 16;
@@ -813,7 +799,7 @@ function coverPage(t, st, T, warns) {
 
   /* Kennzahlen */
   const stats = (tpl.stats ? tpl.stats(t, st) : defaultStats(t, st)).slice(0, 4);
-  const gap = 12, cw = (CW - gap * 3) / 4, sy = BAND + 22;
+  const gap = 12, cw = (CW - gap * (stats.length - 1)) / stats.length, sy = BAND + 22;
   stats.forEach((c, k) => {
     const x = MX + k * (cw + gap);
     pg.rect(x, sy, cw, 64, { fill: T.soft, r: 8 });
@@ -851,14 +837,16 @@ function coverPage(t, st, T, warns) {
   return pg;
 }
 
+/* Kennzahlen der Deckseite: Dauer immer, dann was vorhanden ist (Ziel/Stationen, Strecke, Kosten, Fotos, Temperatur), höchstens vier */
 function defaultStats(t, st) {
-  const cost = st.cost > 0 ? money(st.cost, t.currency) : "–";
-  return [
-    { v: `${st.nDays} ${st.nDays === 1 ? "Tag" : "Tage"}`, l: st.nDays > 1 ? `Dauer · ${st.nights} Nächte` : "Dauer" },
-    { v: String(st.places.length || "–"), l: "Orte" },
-    { v: st.km ? (st.kmEst ? "~" : "") + fmtNum(st.km) + " km" : "–", l: "Strecke" },
-    { v: cost, l: "Kosten" },
-  ];
+  const list = [{ v: `${st.nDays} ${st.nDays === 1 ? "Tag" : "Tage"}`, l: st.nDays > 1 ? `Dauer · ${st.nights} Nächte` : "Dauer" }];
+  if (st.places.length === 1) list.push({ v: st.places[0], l: "Reiseziel" });
+  else if (st.places.length > 1) list.push({ v: String(st.places.length), l: "Stationen" });
+  if (st.km) list.push({ v: (st.kmEst ? "~" : "") + fmtNum(st.km) + " km", l: "Strecke" });
+  if (st.cost > 0) list.push({ v: money(st.cost, t.currency), l: "Kosten" });
+  if (st.photos) list.push({ v: String(st.photos), l: st.photos === 1 ? "Foto" : "Fotos" });
+  if (st.avgT != null) list.push({ v: fmtNum(st.avgT) + " °C", l: "Ø Temperatur" });
+  return list;
 }
 
 /* ---------- Tagesseite ---------- */
@@ -1064,7 +1052,7 @@ function fitPhotos(t, photos, x, y, w, h) {
   return null;
 }
 
-/* Streckenleiste (Rundreise): Start – Ziel mit Kilometern in der Mitte */
+/* Streckenleiste: Start – Ziel mit Kilometern in der Mitte (nur wenn Kilometer oder Fahrzeit eingetragen sind) */
 function routeStrip(pg, sp, T, y) {
   const ly = y + 30;
   if (sp.from) pg.text(MX, y, fitT(sp.from, "B", 10.5, CW / 2 - 40), { f: "B", s: 10.5 });
@@ -1881,12 +1869,12 @@ function cleanPhotoMeta(g, seen) {
 }
 function cleanTrip(j) {
   if (!j || typeof j !== "object" || j.app !== "Reise-Protokoll" || !j.trip || typeof j.trip !== "object") return null;
-  const t = j.trip, base = newTrip(oneOf(t.template, Object.keys(TEMPLATES), "rundreise")), seen = new Set(), photoIds = new Set();
+  const t = migrateTrip(j.trip), base = newTrip(oneOf(t.template, Object.keys(TEMPLATES), "reise")), seen = new Set(), photoIds = new Set();
   const r = t.route && typeof t.route === "object" ? t.route : {};
   const out = {
     ...base, theme: oneOf(t.theme, Object.keys(THEMES), "meer"), title: clipStr(t.title, 200), subtitle: clipStr(t.subtitle, 300), travelers: clipStr(t.travelers, 300),
     currency: typeof t.currency === "string" && /^[A-Z]{3}$/.test(t.currency) ? t.currency : "EUR", start: cleanIso(t.start),
-    startPlace: cleanPlace(t.startPlace), destination: cleanPlace(t.destination), roundTrip: !!t.roundTrip,
+    startPlace: cleanPlace(t.startPlace), roundTrip: !!t.roundTrip,
     summary: clipStr(t.summary, 4000), summaryAuto: t.summaryAuto !== false, mapUser: !!t.mapUser, ruled: t.ruled !== false, costPage: t.costPage !== false,
     projData: t.projData !== false, capWeather: t.capWeather !== false, wxLine: !!t.wxLine,
     capNum: !!t.capNum, capDate: !!t.capDate, capPlace: !!t.capPlace, capGps: !!t.capGps, capNote: t.capNote !== false, capMarks: t.capMarks !== false, capFile: !!t.capFile, hashes: !!t.hashes,
@@ -2307,14 +2295,13 @@ const placeFld = (label, key, p) => `<div class="f pp" data-pp="${key}"><span>${
 /* ---------- Reiter „Reise“ ---------- */
 function panelTrip() {
   const t = S.trip, tpl = TEMPLATES[t.template];
-  return `<h3>Vorlage</h3><div class="tpls">${Object.values(TEMPLATES).map((x) => `<button class="tpl ${x.id === t.template ? "on" : ""}" data-act="tpl" data-id="${x.id}"><b>${esc(x.name)}</b><small>${esc(x.desc)}</small></button>`).join("")}</div>
+  return `${Object.keys(TEMPLATES).length > 1 ? `<h3>Vorlage</h3><div class="tpls">${Object.values(TEMPLATES).map((x) => `<button class="tpl ${x.id === t.template ? "on" : ""}" data-act="tpl" data-id="${x.id}"><b>${esc(x.name)}</b><small>${esc(x.desc)}</small></button>`).join("")}</div>` : ""}
   <h3>Reise</h3>
   ${fld("Titel", "title", t.title, { ph: "z. B. Alpenrundreise 2026" })}
   ${fld("Untertitel", "subtitle", t.subtitle, { ph: "optional" })}
   ${fld("Reisende", "travelers", t.travelers, { ph: "z. B. Anna & Ben" })}
   <div class="row two">${fld("Reisebeginn", "start", t.start, { type: "date" })}${selFld("Währung", "currency", t.currency, [["EUR", "Euro (€)"], ["CHF", "Franken (CHF)"], ["USD", "US-Dollar ($)"], ["GBP", "Pfund (£)"], ["SEK", "Schwedische Kronen"], ["NOK", "Norwegische Kronen"], ["DKK", "Dänische Kronen"], ["PLN", "Złoty"], ["CZK", "Tschechische Kronen"]])}</div>
   ${placeFld("Startort (Heimat)", "startPlace", t.startPlace)}
-  ${tpl.fixedPlace ? placeFld("Reiseziel", "destination", t.destination) : ""}
   ${chk("Rückreise zum Startort auf der Karte", "roundTrip", t.roundTrip)}
   <h3>Design</h3>
   <div class="btnrow"><label class="drop" style="padding:5px 10px;margin:0;display:inline-block">${t.coverPhoto ? "Titelfoto ändern …" : "Titelfoto wählen …"}<input type="file" accept="image/*" hidden id="coverFile"></label>${t.coverPhoto ? `<button data-act="delCover">Titelfoto entfernen</button>` : ""}</div>
@@ -2363,7 +2350,7 @@ const DAY_FIELDS = {
   title: (d) => fld("Titel des Tages", `d:${d.id}.title`, d.title, { ph: "z. B. Salzkammergut" }),
   weather: (d) => `<div class="wx">${selFld("Wetter", `d:${d.id}.weather`, d.weather, [["", "–"], ...WEATHER.map((w) => [w.id, w.name])])}${fld("Min °C", `d:${d.id}.tmin`, d.tmin, { inputmode: "decimal" })}${fld("Max °C", `d:${d.id}.tmax`, d.tmax, { inputmode: "decimal" })}</div>${fld("Wetter-Details (optional, ersetzt die Zeile aus den Fotodaten)", `d:${d.id}.wxExtra`, d.wxExtra, { ph: "z. B. Wind Ø 12 km/h aus SW, am Nachmittag Schauer" })}${wxHint(d)}`,
   lodging: (d) => fld("Unterkunft", `d:${d.id}.lodging`, d.lodging),
-  text: (d) => fld(S.trip.template === "kurztrip" ? "Notizen" : "Tagebuch", `d:${d.id}.text`, d.text, { rows: 7, ph: "Was haben wir erlebt?" }),
+  text: (d) => fld("Tagebuch", `d:${d.id}.text`, d.text, { rows: 6, ph: "Was haben wir erlebt?" }),
   plan: (d) => fld("Tagesplan (eine Zeile pro Punkt, Uhrzeit vorn)", `d:${d.id}.plan`, d.plan, { rows: 7, ph: "09:30 Frühstück im Café, 11:00 Stadtrundgang, …" }),
   highlights: (d) => fld("Highlights (eine pro Zeile)", `d:${d.id}.highlights`, d.highlights, { rows: 3 }),
   costs: (d) => `<div class="f"><span>Ausgaben <b data-sum="${d.id}">${dayCosts(d) ? "· " + money(dayCosts(d), S.trip.currency) : ""}</b></span>${d.costs.map((c) => `<div class="cost"><input data-k="d:${d.id}.costs.${c.id}.l" value="${esc(c.l)}" placeholder="Bezeichnung"><select data-k="d:${d.id}.costs.${c.id}.cat">${CATS.map((k) => `<option value="${k.id}" ${k.id === c.cat ? "selected" : ""}>${esc(k.name)}</option>`).join("")}</select><input data-k="d:${d.id}.costs.${c.id}.a" value="${esc(c.a)}" inputmode="decimal" placeholder="0,00"><button class="ico" data-act="delCost" data-day="${d.id}" data-id="${c.id}" title="Entfernen">×</button></div>`).join("")}<button data-act="addCost" data-day="${d.id}">+ Ausgabe</button></div>`,
@@ -2403,7 +2390,7 @@ function mapStale(t) { return t.mapImg && !t.mapUser && t.route.mapSig !== mapSi
 
 function panelMap() {
   const t = S.trip, r = t.route;
-  const canLegs = r.auto && r.legs && r.legs.length && r.legs.length === r.points.length - 1 && r.points.every(hasGeo) && !TEMPLATES[t.template].fixedPlace;
+  const canLegs = r.auto && r.legs && r.legs.length && r.legs.length === r.points.length - 1 && r.points.every(hasGeo);
   return `<h3>Route</h3>
   ${chk("Orte automatisch aus Startort, Tagen und Foto-GPS bilden", "route.auto", r.auto)}
   ${r.points.length ? r.points.map((p, i) => `<div class="pt"><span class="n">${i + 1}</span>${placeFld("", `route.points.${p.id}`, p).replace("<span></span>", "")}<span class="row"><button class="ico" data-act="ptUp" data-id="${p.id}">↑</button><button class="ico" data-act="ptDown" data-id="${p.id}">↓</button><button class="ico" data-act="ptDel" data-id="${p.id}">×</button></span></div>`).join("") : "<p><small>Noch keine Orte. Startort, Tagesorte oder Fotos mit GPS liefern sie automatisch, oder unten von Hand ergänzen.</small></p>"}
@@ -2527,14 +2514,13 @@ document.addEventListener("click", async (e) => {
   switch (b.dataset.act) {
     case "tpl": {
       t.template = id;
-      if (TEMPLATES[id].fixedPlace && !t.destination.name) { const d = t.days.find((x) => x.place.name); if (d) t.destination = { ...d.place }; }
       changed(); renderPanel(); break;
     }
     case "theme": t.theme = id; changed(); renderPanel(); break;
     case "resetWx": { const d = dayOf(dayId); if (d) { wxState = "unknown"; resetDayWeather(d); toast("Wetter wird aus den Fotodaten ermittelt …"); } break; }
     case "addDay": {
       const last = t.days[t.days.length - 1], d = newDay(last && last.date ? addDays(last.date, 1) : t.start || "");
-      if (TEMPLATES[t.template].fixedPlace) d.place = { ...t.destination };
+      const prev = t.days[t.days.length - 1]; if (prev && prev.place.name) d.place = { ...prev.place };
       t.days.push(d); S.open.add(d.id); changed(); renderPanel(); break;
     }
     case "genDays": {
@@ -2543,8 +2529,7 @@ document.addEventListener("click", async (e) => {
       for (let k = 0; k < n; k++) {
         const date = addDays(start, k);
         if (t.days.some((d) => d.date === date)) continue;
-        const d = newDay(date); if (TEMPLATES[t.template].fixedPlace) d.place = { ...t.destination };
-        t.days.push(d);
+        t.days.push(newDay(date));
       }
       t.days.sort(byDate); if (!t.start) t.start = start;
       changed(); renderPanel(); break;
@@ -2650,7 +2635,7 @@ async function addPhotosToDay(dayId, files) {
 
 /* Mehrere Fotos auf einmal: Tage entstehen aus den Aufnahmedaten, Orte aus dem GPS der Fotos. */
 async function addPhotos(files) {
-  const imgs = [...files].filter(isImageFile), t = S.trip, fixed = TEMPLATES[t.template].fixedPlace;
+  const imgs = [...files].filter(isImageFile), t = S.trip;
   if (!imgs.length) { toast("Keine Bilddateien gefunden."); return; }
   const { list, bad } = await readPhotos(imgs);
   list.sort(photoSort);
@@ -2658,7 +2643,7 @@ async function addPhotos(files) {
   for (const p of list) {
     let d = p.day ? t.days.find((x) => x.date === p.day) : t.days[t.days.length - 1];
     if (!d) {
-      d = newDay(p.day); if (fixed) d.place = { ...t.destination };
+      d = newDay(p.day);
       t.days.push(d); t.days.sort(byDate); made.push(d);
     }
     d.photos.push(p); touched.add(d);
@@ -2672,12 +2657,11 @@ async function addPhotos(files) {
   /* Orte der neuen Tage aus dem GPS des jeweils letzten Fotos (Abendort), langsam im Hintergrund */
   for (const d of made) {
     const g = d.photos.filter((p) => p.gps).map((p) => p.gps).pop();
-    if (!g || (fixed ? t.destination.name : d.place.name)) continue;
+    if (!g || d.place.name) continue;
     try {
       const name = await reversePlace(g.lat, g.lon);
       if (!name) continue;
-      if (fixed) { if (!t.destination.name) { t.destination = { name, lat: g.lat, lon: g.lon }; t.days.forEach((x) => { if (!x.place.name) x.place = { ...t.destination }; }); } }
-      else if (!d.place.name) d.place = { name, lat: g.lat, lon: g.lon };
+      if (!d.place.name) d.place = { name, lat: g.lat, lon: g.lon };
       changed(); if (S.tab === "days") renderPanel();
     } catch (e) { break; }
   }

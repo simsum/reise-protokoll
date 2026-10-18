@@ -6,20 +6,22 @@ Reisetagebuch als PDF. Man wählt eine Vorlage nach Reiseart, trägt Tage, Notiz
 
 Das Tool ist eine einzige HTML-Datei ([`dist/Reise-Protokoll.html`](dist/Reise-Protokoll.html)) und läuft komplett im Browser. Es gibt keinen Server, Fotos werden nicht hochgeladen.
 
-## Vorlagen
+## Eine Vorlage für jede Reise
 
-| Vorlage | Für | Tagesseite |
-|---|---|---|
-| **Kurztrip** | ein Ziel, wenige Tage | Zeitleiste mit Uhrzeiten („09:30 Frühstück“), dazu Notizen |
-| **Rundreise** | mehrere Tage an einem oder an verschiedenen Orten | Streckenleiste (von – nach, Kilometer, Fahrzeit), Tagebuch, Unterkunft |
+Es gibt eine Vorlage „Reise“: vom Kurztrip mit einem Ziel bis zur Rundreise mit vielen Orten. Ein Tag zeigt nur, was eingetragen ist:
 
-Beide Vorlagen haben dieselbe Deckseite (optional mit Titelfoto) und denselben Grundaufbau der Tagesseite: Datum und Tagesnummer, Kästen für Wetter, Unterkunft und Tageskosten, Textbereich mit optionalen Schreiblinien, Highlights, Ausgaben, Fotostreifen. Dazu kommen bei Bedarf Fortsetzungs- und Fotoseiten sowie eine Kostenübersicht am Ende. Fünf Farbschemata (Meer, Herbst, Wald, Nacht, Mono).
+- **Streckenleiste** (von – nach, Kilometer, Fahrzeit): nur wenn Kilometer oder Fahrzeit eingetragen sind.
+- **Tagesplan** als Zeitleiste („09:30 Frühstück“): nur wenn Punkte eingetragen sind.
+- **Tagebuch**, **Highlights**, **Ausgaben**, **Wetter**, **Unterkunft** und **Fotos**.
+- Mehrere Tage am selben Ort: Ohne Ortsangabe gilt der Ort des Vortags.
 
-Weitere Vorlagen und Farbschemata sind je ein Eintrag im Code, siehe [CLAUDE.md](CLAUDE.md).
+Die Deckseite ist immer gleich aufgebaut: Dauer, Kennzahlen (Reiseziel oder Stationen, Strecke, Kosten, Fotos, Temperatur – was vorhanden ist), Karte der Fahrstrecke und Zusammenfassung. Dazu kommen bei Bedarf Fortsetzungs- und Fotoseiten sowie eine Kostenübersicht am Ende. Fünf Farbschemata (Meer, Herbst, Wald, Nacht, Mono).
+
+Weitere Vorlagen und Farbschemata sind je ein Eintrag im Code, siehe [CLAUDE.md](CLAUDE.md). Projekte aus früheren Fassungen mit „Kurztrip“ oder „Rundreise“ werden beim Öffnen automatisch umgestellt.
 
 ## Ablauf
 
-1. **Reise:** Vorlage, Titel, Reisende, Startort, Design.
+1. **Reise:** Titel, Reisende, Startort, Design und alle Foto-Optionen.
 2. **Tage:** Tage anlegen (einzeln oder für einen Zeitraum) und ausfüllen. **Fotos hinzufügen** (Knopf oben, Ziehen auf die Seite oder die Fläche im Reiter) nimmt beliebig viele Fotos auf einmal: Die Tage entstehen aus den Aufnahmedaten, die Fotos werden nach Uhrzeit einsortiert, der Ort eines neuen Tages kommt aus dem GPS der Fotos. HEIC-Fotos (iPhone) werden umgewandelt. Zu jedem Foto gibt es eine Bildunterschrift, Drehen, Ausschnitt und **Markieren** (Kreis, Pfeil, nummerierte Markierung mit Notiz). Das alles erscheint im PDF unter dem Foto.
 3. **Karte:** Die Route entsteht automatisch aus Startort, Tagesorten und Foto-GPS und lässt sich von Hand ändern. „Karte erzeugen“ setzt ein Bild aus OpenStreetMap-Kacheln mit der Route zusammen (Straßenroute über OSRM oder Luftlinie). Das Bild ist danach fest. Alternativ ein eigenes Bild (Screenshot) hochladen. Die berechneten Kilometer und Fahrzeiten lassen sich in die Tage übernehmen.
    **Wetter:** Wetter und Temperaturspanne eines Tages werden automatisch aus den Fotodaten ermittelt (Aufnahmezeit und Ort jedes Fotos, wie im Foto-Protokoll). Von Hand geänderte Werte bleiben unangetastet, „neu ermitteln“ holt sie erneut. Auf der Tagesseite steht unter den Infokästen eine Detailzeile (Wind mit Richtung und Böen, Niederschlag, Bewölkung, Luftfeuchte, Luftdruck, Quelle) als Mittelwerte der Fotodaten; wer möchte, schreibt dort einen eigenen Text. Optional steht außerdem die Wetterzeile des Fotos unter dem Bild.

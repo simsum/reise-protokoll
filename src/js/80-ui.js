@@ -25,14 +25,13 @@ const placeFld = (label, key, p) => `<div class="f pp" data-pp="${key}"><span>${
 /* ---------- Reiter „Reise“ ---------- */
 function panelTrip() {
   const t = S.trip, tpl = TEMPLATES[t.template];
-  return `<h3>Vorlage</h3><div class="tpls">${Object.values(TEMPLATES).map((x) => `<button class="tpl ${x.id === t.template ? "on" : ""}" data-act="tpl" data-id="${x.id}"><b>${esc(x.name)}</b><small>${esc(x.desc)}</small></button>`).join("")}</div>
+  return `${Object.keys(TEMPLATES).length > 1 ? `<h3>Vorlage</h3><div class="tpls">${Object.values(TEMPLATES).map((x) => `<button class="tpl ${x.id === t.template ? "on" : ""}" data-act="tpl" data-id="${x.id}"><b>${esc(x.name)}</b><small>${esc(x.desc)}</small></button>`).join("")}</div>` : ""}
   <h3>Reise</h3>
   ${fld("Titel", "title", t.title, { ph: "z. B. Alpenrundreise 2026" })}
   ${fld("Untertitel", "subtitle", t.subtitle, { ph: "optional" })}
   ${fld("Reisende", "travelers", t.travelers, { ph: "z. B. Anna & Ben" })}
   <div class="row two">${fld("Reisebeginn", "start", t.start, { type: "date" })}${selFld("Währung", "currency", t.currency, [["EUR", "Euro (€)"], ["CHF", "Franken (CHF)"], ["USD", "US-Dollar ($)"], ["GBP", "Pfund (£)"], ["SEK", "Schwedische Kronen"], ["NOK", "Norwegische Kronen"], ["DKK", "Dänische Kronen"], ["PLN", "Złoty"], ["CZK", "Tschechische Kronen"]])}</div>
   ${placeFld("Startort (Heimat)", "startPlace", t.startPlace)}
-  ${tpl.fixedPlace ? placeFld("Reiseziel", "destination", t.destination) : ""}
   ${chk("Rückreise zum Startort auf der Karte", "roundTrip", t.roundTrip)}
   <h3>Design</h3>
   <div class="btnrow"><label class="drop" style="padding:5px 10px;margin:0;display:inline-block">${t.coverPhoto ? "Titelfoto ändern …" : "Titelfoto wählen …"}<input type="file" accept="image/*" hidden id="coverFile"></label>${t.coverPhoto ? `<button data-act="delCover">Titelfoto entfernen</button>` : ""}</div>
@@ -81,7 +80,7 @@ const DAY_FIELDS = {
   title: (d) => fld("Titel des Tages", `d:${d.id}.title`, d.title, { ph: "z. B. Salzkammergut" }),
   weather: (d) => `<div class="wx">${selFld("Wetter", `d:${d.id}.weather`, d.weather, [["", "–"], ...WEATHER.map((w) => [w.id, w.name])])}${fld("Min °C", `d:${d.id}.tmin`, d.tmin, { inputmode: "decimal" })}${fld("Max °C", `d:${d.id}.tmax`, d.tmax, { inputmode: "decimal" })}</div>${fld("Wetter-Details (optional, ersetzt die Zeile aus den Fotodaten)", `d:${d.id}.wxExtra`, d.wxExtra, { ph: "z. B. Wind Ø 12 km/h aus SW, am Nachmittag Schauer" })}${wxHint(d)}`,
   lodging: (d) => fld("Unterkunft", `d:${d.id}.lodging`, d.lodging),
-  text: (d) => fld(S.trip.template === "kurztrip" ? "Notizen" : "Tagebuch", `d:${d.id}.text`, d.text, { rows: 7, ph: "Was haben wir erlebt?" }),
+  text: (d) => fld("Tagebuch", `d:${d.id}.text`, d.text, { rows: 6, ph: "Was haben wir erlebt?" }),
   plan: (d) => fld("Tagesplan (eine Zeile pro Punkt, Uhrzeit vorn)", `d:${d.id}.plan`, d.plan, { rows: 7, ph: "09:30 Frühstück im Café, 11:00 Stadtrundgang, …" }),
   highlights: (d) => fld("Highlights (eine pro Zeile)", `d:${d.id}.highlights`, d.highlights, { rows: 3 }),
   costs: (d) => `<div class="f"><span>Ausgaben <b data-sum="${d.id}">${dayCosts(d) ? "· " + money(dayCosts(d), S.trip.currency) : ""}</b></span>${d.costs.map((c) => `<div class="cost"><input data-k="d:${d.id}.costs.${c.id}.l" value="${esc(c.l)}" placeholder="Bezeichnung"><select data-k="d:${d.id}.costs.${c.id}.cat">${CATS.map((k) => `<option value="${k.id}" ${k.id === c.cat ? "selected" : ""}>${esc(k.name)}</option>`).join("")}</select><input data-k="d:${d.id}.costs.${c.id}.a" value="${esc(c.a)}" inputmode="decimal" placeholder="0,00"><button class="ico" data-act="delCost" data-day="${d.id}" data-id="${c.id}" title="Entfernen">×</button></div>`).join("")}<button data-act="addCost" data-day="${d.id}">+ Ausgabe</button></div>`,
@@ -121,7 +120,7 @@ function mapStale(t) { return t.mapImg && !t.mapUser && t.route.mapSig !== mapSi
 
 function panelMap() {
   const t = S.trip, r = t.route;
-  const canLegs = r.auto && r.legs && r.legs.length && r.legs.length === r.points.length - 1 && r.points.every(hasGeo) && !TEMPLATES[t.template].fixedPlace;
+  const canLegs = r.auto && r.legs && r.legs.length && r.legs.length === r.points.length - 1 && r.points.every(hasGeo);
   return `<h3>Route</h3>
   ${chk("Orte automatisch aus Startort, Tagen und Foto-GPS bilden", "route.auto", r.auto)}
   ${r.points.length ? r.points.map((p, i) => `<div class="pt"><span class="n">${i + 1}</span>${placeFld("", `route.points.${p.id}`, p).replace("<span></span>", "")}<span class="row"><button class="ico" data-act="ptUp" data-id="${p.id}">↑</button><button class="ico" data-act="ptDown" data-id="${p.id}">↓</button><button class="ico" data-act="ptDel" data-id="${p.id}">×</button></span></div>`).join("") : "<p><small>Noch keine Orte. Startort, Tagesorte oder Fotos mit GPS liefern sie automatisch, oder unten von Hand ergänzen.</small></p>"}
@@ -245,14 +244,13 @@ document.addEventListener("click", async (e) => {
   switch (b.dataset.act) {
     case "tpl": {
       t.template = id;
-      if (TEMPLATES[id].fixedPlace && !t.destination.name) { const d = t.days.find((x) => x.place.name); if (d) t.destination = { ...d.place }; }
       changed(); renderPanel(); break;
     }
     case "theme": t.theme = id; changed(); renderPanel(); break;
     case "resetWx": { const d = dayOf(dayId); if (d) { wxState = "unknown"; resetDayWeather(d); toast("Wetter wird aus den Fotodaten ermittelt …"); } break; }
     case "addDay": {
       const last = t.days[t.days.length - 1], d = newDay(last && last.date ? addDays(last.date, 1) : t.start || "");
-      if (TEMPLATES[t.template].fixedPlace) d.place = { ...t.destination };
+      const prev = t.days[t.days.length - 1]; if (prev && prev.place.name) d.place = { ...prev.place };
       t.days.push(d); S.open.add(d.id); changed(); renderPanel(); break;
     }
     case "genDays": {
@@ -261,8 +259,7 @@ document.addEventListener("click", async (e) => {
       for (let k = 0; k < n; k++) {
         const date = addDays(start, k);
         if (t.days.some((d) => d.date === date)) continue;
-        const d = newDay(date); if (TEMPLATES[t.template].fixedPlace) d.place = { ...t.destination };
-        t.days.push(d);
+        t.days.push(newDay(date));
       }
       t.days.sort(byDate); if (!t.start) t.start = start;
       changed(); renderPanel(); break;
@@ -368,7 +365,7 @@ async function addPhotosToDay(dayId, files) {
 
 /* Mehrere Fotos auf einmal: Tage entstehen aus den Aufnahmedaten, Orte aus dem GPS der Fotos. */
 async function addPhotos(files) {
-  const imgs = [...files].filter(isImageFile), t = S.trip, fixed = TEMPLATES[t.template].fixedPlace;
+  const imgs = [...files].filter(isImageFile), t = S.trip;
   if (!imgs.length) { toast("Keine Bilddateien gefunden."); return; }
   const { list, bad } = await readPhotos(imgs);
   list.sort(photoSort);
@@ -376,7 +373,7 @@ async function addPhotos(files) {
   for (const p of list) {
     let d = p.day ? t.days.find((x) => x.date === p.day) : t.days[t.days.length - 1];
     if (!d) {
-      d = newDay(p.day); if (fixed) d.place = { ...t.destination };
+      d = newDay(p.day);
       t.days.push(d); t.days.sort(byDate); made.push(d);
     }
     d.photos.push(p); touched.add(d);
@@ -390,12 +387,11 @@ async function addPhotos(files) {
   /* Orte der neuen Tage aus dem GPS des jeweils letzten Fotos (Abendort), langsam im Hintergrund */
   for (const d of made) {
     const g = d.photos.filter((p) => p.gps).map((p) => p.gps).pop();
-    if (!g || (fixed ? t.destination.name : d.place.name)) continue;
+    if (!g || d.place.name) continue;
     try {
       const name = await reversePlace(g.lat, g.lon);
       if (!name) continue;
-      if (fixed) { if (!t.destination.name) { t.destination = { name, lat: g.lat, lon: g.lon }; t.days.forEach((x) => { if (!x.place.name) x.place = { ...t.destination }; }); } }
-      else if (!d.place.name) d.place = { name, lat: g.lat, lon: g.lon };
+      if (!d.place.name) d.place = { name, lat: g.lat, lon: g.lon };
       changed(); if (S.tab === "days") renderPanel();
     } catch (e) { break; }
   }
