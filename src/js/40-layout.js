@@ -208,13 +208,12 @@ function dayPages(t, i, T, warns) {
     off = bh + 10;
   }
 
-  /* Fotos (die ersten drei als Streifen, mit Bildunterschrift) */
-  const shown = d.photos.slice(0, 3), stripH = 132, stripY = BOTTOM - stripH;
+  /* Fotos (die ersten stripN als Streifen, mit Beschriftung; die Höhe richtet sich nach der Zahl der Beschriftungszeilen) */
+  const shown = d.photos.slice(0, t.stripN), g = 10, sw = shown.length ? (CW - g * (shown.length - 1)) / shown.length : 0;
+  const lines = shown.map((p) => photoLines(t, p, sw, 8, warns, `Tag ${i + 1}`));
+  const stripH = shown.length ? 100 + Math.max(...lines.map(captionH)) : 0, stripY = BOTTOM - stripH;
   const bodyBottom = shown.length ? stripY - 16 : BOTTOM - 4;
-  if (shown.length) {
-    const g = 10, w = (CW - g * (shown.length - 1)) / shown.length;
-    shown.forEach((p, k) => photoBlock(pg, p, MX + k * (w + g), stripY, w, stripH, 3, T, warns, `Tag ${i + 1}`, t.wxLine));
-  }
+  shown.forEach((p, k) => photoBlock(pg, p, MX + k * (sw + g), stripY, sw, stripH, lines[k], T, 100));
 
   /* Text links */
   const lw = 316;
@@ -237,41 +236,60 @@ function dayPages(t, i, T, warns) {
   if (r.rest.length) warns.push(`Tag ${i + 1}: Der Text ist zu lang und wird abgeschnitten.`);
 
   /* weitere Fotos: Aufteilung nach Anzahl, gleichmäßig auf Seiten verteilt */
-  const more = d.photos.slice(3), per = more.length ? Math.ceil(more.length / Math.ceil(more.length / 6)) : 6;
+  const more = d.photos.slice(t.stripN), per = more.length ? Math.ceil(more.length / Math.ceil(more.length / 6)) : 6;
   for (let k = 0; k < more.length; k += per) {
     const p3 = new Pg(T); out.push(p3);
     const y0 = miniHeader(p3, `Tag ${i + 1} · Fotos`, title), chunk = more.slice(k, k + per);
-    galleryCells(chunk.length, MX, y0, CW, BOTTOM - y0).forEach((c, n) => photoBlock(p3, chunk[n], c.x, c.y, c.w, c.h, 6, T, warns, `Tag ${i + 1}`, t.wxLine));
+    galleryCells(chunk.length, MX, y0, CW, BOTTOM - y0).forEach((c, n) => photoBlock(p3, chunk[n], c.x, c.y, c.w, c.h, photoLines(t, chunk[n], c.w, 10, warns, `Tag ${i + 1}`), T));
   }
   return out;
 }
 
 /* Rahmen für n Fotos (1–6) in einer Fläche; Höhen begrenzt, damit nichts überlang wird */
-/* ---------- Foto mit Markierungen, Bildunterschrift und Notizen zu den Nummern ----------
+/* ---------- Foto mit Markierungen und Beschriftung ----------
    Hat das Foto Markierungen, wird es ganz gezeigt (Rand bleibt frei), sonst füllt es den Rahmen. */
-function photoBlock(pg, p, x, y, w, h, maxLines, T, warns, where, wxLine) {
-  const v = photoView(p), LH = 10.5, lines = [];
-  const cap = (p.note || "").trim();
-  const wxl = wxLine && p.weather ? (p.time ? p.time.slice(0, 5) + " Uhr · " : "") + p.weather : "";
-  if (cap) wrapAll(cap, "I", 8.5, w).forEach((l) => lines.push({ t: l, f: "I" }));
-  NUMS(p).forEach((m, k) => { if ((m.note || "").trim()) wrapAll(m.note, "R", 8, w - 14).forEach((l, n) => lines.push({ t: l, f: "R", n: n ? 0 : k + 1, c: m.c })); });
-  if (wxl) wrapAll(wxl, "R", 7.5, w).slice(0, 2).forEach((l) => lines.push({ t: fitT(l, "R", 7.5, w), f: "R", wx: true }));
-  let shown = lines;
-  if (lines.length > maxLines) { shown = lines.slice(0, maxLines); shown[maxLines - 1] = { ...shown[maxLines - 1], t: fitT(shown[maxLines - 1].t + " …", shown[maxLines - 1].f, 8.5, w - 14) }; warns.push(`${where}: Eine Bildunterschrift ist zu lang und wird gekürzt.`); }
-  const th = shown.length ? shown.length * LH + 5 : 0, ih = Math.max(20, h - th);
+const LH = 10.5;
+const photoNo = (t, p) => t.days.flatMap((d) => d.photos).indexOf(p) + 1;
+const gpsText = (g) => `${Math.abs(g.lat).toFixed(5)}° ${g.lat >= 0 ? "N" : "S"}, ${Math.abs(g.lon).toFixed(5)}° ${g.lon >= 0 ? "E" : "W"}`;
+const mapUrl = (g) => `https://www.openstreetmap.org/?mlat=${g.lat.toFixed(6)}&mlon=${g.lon.toFixed(6)}#map=18/${g.lat.toFixed(6)}/${g.lon.toFixed(6)}`;
+
+/* Beschriftungszeilen unter einem Foto nach den Einstellungen (Fotonummer, Datum, Ort, GPS, Wetter, Bemerkung, Notizen, Dateiname) */
+function photoLines(t, p, w, maxLines, warns, where) {
+  const L = [], add = (text, f, s, c, extra) => wrapAll(text, f, s, extra && extra.n ? w - 12 : w).forEach((l, k) => L.push({ t: l, f, s, c, ...(extra || {}), n: extra && extra.n && !k ? extra.n : 0, x: extra && extra.n ? 12 : 0 }));
+  const head = [t.capNum ? "Foto " + photoNo(t, p) : "", t.capDate && p.day ? fmtDate(p.day, { day: "2-digit", month: "2-digit", year: "numeric" }) + (p.time ? ", " + p.time.slice(0, 5) + " Uhr" : "") : ""].filter(Boolean).join("  ·  ");
+  if (head) add(head, "B", 8, "ink");
+  if (t.capPlace && p.place) add(p.place, "R", 8, "ink");
+  if (t.capGps && p.gps) L.push({ t: gpsText(p.gps), f: "R", s: 7.5, c: "acc", url: mapUrl(p.gps), n: 0, x: 0 });
+  if (t.wxLine && p.weather) add((p.time ? p.time.slice(0, 5) + " Uhr · " : "") + p.weather, "R", 7.5, "muted");
+  if (t.capNote && (p.note || "").trim()) add(p.note.trim(), "I", 8.5, "ink");
+  if (t.capMarks) NUMS(p).forEach((m, k) => { if ((m.note || "").trim()) add(m.note.trim(), "R", 8, "muted", { n: k + 1, col: m.c }); });
+  if (t.capFile && p.name) add("Datei: " + p.name, "R", 7.5, "muted");
+  if (L.length > maxLines) {
+    L.length = maxLines;
+    const last = L[maxLines - 1]; last.t = fitT(last.t + " …", last.f, last.s, w - (last.x || 0));
+    warns.push(`${where}: Eine Fotobeschriftung ist zu lang und wird gekürzt.`);
+  }
+  return L;
+}
+const captionH = (L) => (L.length ? L.length * LH + 5 : 0);
+
+function photoBlock(pg, p, x, y, w, h, L, T, fixedIh) {
+  const v = photoView(p), th = captionH(L), ih = fixedIh || Math.max(20, h - th);
   const marked = viewMarks(p).length > 0;
   let r = { x, y, w, h: ih };
   if (marked) { const k = Math.min(w / v.w, ih / v.h); r = { w: v.w * k, h: v.h * k }; r.x = x + (w - r.w) / 2; r.y = y; }
   pg.img(r.x, r.y, r.w, r.h, v.src, v.w, v.h, p.id);
   pg.rect(r.x, r.y, r.w, r.h, { stroke: T.rule, sw: 0.5 });
   if (marked) drawMarks(pg, p, r, v);
-  shown.forEach((l, k) => {
+  const col = { ink: T.ink, muted: T.muted, acc: T.accent };
+  L.forEach((l, k) => {
     const ty = y + ih + 5 + k * LH;
     if (l.n) {
-      pg.rect(x, ty + 0.5, 8, 8, { fill: l.c, r: 4 });
-      pg.text(x + 4, ty + 1.9, String(l.n), { f: "B", s: 5.8, c: numInk(l.c), a: "c" });
+      pg.rect(x, ty + 0.5, 8, 8, { fill: l.col, r: 4 });
+      pg.text(x + 4, ty + 1.9, String(l.n), { f: "B", s: 5.8, c: numInk(l.col), a: "c" });
     }
-    pg.text(l.f === "I" || l.wx ? x : x + 12, ty, l.t, { f: l.f, s: l.f === "I" ? 8.5 : l.wx ? 7.5 : 8, c: l.f === "I" ? T.ink : T.muted });
+    pg.text(x + (l.x || 0), ty, l.t, { f: l.f, s: l.s, c: col[l.c] });
+    if (l.url) pg.link(x, ty - 1, tw(l.t, l.f, l.s), 10, l.url);
   });
 }
 
@@ -405,12 +423,44 @@ function costPages(t, st, T) {
   return out;
 }
 
+/* ---------- Prüfsummenseiten (SHA-256 der Originaldateien) ---------- */
+function hashPages(t, T) {
+  const photos = t.days.flatMap((d, i) => d.photos.map((p) => ({ p, i }))), out = [];
+  if (!t.hashes || !photos.length) return out;
+  let pg = null, y = 0, first = true;
+  const open = () => {
+    pg = new Pg(T); out.push(pg);
+    y = miniHeader(pg, "Nachweis", "Prüfsummen der Originalfotos" + (first ? "" : " · Fortsetzung"));
+    if (first) {
+      const intro = "Die Prüfsumme (SHA-256) wird über die unveränderte Originaldatei gebildet. Stimmt sie mit der Prüfsumme einer vorliegenden Datei überein, ist diese Datei bitgenau das Original. Prüfen unter Windows: certutil -hashfile <Datei> SHA256, unter macOS/Linux: shasum -a 256 <Datei>";
+      wrapMax(intro, "R", 8, CW, 4).lines.forEach((l) => { pg.text(MX, y, l, { s: 8, c: T.muted }); y += 10.5; });
+      y += 8;
+    }
+    first = false;
+  };
+  const note = t.embed !== "original" ? `Im PDF verkleinert eingebettet (${t.embed} px), die Prüfsumme gilt für die Originaldatei.` : "";
+  photos.forEach(({ p, i }) => {
+    const rowH = 11 + 10 + 8 + (note ? 9.5 : 0);
+    if (!pg || y + rowH > BOTTOM) open();
+    const no = "Foto " + photoNo(t, p), nx = MX + Math.max(44, tw(no, "B", 8.5) + 8);
+    pg.text(MX, y, no, { f: "B", s: 8.5 });
+    const meta = [p.name, fmtSize(p.size || (p.file && p.file.size) || 0), p.day ? fmtDate(p.day, { day: "2-digit", month: "2-digit", year: "numeric" }) + (p.time ? ", " + p.time.slice(0, 5) + " Uhr" : "") : "", "Tag " + (i + 1)].filter(Boolean).join("  ·  ");
+    pg.text(nx, y, fitT(meta, "R", 8.5, MX + CW - nx), { s: 8.5 }); y += 11;
+    pg.text(nx, y, p.sha || "–", { f: "C", s: 7.5 }); y += 10;
+    if (note) { pg.text(nx, y, fitT(note, "R", 7, MX + CW - nx), { s: 7, c: T.muted }); y += 9.5; }
+    y += 3; pg.line(MX, y, PW - MX, y, T.rule, 0.4); y += 5;
+  });
+  return out;
+}
+const fmtSize = (b) => (b >= 1048576 ? fmtNum(b / 1048576, 1) + " MB" : Math.max(1, Math.round(b / 1024)) + " KB");
+
 /* ---------- Gesamtreise ---------- */
 function layoutTrip(t) {
   const T = THEMES[t.theme] || THEMES.meer, st = tripStats(t), warns = [], pages = [];
   pages.push(coverPage(t, st, T, warns));
   t.days.forEach((_, i) => pages.push(...dayPages(t, i, T, warns)));
   if (t.costPage) pages.push(...costPages(t, st, T));
+  pages.push(...hashPages(t, T));
   const N = pages.length;
   const created = new Date().toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
   pages.forEach((pg, n) => {

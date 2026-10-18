@@ -33,6 +33,12 @@ async function decodeFile(file) {
   }
 }
 
+/* SHA-256 der Originaldatei (Prüfsummenseite); braucht einen sicheren Kontext (https oder lokale Datei) */
+async function sha256hex(bytes) {
+  const buf = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+  return [...buf].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 const blobToDataUrl = (b) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(r.error); r.readAsDataURL(b); });
 const dataUrlToBlob = (u) => fetch(u).then((r) => r.blob());
 
@@ -54,9 +60,10 @@ async function makePhoto(file, meta) {
     id: uid(), name: file.name || "Foto", type: file.type || "", mod: file.lastModified || 0, size: file.size || 0, file,
     src: reuse ? await blobToDataUrl(file) : cv.toDataURL("image/jpeg", 0.85), bw: cv.width, bh: cv.height, w: cv.width, h: cv.height, vsrc: "",
     gps: null, day: "", time: "", dayFromFile: false, note: "", rot: 0, crop: null, marks: [],
-    wx: null, weather: "", weatherSrc: "", wxTried: false,
+    wx: null, weather: "", weatherSrc: "", wxTried: false, place: "", placeSrc: "", sha: "",
   };
-  if (meta) return applyPhotoMeta(p, meta);
+  try { p.sha = await sha256hex(new Uint8Array(await file.arrayBuffer())); } catch (e) { /* ohne Prüfsumme */ }
+  if (meta) { const sha = p.sha; applyPhotoMeta(p, meta); p.sha = meta.sha || sha; return p; }
   let ex = null;
   if (window.exifr) {
     try { const g2 = await exifr.gps(file); if (g2 && Number.isFinite(g2.latitude) && !(g2.latitude === 0 && g2.longitude === 0)) p.gps = { lat: g2.latitude, lon: g2.longitude }; } catch (e) { /* kein GPS */ }
@@ -74,7 +81,7 @@ async function makePhoto(file, meta) {
 /* Gespeicherte Angaben übernehmen; Markierungen und Ausschnitt an die Größe der Arbeitskopie anpassen. */
 function applyPhotoMeta(p, m) {
   p.id = m.id || p.id; p.name = m.name || p.name; p.gps = m.gps; p.day = m.day; p.time = m.time; p.dayFromFile = !!m.dayFromFile; p.note = m.note;
-  p.rot = m.rot; p.wx = m.wx; p.weather = m.weather; p.weatherSrc = m.weatherSrc; p.wxTried = !!(m.wx || m.weather);
+  p.place = m.place; p.placeSrc = m.place ? m.placeSrc || "manual" : ""; p.rot = m.rot; p.wx = m.wx; p.weather = m.weather; p.weatherSrc = m.weatherSrc; p.wxTried = !!(m.wx || m.weather);
   const f = m.bw > 0 ? p.bw / m.bw : 1;
   const sc = (o) => { const q = { ...o }; for (const k of ["x", "y", "x2", "y2", "r"]) if (k in q) q[k] = q[k] * f; return q; };
   p.marks = m.marks.map(sc);

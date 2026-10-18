@@ -28,6 +28,19 @@ Weitere Vorlagen und Farbschemata sind je ein Eintrag im Code, siehe [CLAUDE.md]
 
 > Die Anhänge zeigen Adobe Acrobat, Foxit, PDF-XChange und Firefox an (Büroklammer neben dem Foto). Der PDF-Viewer von Chrome und Edge zeigt sie nicht an, zum Weiterbearbeiten stört das nicht. Wird das PDF in einem anderen Programm gespeichert oder gedruckt, gehen die Anhänge oft verloren. Die Bearbeitungsdaten stehen im Klartext im PDF, wer das nicht möchte, schaltet die Option „Bearbeitungsdaten und Fotos im PDF speichern“ aus.
 
+## Foto-Optionen (wie im Foto-Protokoll)
+
+Im Reiter „Reise“:
+
+| Gruppe | Optionen |
+|---|---|
+| **Beschriftung unter den Bildern** | Fotonummer, Datum und Uhrzeit, Ort, GPS-Koordinaten (im PDF als Link zur Karte), Wetter zur Aufnahmezeit, Bildunterschrift, Notizen zu nummerierten Markierungen, Dateiname |
+| **Fotos auf den Seiten** | 0 bis 3 Fotos auf der Tagesseite (weitere kommen auf Fotoseiten), Bildauflösung 110 / 150 / 220 / 300 dpi (gerechnet aus dem Original) |
+| **Originale & Qualität** | Originaldateien bitgenau einbetten (mit EXIF) oder auf 3200 / 2400 / 1600 px verkleinern (Aufnahmedatum und GPS bleiben in der Datei), Bearbeitungsdaten im PDF speichern, Prüfsummen-Seite (SHA-256) |
+| **Ort und Wetter aus den Fotodaten** | Ort aus GPS: OpenStreetMap (Straße, Hausnummer) mit Rückfall auf eine eingebaute Ortsliste, nur offline oder aus; Wetter ermitteln ja/nein |
+
+Zu jedem Foto lassen sich Bildunterschrift, Ort und Wetter von Hand ändern; Handeingaben werden nie überschrieben.
+
 ## Datenschutz und Netzwerk
 
 - Alle Eingaben bleiben im Browser (IndexedDB) beziehungsweise in der Projektdatei.

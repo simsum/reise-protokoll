@@ -31,7 +31,7 @@ function newTrip(template = "rundreise") {
     startPlace: blankPlace(), destination: blankPlace(), roundTrip: false,
     days: [], summary: "", summaryAuto: true,
     route: { auto: true, road: true, points: [], km: null, legs: [], mapSig: "" },
-    mapImg: "", mapSource: "", mapUser: false, coverPhoto: "", projData: true, embed: "original", capWeather: true, wxLine: false, ruled: true, costPage: true,
+    mapImg: "", mapSource: "", mapUser: false, coverPhoto: "", projData: true, embed: "original", capWeather: true, wxLine: false, capNum: false, capDate: false, capPlace: false, capGps: false, capNote: true, capMarks: true, capFile: false, hashes: false, dpi: "150", placeMode: "auto", stripN: 3, ruled: true, costPage: true,
   };
 }
 
@@ -43,6 +43,7 @@ function normalizeTrip(t) {
   out.destination = { ...blankPlace(), ...(t.destination || {}) };
   out.route = { ...base.route, ...(t.route || {}) };
   if (!THEMES[out.theme]) out.theme = "meer";
+  if (out.embed === "work") out.embed = "1600"; // frühere Bezeichnung
   out.days = (Array.isArray(t.days) ? t.days : []).map((d) => ({
     ...newDay(), ...d, place: { ...blankPlace(), ...(d.place || {}) },
     costs: Array.isArray(d.costs) ? d.costs.map((c) => ({ id: uid(), l: "", cat: "sonstiges", a: "", ...c })) : [],
@@ -54,7 +55,7 @@ function normalizeTrip(t) {
 /* Ältere oder unvollständige Fotos ergänzen (Arbeitskopie `src` ist Pflicht). */
 function normPhoto(p) {
   const bw = p.bw || p.w || 1, bh = p.bh || p.h || 1;
-  const o = { id: uid(), name: "Foto", type: "", mod: 0, size: 0, file: null, src: "", vsrc: "", gps: null, day: "", time: "", dayFromFile: false, note: "", rot: 0, crop: null, marks: [], wx: null, weather: "", weatherSrc: "", wxTried: false, ...p, bw, bh };
+  const o = { id: uid(), name: "Foto", type: "", mod: 0, size: 0, file: null, src: "", vsrc: "", gps: null, day: "", time: "", dayFromFile: false, note: "", rot: 0, crop: null, marks: [], wx: null, weather: "", weatherSrc: "", wxTried: false, place: "", placeSrc: "", sha: "", ...p, bw, bh };
   o.w = o.w || bw; o.h = o.h || bh;
   return o;
 }

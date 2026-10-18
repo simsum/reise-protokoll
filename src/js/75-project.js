@@ -39,6 +39,7 @@ function cleanPhotoMeta(g, seen) {
     gps: cleanGeo(g.gps), note: clipStr(g.note, 1000), rot: oneOf(g.rot, [0, 1, 2, 3], 0), crop: cleanCrop(g.crop),
     marks: (Array.isArray(g.marks) ? g.marks : []).slice(0, 300).map(cleanMark).filter(Boolean), bw: num(g.bw, 1, 20000, 0), bh: num(g.bh, 1, 20000, 0),
     wx: cleanWx(g.wx), weather: clipStr(g.weather, 300), weatherSrc: oneOf(g.weatherSrc, ["", "brightsky", "openmeteo", "manual"], ""),
+    place: clipStr(g.place, 500), placeSrc: oneOf(g.placeSrc, ["", "osm", "offline", "manual"], ""), sha: typeof g.sha === "string" && /^[0-9a-f]{64}$/.test(g.sha) ? g.sha : "",
   };
 }
 function cleanTrip(j) {
@@ -50,7 +51,9 @@ function cleanTrip(j) {
     currency: typeof t.currency === "string" && /^[A-Z]{3}$/.test(t.currency) ? t.currency : "EUR", start: cleanIso(t.start),
     startPlace: cleanPlace(t.startPlace), destination: cleanPlace(t.destination), roundTrip: !!t.roundTrip,
     summary: clipStr(t.summary, 4000), summaryAuto: t.summaryAuto !== false, mapUser: !!t.mapUser, ruled: t.ruled !== false, costPage: t.costPage !== false,
-    projData: t.projData !== false, capWeather: t.capWeather !== false, wxLine: !!t.wxLine, embed: oneOf(t.embed, ["original", "work"], "original"),
+    projData: t.projData !== false, capWeather: t.capWeather !== false, wxLine: !!t.wxLine,
+    capNum: !!t.capNum, capDate: !!t.capDate, capPlace: !!t.capPlace, capGps: !!t.capGps, capNote: t.capNote !== false, capMarks: t.capMarks !== false, capFile: !!t.capFile, hashes: !!t.hashes,
+    dpi: oneOf(t.dpi, ["110", "150", "220", "300"], "150"), placeMode: oneOf(t.placeMode, ["auto", "offline", "off"], "auto"), stripN: oneOf(+t.stripN, [0, 1, 2, 3], 3), embed: oneOf(t.embed === "work" ? "1600" : t.embed, ["original", "3200", "2400", "1600"], "original"),
     mapSource: oneOf(t.mapSource, ["", "osm", "osmde", "esri"], ""), mapW: num(t.mapW, 1, 20000, 0), mapH: num(t.mapH, 1, 20000, 0), coverW: num(t.coverW, 1, 20000, 0), coverH: num(t.coverH, 1, 20000, 0),
     hasMap: !!t.hasMap, hasCover: !!t.hasCover,
     route: {
@@ -74,36 +77,46 @@ function cleanTrip(j) {
 }
 
 /* ---------- Schreiben ---------- */
-function jsonOfTrip(t, attOf, shrunk) {
+function jsonOfTrip(t, attOf, shrunkOf) {
   // Bilddaten gehören nicht in die JSON (sie stehen als Anhänge im PDF); `src` nur bei Fotos weglassen (die Wetterquelle heißt auch so)
   const o = JSON.parse(JSON.stringify(t, function (k, v) {
     if (k === "mapImg" || k === "coverPhoto") return undefined;
     if ((k === "src" || k === "vsrc" || k === "file") && typeof this.bw === "number") return undefined;
     return v;
   }));
-  o.days.forEach((d) => d.photos.forEach((p) => { p.att = attOf.get(p.id) || null; p.shrunk = shrunk; }));
+  o.days.forEach((d) => d.photos.forEach((p) => { p.att = attOf.get(p.id) || null; p.shrunk = !!shrunkOf.get(p.id); }));
   o.hasMap = !!t.mapImg; o.hasCover = !!t.coverPhoto;
   return { app: "Reise-Protokoll", format: FORMAT, created: new Date().toISOString(), trip: o };
 }
 
 /* Alle Anhänge der Reise: Projektdaten, Fotos, Karte, Titelfoto */
 async function collectAttachments(t, onProgress) {
-  const list = [], attOf = new Map(), shrunk = t.embed === "work", photos = t.days.flatMap((d) => d.photos);
+  const list = [], attOf = new Map(), shrunkOf = new Map(), photos = t.days.flatMap((d) => d.photos), edge = t.embed === "original" ? 0 : +t.embed;
   let n = 0;
   for (const p of photos) {
     n++;
     const nr = String(n).padStart(4, "0");
-    let bytes, mime, name = p.name || "Foto", rel = "Source";
-    if (!shrunk && p.file) { bytes = new Uint8Array(await p.file.arrayBuffer()); mime = p.type || "application/octet-stream"; }
-    else { bytes = bytesOfDataUrl(p.src); mime = "image/jpeg"; rel = "Alternative"; if (!/\.jpe?g$/i.test(name)) name = name.replace(/\.[^.]+$/, "") + ".jpg"; }
-    const desc = ["Foto " + n, p.day ? fmtDate(p.day, { day: "numeric", month: "long", year: "numeric" }) : "", p.time ? p.time.slice(0, 5) + " Uhr" : "", p.gps ? `${p.gps.lat.toFixed(5)}, ${p.gps.lon.toFixed(5)}` : "", shrunk ? "Arbeitskopie (verkleinert)" : "Originaldatei"].filter(Boolean).join(" · ");
-    attOf.set(p.id, nr);
+    let bytes = null, mime = "image/jpeg", name = p.name || "Foto", rel = "Alternative", px = "";
+    if (p.file) {
+      if (edge) {
+        const c = await compressOriginal(p, edge).catch((e) => { console.warn(e); return null; });
+        if (c) { bytes = c.bytes; name = c.name; px = c.px; }
+      }
+      if (!bytes) { bytes = new Uint8Array(await p.file.arrayBuffer()); mime = p.type || "application/octet-stream"; rel = "Source"; }
+    } else {
+      bytes = bytesOfDataUrl(p.src);
+      if (!/\.jpe?g$/i.test(name)) name = name.replace(/\.[^.]+$/, "") + ".jpg";
+    }
+    const shrunk = rel === "Alternative";
+    const desc = ["Foto " + n, p.day ? fmtDate(p.day, { day: "numeric", month: "long", year: "numeric" }) : "", p.time ? p.time.slice(0, 5) + " Uhr" : "", p.place, p.gps ? gpsText(p.gps) : "",
+      shrunk ? `verkleinert${px ? " (" + px + ")" : ""}` : "Originaldatei", p.sha ? "SHA-256 Original: " + p.sha : ""].filter(Boolean).join(" · ");
+    attOf.set(p.id, nr); shrunkOf.set(p.id, shrunk);
     list.push({ name: `${nr} ${name}`, bytes, mime, desc, rel, pid: p.id });
     if (onProgress) onProgress(n, photos.length);
   }
   if (t.mapImg) list.push({ name: MAP_FILE, bytes: bytesOfDataUrl(t.mapImg), mime: "image/jpeg", desc: "Karte der Deckseite", rel: "Data" });
   if (t.coverPhoto) list.push({ name: COVER_FILE, bytes: bytesOfDataUrl(t.coverPhoto), mime: "image/jpeg", desc: "Titelfoto der Deckseite", rel: "Data" });
-  const json = new TextEncoder().encode(JSON.stringify(jsonOfTrip(t, attOf, shrunk)));
+  const json = new TextEncoder().encode(JSON.stringify(jsonOfTrip(t, attOf, shrunkOf)));
   list.unshift({ name: PROJECT_FILE, bytes: json, mime: "application/json", desc: "Bearbeitungsdaten von Reise-Protokoll (Einstellungen, Tage, Notizen, Markierungen). Das PDF in Reise-Protokoll öffnen, um es weiterzubearbeiten.", rel: "Data" });
   return list;
 }

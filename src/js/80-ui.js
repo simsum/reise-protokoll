@@ -40,13 +40,26 @@ function panelTrip() {
   <h3>Seiten</h3>
   ${chk("Linien zum Handschreiben in freien Textbereichen", "ruled", t.ruled)}
   ${chk("Kostenübersicht am Ende", "costPage", t.costPage)}
-  <h3>Wetter</h3>
-  ${chk("Wetter aus den Fotodaten ermitteln (Koordinaten und Aufnahmezeit gehen dafür an DWD/Bright Sky bzw. Open-Meteo)", "capWeather", t.capWeather)}
-  ${chk("Wetter unter den Fotos anzeigen", "wxLine", t.wxLine)}
-  <h3>PDF speichern</h3>
+  <h3>Fotos: Beschriftung unter den Bildern</h3>
+  ${chk("Fotonummer (Foto 1, Foto 2 …)", "capNum", t.capNum)}
+  ${chk("Datum und Uhrzeit", "capDate", t.capDate)}
+  ${chk("Ort", "capPlace", t.capPlace)}
+  ${chk("GPS-Koordinaten (im PDF als Link zur Karte)", "capGps", t.capGps)}
+  ${chk("Wetter zur Aufnahmezeit", "wxLine", t.wxLine)}
+  ${chk("Bildunterschrift / Bemerkung", "capNote", t.capNote)}
+  ${chk("Notizen zu nummerierten Markierungen", "capMarks", t.capMarks)}
+  ${chk("Dateiname", "capFile", t.capFile)}
+  <h3>Fotos auf den Seiten</h3>
+  ${selFld("Fotos auf der Tagesseite (weitere kommen auf Fotoseiten)", "stripN", String(t.stripN), [["0", "Keine, nur Fotoseiten"], ["1", "1 Foto"], ["2", "2 Fotos"], ["3", "3 Fotos"]])}
+  ${selFld("Bildauflösung auf der Seite", "dpi", t.dpi, [["110", "110 dpi – klein, für den Bildschirm"], ["150", "150 dpi – Standard"], ["220", "220 dpi – guter Druck"], ["300", "300 dpi – sehr scharf, großes PDF"]])}
+  <h3>Originale & Qualität</h3>
+  ${selFld("Fotos im PDF einbetten", "embed", t.embed, [["original", "Originaldateien (volle Qualität, mit EXIF)"], ["3200", "Verkleinert auf 3200 px (leicht, ca. 1,2 MB je Foto)"], ["2400", "Verkleinert auf 2400 px (mittel, ca. 0,7 MB)"], ["1600", "Verkleinert auf 1600 px (stark, ca. 0,3 MB)"]])}
   ${chk("Bearbeitungsdaten und Fotos im PDF speichern (PDF lässt sich später wieder öffnen und weiterbearbeiten)", "projData", t.projData)}
-  ${selFld("Fotos im PDF einbetten", "embed", t.embed, [["original", "Originaldateien (volle Qualität, EXIF, großes PDF)"], ["work", "Arbeitskopien (1600 px, kleines PDF)"]])}
-  <small>${embedEstimate(t)}</small>`;
+  ${chk("Prüfsummen-Seite (SHA-256) anhängen: belegt später, dass ein Foto unverändert ist", "hashes", t.hashes)}
+  <small>${embedEstimate(t)}</small>
+  <h3>Ort und Wetter aus den Fotodaten</h3>
+  ${selFld("Ort aus GPS", "placeMode", t.placeMode, [["auto", "OpenStreetMap (Straße, Hausnummer), sonst offline"], ["offline", "Nur offline (nächster Ort aus der eingebauten Liste)"], ["off", "Aus"]])}
+  ${chk("Wetter aus den Fotodaten ermitteln (Koordinaten und Aufnahmedatum gehen dafür an DWD/Bright Sky bzw. Open-Meteo)", "capWeather", t.capWeather)}`;
 }
 
 function embedEstimate(t) {
@@ -54,7 +67,8 @@ function embedEstimate(t) {
   if (!ph.length) return "Noch keine Fotos.";
   const orig = ph.reduce((s, p) => s + (p.file ? p.file.size : p.size || 0), 0), work = ph.reduce((s, p) => s + p.src.length * 0.75, 0);
   const mb = (n) => fmtNum(n / 1048576, 1) + " MB";
-  return `${ph.length} Fotos: etwa ${mb(t.embed === "work" || !orig ? work : orig)} zusätzlich im PDF${t.projData ? "" : " (nur wenn die Bearbeitungsdaten gespeichert werden)"}.`;
+  const per = { 3200: 1.2, 2400: 0.7, 1600: 0.3 }[t.embed], est = t.embed === "original" ? (orig || work) : Math.min(orig || Infinity, per * 1048576 * ph.length);
+  return `${ph.length} Fotos: etwa ${mb(est)} zusätzlich im PDF${t.projData ? "" : " (nur wenn die Bearbeitungsdaten gespeichert werden)"}.`;
 }
 
 /* ---------- Reiter „Tage“ ---------- */
@@ -156,6 +170,18 @@ function renderPreview() {
 
 function scheduleSave() { clearTimeout(saveTimer); saveTimer = setTimeout(() => idbSet("trip", S.trip).catch(() => {}), 600); }
 
+/* Änderung aus dem Hintergrund (Ort, Wetter): Vorschau aktualisieren, die Seitenleiste nur neu zeichnen, wenn gerade nicht getippt wird */
+let softT;
+function softChanged() {
+  changed();
+  clearTimeout(softT);
+  softT = setTimeout(function again() {
+    const a = document.activeElement;
+    if (a && $("#panel").contains(a) && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) { softT = setTimeout(again, 1500); return; }
+    if (S.tab === "days" || S.tab === "trip") renderPanel();
+  }, 400);
+}
+
 /* Nach jeder Änderung: Abgeleitetes aktualisieren, Vorschau und Autosave anstoßen. */
 function changed(key) {
   const t = S.trip;
@@ -176,6 +202,10 @@ document.addEventListener("input", (e) => {
   r.obj[r.prop] = el.type === "checkbox" ? el.checked : el.value;
   if (/^d:[^.]+\.(weather|tmin|tmax)$/.test(key)) { const wd = dayOf(key.split(".")[0].slice(2)); if (wd) wd.wxAuto = false; }
   if (key === "capWeather" && el.checked) { wxState = "unknown"; queueAllWeather(); }
+  if (key === "stripN") r.obj[r.prop] = +el.value;
+  if (key === "placeMode") reresolvePlaces();
+  if (/^d:[^.]+\.photos\.[^.]+\.place$/.test(key)) { r.obj.placeSrc = el.value ? "manual" : ""; if (!el.value) queuePlace(r.obj); }
+  if (/^d:[^.]+\.photos\.[^.]+\.weather$/.test(key)) { r.obj.weatherSrc = el.value ? "manual" : ""; if (!el.value) { r.obj.wx = null; r.obj.wxTried = false; queueWeather(r.obj); } }
   if (key === "route.auto" && el.checked) t_resetRoute();
   if (key === "summaryAuto" && el.checked) { S.trip.summary = suggestSummary(S.trip); const sm = $('[data-k="summary"]'); if (sm) sm.value = S.trip.summary; }
   const card = el.closest("details.day");
@@ -331,7 +361,7 @@ async function addPhotosToDay(dayId, files) {
   const d = dayOf(dayId); if (!d) return;
   const { list, bad } = await readPhotos(files.filter(isImageFile));
   d.photos.push(...list); d.photos.sort(photoSort);
-  S.open.add(dayId); changed(); renderPanel(); queueAllWeather();
+  S.open.add(dayId); changed(); renderPanel(); queueAllWeather(); queueAllPlaces();
   toast(bad ? `${list.length} Fotos hinzugefügt, ${bad} nicht lesbar.` : `${list.length} Fotos hinzugefügt.`);
 }
 
@@ -354,7 +384,7 @@ async function addPhotos(files) {
   const first = made.length ? made.slice().sort(byDate)[0] : null;
   if (!t.start && first && first.date) t.start = first.date;
   const noDate = list.filter((p) => p.dayFromFile).length;
-  changed(); S.tab = "days"; made.forEach((d) => S.open.add(d.id)); renderPanel(); queueAllWeather();
+  changed(); S.tab = "days"; made.forEach((d) => S.open.add(d.id)); renderPanel(); queueAllWeather(); queueAllPlaces();
   toast(`${list.length} Fotos zugeordnet${made.length ? `, ${made.length} ${made.length === 1 ? "neuer Tag" : "neue Tage"} angelegt` : ""}${bad ? `, ${bad} nicht lesbar` : ""}${noDate ? `. Bei ${noDate} fehlte das Aufnahmedatum (Dateidatum verwendet)` : ""}.`, 8000);
   /* Orte der neuen Tage aus dem GPS des jeweils letzten Fotos (Abendort), langsam im Hintergrund */
   for (const d of made) {
@@ -376,6 +406,8 @@ function photoCard(d, p) {
   const k = `d:${d.id}.photos.${p.id}`;
   return `<div class="pcard"><img class="pthumb" src="${p.vsrc || p.src}" alt=""><div class="pbody">
     <input data-k="${k}.note" value="${esc(p.note)}" placeholder="Bildunterschrift / Anmerkung">
+    <input data-k="${k}.place" value="${esc(p.place)}" placeholder="Ort (aus GPS, änderbar)" style="margin-top:3px">
+    <input data-k="${k}.weather" value="${esc(p.weather)}" placeholder="Wetter (aus Aufnahmezeit und GPS, änderbar)" style="margin-top:3px">
     <small>${esc(p.name)}${info ? " · " + esc(info) : ""}</small>
     <div class="btnrow" style="margin:4px 0 0"><button data-act="photoMark" data-day="${d.id}" data-id="${p.id}">Markieren …</button><button class="ico" data-act="photoRotL" data-day="${d.id}" data-id="${p.id}" title="Links drehen">⟲</button><button class="ico" data-act="photoRotR" data-day="${d.id}" data-id="${p.id}" title="Rechts drehen">⟳</button><button class="ico" data-act="photoUp" data-day="${d.id}" data-id="${p.id}" title="Früher">↑</button><button class="ico" data-act="photoDown" data-day="${d.id}" data-id="${p.id}" title="Später">↓</button><button class="ico" data-act="delPhoto" data-day="${d.id}" data-id="${p.id}" title="Entfernen">×</button></div></div></div>`;
 }
@@ -556,7 +588,7 @@ function loadTrip(t, fresh) {
   refreshDerived(S.trip);
   S.tab = "trip";
   renderPanel(); renderPreview(); scheduleSave();
-  queueAllWeather();
+  queueAllWeather(); queueAllPlaces();
 }
 const hasContent = () => S.trip.days.length > 0 || S.trip.title.trim() !== "";
 
@@ -581,7 +613,14 @@ async function makePdf() {
   try {
     const t = S.trip, { pages } = layoutTrip(t);
     const atts = t.projData ? await collectAttachments(t, (n, N) => (btn.textContent = `Fotos ${n}/${N} …`)) : [];
-    const bytes = await buildPdf(pages, { title: t.title, author: t.travelers }, atts, (n, N) => (btn.textContent = `Seite ${n}/${N} …`));
+    const dpi = +t.dpi || 150, cache = new Map(), byId = new Map(t.days.flatMap((d) => d.photos).map((p) => [p.id, p]));
+    const imageFor = async (op) => {
+      const p = byId.get(op.pid); if (!p) return null;
+      const key = `${op.pid}|${Math.round(op.w)}|${Math.round(op.h)}`;
+      if (!cache.has(key)) cache.set(key, await renderPhotoPx(p, op, dpi));
+      return cache.get(key);
+    };
+    const bytes = await buildPdf(pages, { title: t.title, author: t.travelers }, atts, (n, N) => (btn.textContent = `Seite ${n}/${N} …`), { imageFor });
     download(new Blob([bytes], { type: "application/pdf" }), safeName(t.title) + ".pdf");
     toast(`PDF erstellt (${fmtNum(bytes.length / 1048576, 1)} MB${t.projData ? ", mit Bearbeitungsdaten" : ""}).`);
   } catch (e) { console.error(e); toast("PDF-Fehler: " + e.message); }

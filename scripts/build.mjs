@@ -17,6 +17,7 @@ const js = readdirSync(join(root, "src/js"))
 const html = read("src/index.html")
   .replace("/*__STYLES__*/", () => read("src/styles.css").trimEnd())
   .replace("/*__APP__*/", () => js)
+  .replace("__ORTE_B64__", () => read("data/orte.b64").trim())
   .replace("__VERSION__", "v" + pkg.version);
 
 mkdirSync(join(root, "dist"), { recursive: true });

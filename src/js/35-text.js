@@ -3,10 +3,11 @@
    brechen Vorschau und PDF an denselben Stellen um. */
 const FONT_NAMES = {
   R: "Helvetica", B: "HelveticaBold", I: "HelveticaOblique", BI: "HelveticaBoldOblique",
-  S: "TimesRoman", SB: "TimesRomanBold", SI: "TimesRomanItalic",
+  S: "TimesRoman", SB: "TimesRomanBold", SI: "TimesRomanItalic", C: "Courier",
 };
 const isSerif = (f) => f[0] === "S";
-const BASELINE = { sans: 0.8465, serif: 0.8375 }; // Grundlinie unter der Oberkante bei line-height 1
+const BASELINE = { sans: 0.8465, serif: 0.8375, mono: 0.7665 };
+const baseOf = (f) => (f === "C" ? BASELINE.mono : isSerif(f) ? BASELINE.serif : BASELINE.sans); // Grundlinie unter der Oberkante bei line-height 1
 const FM = { ready: false };
 
 async function initFonts() {

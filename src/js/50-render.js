@@ -4,7 +4,7 @@ const FONT_CSS = {
   R: "font-family:Helvetica,Arial,'Liberation Sans',sans-serif", B: "font-family:Helvetica,Arial,'Liberation Sans',sans-serif;font-weight:700",
   I: "font-family:Helvetica,Arial,'Liberation Sans',sans-serif;font-style:italic", BI: "font-family:Helvetica,Arial,'Liberation Sans',sans-serif;font-weight:700;font-style:italic",
   S: "font-family:'Times New Roman',Times,'Liberation Serif',serif", SB: "font-family:'Times New Roman',Times,'Liberation Serif',serif;font-weight:700",
-  SI: "font-family:'Times New Roman',Times,'Liberation Serif',serif;font-style:italic",
+  SI: "font-family:'Times New Roman',Times,'Liberation Serif',serif;font-style:italic", C: "font-family:'Courier New',Courier,'Liberation Mono',monospace",
 };
 
 function pageHtml(pg) {
@@ -43,7 +43,7 @@ function bytesOfDataUrl(u) {
 }
 
 /* attachments: [{name, bytes, mime, desc, rel, pid}] werden als Dateianhänge eingebettet (pid: Foto, dessen Seite eine Büroklammer bekommt). */
-async function buildPdf(pages, meta, attachments, onProgress) {
+async function buildPdf(pages, meta, attachments, onProgress, hooks) {
   const L = PDFLib, doc = await L.PDFDocument.create();
   doc.setTitle(meta.title || "Reiseprotokoll"); doc.setCreator("Reise-Protokoll"); doc.setProducer("Reise-Protokoll (pdf-lib)");
   if (meta.author) doc.setAuthor(meta.author);
@@ -79,7 +79,7 @@ async function buildPdf(pages, meta, attachments, onProgress) {
       } else if (o.k === "line") {
         page.drawLine({ start: { x: o.x1, y: Y(o.y1) }, end: { x: o.x2, y: Y(o.y2) }, thickness: o.sw, color: rgbOf(o.c) });
       } else if (o.k === "t") {
-        const font = fonts[o.f], base = o.y + (isSerif(o.f) ? BASELINE.serif : BASELINE.sans) * o.s;
+        const font = fonts[o.f], base = o.y + baseOf(o.f) * o.s;
         const w = tw(o.text, o.f, o.s, o.ls);
         let x = o.a === "c" ? o.x - w / 2 : o.a === "r" ? o.x - w : o.x;
         if (!o.ls) page.drawText(o.text, { x, y: Y(base), size: o.s, font, color: rgbOf(o.c) });
@@ -95,7 +95,10 @@ async function buildPdf(pages, meta, attachments, onProgress) {
         if (o.stroke) { opt.borderColor = rgbOf(o.stroke); opt.borderWidth = o.sw; if (o.so != null) opt.borderOpacity = o.so; }
         page.drawSvgPath(o.d, opt);
       } else if (o.k === "img") {
-        const im = await embed(o.src), s = Math.max(o.w / im.width, o.h / im.height);
+        let im = null;
+        if (hooks && hooks.imageFor && o.pid) { try { const b = await hooks.imageFor(o); if (b) im = await doc.embedJpg(b); } catch (e) { console.warn("Bild", e); } }
+        if (!im) im = await embed(o.src);
+        const s = Math.max(o.w / im.width, o.h / im.height);
         const dw = im.width * s, dh = im.height * s;
         page.pushOperators(L.pushGraphicsState(), L.moveTo(o.x, Y(o.y + o.h)), L.lineTo(o.x + o.w, Y(o.y + o.h)),
           L.lineTo(o.x + o.w, Y(o.y)), L.lineTo(o.x, Y(o.y)), L.closePath(), L.clip(), L.endPath());

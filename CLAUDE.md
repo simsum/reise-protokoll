@@ -22,7 +22,9 @@ Reise-Protokoll ist ein eigenständiges Tool (kein Teil von Foto-Protokoll, nur 
 | `50-render` | `pageHtml` (Vorschau) und `buildPdf` (pdf-lib) aus dem Seitenmodell |
 | `60-map` | Karte: OSM-Kacheln + Route auf Canvas, OSRM, Schemakarte als Rückfall |
 | `70-photos` | Foto: Original + Arbeitskopie, EXIF, HEIC, Drehen/Ausschnitt (`viewMarks`, `drawView`), Markierungs-Geometrie, Nominatim |
+| `72-places` | Ort pro Foto: Nominatim (Zoom 18), Offline-Ortsliste (`data/orte.b64`, GeoNames CC BY 4.0), `placeMode` |
 | `75-project` | Projektdaten im PDF: `cleanTrip()` (Prüfen), `collectAttachments()`, `readProjectPdf()` |
+| `76-embed` | Einbetten: `compressOriginal()` (verkleinern, EXIF übernehmen), `renderPhotoPx()` (Bild in der gewählten dpi aus dem Original) |
 | `78-weather` | Wetter aus Fotodaten: Bright Sky (DWD) → Open-Meteo, `deriveDayWeather()`, Warteschlange `queueWeather()` |
 | `80-ui` | Reiter, Ereignisse, Speichern/Öffnen, Autosave (IndexedDB) |
 | `90-main` | Start |

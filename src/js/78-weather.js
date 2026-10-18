@@ -149,7 +149,7 @@ async function resolveWeather(p) {
   if (!wxWanted(p)) return;
   p.wxTried = true;
   if (wx) { p.wx = { ...wx }; p.weather = wxText(wx); p.weatherSrc = wx.src; const d = ownerDay(p); if (d) deriveDayWeather(d); }
-  changed(); if (S.tab === "days") renderPanel();
+  softChanged();
 }
 
 /* Wetter eines Tages neu aus den Fotos ermitteln (hebt eine manuelle Änderung auf) */
