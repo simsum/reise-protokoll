@@ -107,7 +107,7 @@ function panelDays() {
   return `<label class="drop" id="dropAll">Fotos hierher ziehen oder klicken: sie werden nach Aufnahmedatum den Tagen zugeordnet (fehlende Tage entstehen dabei)<input type="file" accept="image/*" multiple hidden id="photoAll"></label>
   <div class="btnrow"><button data-act="addDay">+ Tag hinzufügen</button>
     <span class="row" style="gap:4px">ab <input type="date" id="genStart" value="${esc(startDefault || "")}" style="border:1px solid var(--line);border-radius:8px;padding:5px"> <input type="number" id="genN" min="1" max="60" value="${tpl.defaultDays}" style="width:60px;border:1px solid var(--line);border-radius:8px;padding:5px"> Tage <button data-act="genDays">anlegen</button></span>
-    <button data-act="sortDays" title="Nach Datum sortieren">Sortieren</button></div>
+    <button data-act="sortDays" title="Nach Datum sortieren">Sortieren</button>${countDuplicates() ? `<button data-act="dedupe" title="Dasselbe Foto kommt mehrfach vor">${countDuplicates()} doppelte Fotos entfernen</button>` : ""}</div>
   ${t.days.map((d, i) => `<details class="day" data-day="${d.id}" ${S.open.has(d.id) ? "open" : ""}><summary><span class="dsum">${daySummary(i)}</span></summary><div class="body">
     ${fld("Datum", `d:${d.id}.date`, d.date, { type: "date" })}
     ${tpl.dayFields.map((k) => DAY_FIELDS[k](d)).join("")}
@@ -265,6 +265,7 @@ document.addEventListener("click", async (e) => {
       changed(); renderPanel(); break;
     }
     case "sortDays": t.days.sort(byDate); changed(); renderPanel(); break;
+    case "dedupe": { const n = removeDuplicates(); changed(); renderPanel(); toast(`${n} doppelte Fotos entfernt.`); break; }
     case "delDay": if (confirm("Diesen Tag mit Text, Ausgaben und Fotos löschen?")) { t.days = t.days.filter((d) => d.id !== dayId); changed(); renderPanel(); } break;
     case "dayUp": case "dayDown": {
       const i = t.days.findIndex((d) => d.id === dayId), j = i + (b.dataset.act === "dayUp" ? -1 : 1);
@@ -353,21 +354,39 @@ async function readPhotos(files) {
   }
   return { list: out, bad };
 }
+/* Dasselbe Foto nicht zweimal: gleiche Prüfsumme (SHA-256) der Originaldatei, ohne Prüfsumme Name, Größe und Änderungsdatum */
+const photoKey = (p) => p.sha || `${p.name}|${p.size}|${p.mod}`;
+function dropDuplicates(list) {
+  const have = new Set(S.trip.days.flatMap((d) => d.photos).map(photoKey)), out = [];
+  let dup = 0;
+  for (const p of list) { const k = photoKey(p); if (have.has(k)) { dup++; continue; } have.add(k); out.push(p); }
+  return { list: out, dup };
+}
+const dupNote = (n) => (n ? ` ${n} schon vorhandene${n === 1 ? "s Foto" : " Fotos"} übersprungen.` : "");
+/* bereits vorhandene Doppelte entfernen (das jeweils zuerst eingefügte bleibt) */
+function removeDuplicates() {
+  const seen = new Set(); let n = 0;
+  S.trip.days.forEach((d) => { d.photos = d.photos.filter((p) => { const k = photoKey(p); if (seen.has(k)) { n++; return false; } seen.add(k); return true; }); });
+  return n;
+}
+const countDuplicates = () => { const seen = new Set(); let n = 0; S.trip.days.forEach((d) => d.photos.forEach((p) => { const k = photoKey(p); if (seen.has(k)) n++; else seen.add(k); })); return n; };
+
 const photoSort = (a, b) => (a.day + " " + a.time).localeCompare(b.day + " " + b.time);
 
 async function addPhotosToDay(dayId, files) {
   const d = dayOf(dayId); if (!d) return;
-  const { list, bad } = await readPhotos(files.filter(isImageFile));
+  const read = await readPhotos(files.filter(isImageFile)), { bad } = read, { list, dup } = dropDuplicates(read.list);
   d.photos.push(...list); d.photos.sort(photoSort);
   S.open.add(dayId); changed(); renderPanel(); queueAllWeather(); queueAllPlaces();
-  toast(bad ? `${list.length} Fotos hinzugefügt, ${bad} nicht lesbar.` : `${list.length} Fotos hinzugefügt.`);
+  toast((bad ? `${list.length} Fotos hinzugefügt, ${bad} nicht lesbar.` : `${list.length} Fotos hinzugefügt.`) + dupNote(dup));
 }
 
 /* Mehrere Fotos auf einmal: Tage entstehen aus den Aufnahmedaten, Orte aus dem GPS der Fotos. */
 async function addPhotos(files) {
   const imgs = [...files].filter(isImageFile), t = S.trip;
   if (!imgs.length) { toast("Keine Bilddateien gefunden."); return; }
-  const { list, bad } = await readPhotos(imgs);
+  const read = await readPhotos(imgs), { bad } = read, { list, dup } = dropDuplicates(read.list);
+  if (!list.length) { toast(dup ? "Alle diese Fotos sind schon im Projekt." : "Die Fotos konnten nicht gelesen werden."); return; }
   list.sort(photoSort);
   const made = [], touched = new Set();
   for (const p of list) {
@@ -383,7 +402,7 @@ async function addPhotos(files) {
   if (!t.start && first && first.date) t.start = first.date;
   const noDate = list.filter((p) => p.dayFromFile).length;
   changed(); S.tab = "days"; made.forEach((d) => S.open.add(d.id)); renderPanel(); queueAllWeather(); queueAllPlaces();
-  toast(`${list.length} Fotos zugeordnet${made.length ? `, ${made.length} ${made.length === 1 ? "neuer Tag" : "neue Tage"} angelegt` : ""}${bad ? `, ${bad} nicht lesbar` : ""}${noDate ? `. Bei ${noDate} fehlte das Aufnahmedatum (Dateidatum verwendet)` : ""}.`, 8000);
+  toast(`${list.length} Fotos zugeordnet${made.length ? `, ${made.length} ${made.length === 1 ? "neuer Tag" : "neue Tage"} angelegt` : ""}${bad ? `, ${bad} nicht lesbar` : ""}${noDate ? `. Bei ${noDate} fehlte das Aufnahmedatum (Dateidatum verwendet)` : ""}.${dupNote(dup)}`, 8000);
   /* Orte der neuen Tage aus dem GPS des jeweils letzten Fotos (Abendort), langsam im Hintergrund */
   for (const d of made) {
     const g = d.photos.filter((p) => p.gps).map((p) => p.gps).pop();

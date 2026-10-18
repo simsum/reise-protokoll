@@ -46,6 +46,13 @@ await page.evaluate(async (src) => {
 const days = await page.evaluate(() => S.trip.days.map((d) => `${d.date}:${d.photos.length}`));
 ok(days.join(" ") === "2026-05-14:2 2026-05-16:2 2026-05-17:1", `Tage aus Fotodaten: ${days.join(" ")}`);
 ok(await page.evaluate(() => S.trip.start === "2026-05-14"), "Reisebeginn aus erstem Foto");
+await page.evaluate(async (src) => { await addPhotos(await eval(src)([[0, "2026-05-14T09:10:00"], [3, "2026-05-16T08:00:00"]])); }, mkFiles);
+ok((await page.evaluate(() => S.trip.days.map((d) => d.photos.length).join())) === "2,2,1", "dieselben Fotos ein zweites Mal hinzugefügt: kein Duplikat");
+ok(await page.evaluate(() => /schon im Projekt/.test(document.querySelector("#toast").textContent)), "Hinweis auf übersprungene Duplikate");
+await page.evaluate(async (src) => { const d = S.trip.days[0], f = (await eval(src)([[0, "2026-05-14T09:10:00"]]))[0]; d.photos.push(await makePhoto(f)); changed(); renderPanel(); }, mkFiles);
+ok((await page.locator('[data-act="dedupe"]').count()) === 1 && (await page.evaluate(() => countDuplicates())) === 1, "vorhandenes Duplikat wird angeboten");
+await page.click('[data-act="dedupe"]');
+ok((await page.evaluate(() => S.trip.days.map((d) => d.photos.length).join())) === "2,2,1", "Knopf entfernt das Duplikat");
 ok(await page.evaluate(() => S.trip.days[1].photos[0].time < S.trip.days[1].photos[1].time), "Fotos eines Tages nach Uhrzeit sortiert");
 
 console.log("Anmerkungen");
