@@ -31,7 +31,7 @@ function newTrip(template = "rundreise") {
     startPlace: blankPlace(), destination: blankPlace(), roundTrip: false,
     days: [], summary: "", summaryAuto: true,
     route: { auto: true, road: true, points: [], km: null, legs: [], mapSig: "" },
-    mapImg: "", mapUser: false, coverPhoto: "", projData: true, embed: "original", capWeather: true, wxLine: false, ruled: true, costPage: true,
+    mapImg: "", mapSource: "", mapUser: false, coverPhoto: "", projData: true, embed: "original", capWeather: true, wxLine: false, ruled: true, costPage: true,
   };
 }
 

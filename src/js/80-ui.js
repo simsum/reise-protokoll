@@ -506,7 +506,9 @@ async function makeMap() {
     t.mapImg = r.src; t.mapW = r.w; t.mapH = r.h; t.mapUser = false; t.route.mapSig = mapSignature(t);
     if (r.legs) { t.route.legs = r.legs; t.route.km = r.km; }
     changed(); renderPanel();
-    toast(r.mode === "osm" ? "Karte erzeugt." : "Karte erzeugt, aber ohne Kartenhintergrund (Kacheln nicht erreichbar).");
+    t.mapSource = r.source;
+    toast(r.mode !== "osm" ? "Karte erzeugt, aber ohne Kartenhintergrund (Kartenserver nicht erreichbar)."
+      : r.blocked ? "Karte erzeugt. OpenStreetMap hat die Kacheln gesperrt (beim Öffnen der Datei von der Festplatte fehlt der Referer), deshalb stammen sie von einem anderen Kartenserver." : "Karte erzeugt.", r.blocked || r.mode !== "osm" ? 10000 : 3500);
   } catch (e) { if (st) st.textContent = e.message; toast(e.message); if (btn) btn.disabled = false; }
 }
 async function useOwnMap(file) {

@@ -42,7 +42,7 @@ Reise-Protokoll ist ein eigenständiges Tool (kein Teil von Foto-Protokoll, nur 
 
 - Text-`y` im Seitenmodell ist die **Oberkante** der Zeile (CSS `line-height: 1`); das PDF setzt die Grundlinie bei `y + BASELINE × Größe`.
 - pdf-lib: `drawSvgPath` skaliert auch die Linienbreite mit `scale`; Bilder werden mit Klippfad zugeschnitten (`pushGraphicsState` … `clip`).
-- OSM-Kacheln erlauben Canvas-Auslesen (CORS `*`). Schlägt das fehl oder fehlen Kacheln, entsteht automatisch die Schemakarte. Öffentliche Dienste (Kacheln, Nominatim max. 1 Anfrage/s, OSRM-Demo-Server) nur für gelegentliche Nutzung; Quellenangabe steht auf der Karte.
+- Kacheln kommen per `fetch` (damit 403 erkannt wird), Reihenfolge `TILE_SOURCES`: OSM → OSM.de → Esri (alle mit CORS `*`). `tile.openstreetmap.org` antwortet ohne Referer (Datei von der Festplatte) mit 403 und einer Fehlerkachel – nicht als `<img>` laden, sonst wird die Fehlerkachel in die Karte gemalt. CARTO (`basemaps.cartocdn.com`) ist nicht nutzbar (Schlüssel nötig, Wasserzeichen). Fehlen Kacheln insgesamt, entsteht automatisch die Schemakarte. Öffentliche Dienste (Kacheln, Nominatim max. 1 Anfrage/s, OSRM-Demo-Server) nur für gelegentliche Nutzung; Quellenangabe steht auf der Karte.
 - Tests: Playwright ersetzt alle Netzzugriffe durch Testantworten (`test/e2e.mjs`: Oberfläche, Karte, Vorlagen; `test/projekt.mjs`: Mehrfach-Import, PDF-Roundtrip, manipulierte PDFs). PDFs lassen sich mit `pip install pymupdf` zu Bildern rendern, um das Layout zu prüfen.
 
 ## Windows

@@ -51,7 +51,7 @@ function cleanTrip(j) {
     startPlace: cleanPlace(t.startPlace), destination: cleanPlace(t.destination), roundTrip: !!t.roundTrip,
     summary: clipStr(t.summary, 4000), summaryAuto: t.summaryAuto !== false, mapUser: !!t.mapUser, ruled: t.ruled !== false, costPage: t.costPage !== false,
     projData: t.projData !== false, capWeather: t.capWeather !== false, wxLine: !!t.wxLine, embed: oneOf(t.embed, ["original", "work"], "original"),
-    mapW: num(t.mapW, 1, 20000, 0), mapH: num(t.mapH, 1, 20000, 0), coverW: num(t.coverW, 1, 20000, 0), coverH: num(t.coverH, 1, 20000, 0),
+    mapSource: oneOf(t.mapSource, ["", "osm", "osmde", "esri"], ""), mapW: num(t.mapW, 1, 20000, 0), mapH: num(t.mapH, 1, 20000, 0), coverW: num(t.coverW, 1, 20000, 0), coverH: num(t.coverH, 1, 20000, 0),
     hasMap: !!t.hasMap, hasCover: !!t.hasCover,
     route: {
       auto: r.auto !== false, road: r.road !== false, km: num(r.km, 0, 1e6, null), mapSig: clipStr(r.mapSig, 4000),

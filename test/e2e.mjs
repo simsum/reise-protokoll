@@ -32,15 +32,19 @@ const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PAT
 const page = await (await browser.newContext({ viewport: { width: 1500, height: 1250 }, acceptDownloads: true })).newPage();
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
-page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+page.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/.test(m.text())) errors.push(m.text()); }); // gesperrte Kacheln im Test sind gewollt
 
+let blockOsm = false, blockDe = false, blockEsri = false;
 const nm = (p) => join(root, "node_modules", p);
 await page.route("**/*", async (r) => {
   const u = r.request().url();
   if (u.startsWith("file:")) return r.continue();
   if (u.includes("pdf-lib.min.js")) return r.fulfill({ contentType: "text/javascript", body: readFileSync(nm("pdf-lib/dist/pdf-lib.min.js")) });
   if (u.includes("exifr")) return r.fulfill({ contentType: "text/javascript", body: readFileSync(nm("exifr/dist/full.umd.js")) });
-  if (u.includes("tile.openstreetmap.org")) return r.fulfill({ contentType: "image/png", headers: { "access-control-allow-origin": "*" }, body: png(256, 256) });
+  if (u.includes("tile.openstreetmap.org") && blockOsm) return r.fulfill({ status: 403, contentType: "image/png", headers: { "access-control-allow-origin": "*" }, body: png(256, 256) });
+  if (u.includes("tile.openstreetmap.de") && blockDe) return r.abort();
+  if (u.includes("arcgisonline.com") && blockEsri) return r.abort();
+  if (/tile\.openstreetmap\.(org|de)|arcgisonline\.com/.test(u)) return r.fulfill({ contentType: "image/png", headers: { "access-control-allow-origin": "*" }, body: png(256, 256) });
   if (u.includes("router.project-osrm.org")) {
     const coords = decodeURIComponent(u.split("/driving/")[1].split("?")[0]).split(";").map((s) => s.split(",").map(Number));
     const legs = coords.slice(1).map(() => ({ distance: 150000, duration: 6300 }));
@@ -69,6 +73,29 @@ ok(await page.locator(".mapimg").count() === 1, "Kartenvorschau im Reiter");
 ok((await page.evaluate(() => S.trip.route.legs.length)) === 4, "Teilstrecken der Route vorhanden");
 await page.click('[data-act="applyLegs"]');
 ok((await page.evaluate(() => S.trip.days[0].km)) === "150", "km aus Route in Tag übernommen");
+
+console.log("Kartenserver gesperrt (403 wie beim Öffnen von der Festplatte)");
+blockOsm = true;
+await page.evaluate(() => { S.trip.mapImg = ""; S.trip.mapSource = ""; renderPanel(); });
+await page.click("#mapBtn");
+await page.waitForFunction(() => S.trip.mapImg, null, { timeout: 30000 });
+ok((await page.evaluate(() => S.trip.mapSource)) === "osmde", "OSM gesperrt: Ersatz OpenStreetMap.de");
+ok((await page.evaluate(() => document.querySelector("#toast").textContent)).includes("gesperrt"), "Hinweis auf die Sperre");
+blockDe = true;
+await page.evaluate(() => { S.trip.mapImg = ""; S.trip.mapSource = ""; renderPanel(); });
+await page.click("#mapBtn");
+await page.waitForFunction(() => S.trip.mapImg, null, { timeout: 30000 });
+ok((await page.evaluate(() => S.trip.mapSource)) === "esri", "auch OSM.de gesperrt: Esri");
+blockEsri = true;
+await page.evaluate(() => { S.trip.mapImg = ""; S.trip.mapSource = ""; renderPanel(); });
+await page.click("#mapBtn");
+await page.waitForFunction(() => S.trip.mapImg, null, { timeout: 30000 });
+ok((await page.evaluate(() => S.trip.mapSource)) === "", "alle gesperrt: Schemakarte statt Fehlkacheln");
+blockOsm = false; blockDe = false; blockEsri = false;
+await page.evaluate(() => { S.trip.mapImg = ""; renderPanel(); });
+await page.click("#mapBtn");
+await page.waitForFunction(() => S.trip.mapImg, null, { timeout: 30000 });
+ok((await page.evaluate(() => S.trip.mapSource)) === "osm", "wieder frei: OpenStreetMap");
 
 console.log("Vorlagen");
 await page.click('[data-tab="trip"]');

@@ -27,15 +27,22 @@ async function osrmRoute(pts) {
   };
 }
 
-function loadTile(z, x, y) {
-  return new Promise((res) => {
-    const im = new Image();
-    im.crossOrigin = "anonymous";
-    const to = setTimeout(() => res(null), 9000);
-    im.onload = () => { clearTimeout(to); res(im); };
-    im.onerror = () => { clearTimeout(to); res(null); };
-    im.src = `https://tile.openstreetmap.org/${z}/${x}/${y}.png`;
-  });
+/* Kachelanbieter in der Reihenfolge, in der sie versucht werden. OpenStreetMap verlangt einen Referer und
+   sperrt sonst mit 403 (z. B. beim Öffnen der Datei von der Festplatte); dann springen die nächsten ein.
+   (CARTO ginge auch, verlangt aber inzwischen einen Schlüssel und blendet sonst ein Wasserzeichen ein.) */
+const TILE_SOURCES = [
+  { id: "osm", name: "OpenStreetMap", url: (z, x, y) => `https://tile.openstreetmap.org/${z}/${x}/${y}.png`, credit: "© OpenStreetMap-Mitwirkende" },
+  { id: "osmde", name: "OpenStreetMap.de", url: (z, x, y) => `https://tile.openstreetmap.de/${z}/${x}/${y}.png`, credit: "© OpenStreetMap-Mitwirkende (openstreetmap.de)" },
+  { id: "esri", name: "Esri", url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/${z}/${y}/${x}`, credit: "Karte: Esri, HERE, Garmin, © OpenStreetMap-Mitwirkende" },
+];
+/* Per fetch statt <img>, damit eine Sperre (403) als Fehler erkannt wird und nicht als Kachel zählt. */
+async function loadTile(src, z, x, y) {
+  try {
+    const r = await fetch(src.url(z, x, y), { signal: AbortSignal.timeout(9000) });
+    if (!r.ok) return null;
+    const b = await r.blob();
+    return /^image\//.test(b.type) ? await createImageBitmap(b) : null;
+  } catch (e) { return null; }
 }
 
 /* Liefert {src, w, h, mode: "osm"|"schema", legs?, km?} */
@@ -69,21 +76,24 @@ async function renderMap(t, { road = true, onStatus = () => {}, noTiles = false,
   const g = cv.getContext("2d");
   g.fillStyle = mix(T.soft, "#FFFFFF", 0.4); g.fillRect(0, 0, MAP_W, MAP_H);
 
-  /* Kacheln */
-  if (!noTiles) onStatus("Kartenkacheln werden geladen …");
+  /* Kacheln: Anbieter nacheinander versuchen, bis mindestens 70 % der Kacheln da sind */
+  const coords = [], nT = 2 ** z;
   const tx0 = Math.floor(ox / TILE), tx1 = Math.floor((ox + MAP_W) / TILE), ty0 = Math.floor(oy / TILE), ty1 = Math.floor((oy + MAP_H) / TILE);
-  const jobs = [], nT = 2 ** z;
-  for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) {
-    if (ty < 0 || ty >= nT) continue;
-    const wx = ((tx % nT) + nT) % nT;
-    if (noTiles) continue;
-    jobs.push(loadTile(z, wx, ty).then((im) => ({ im, tx, ty })));
+  for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) if (ty >= 0 && ty < nT) coords.push({ tx, ty, wx: ((tx % nT) + nT) % nT });
+  let source = null, blocked = false;
+  for (const src of noTiles ? [] : TILE_SOURCES) {
+    onStatus(`Kartenkacheln werden geladen (${src.name}) …`);
+    const tiles = await Promise.all(coords.map((c) => loadTile(src, z, c.wx, c.ty).then((im) => ({ im, ...c }))));
+    const ok = tiles.filter((x) => x.im);
+    if (ok.length >= Math.max(1, tiles.length * 0.7)) {
+      for (const { im, tx, ty } of ok) { g.drawImage(im, tx * TILE - ox, ty * TILE - oy); im.close && im.close(); }
+      source = src; break;
+    }
+    ok.forEach((x) => x.im.close && x.im.close());
+    if (src.id === "osm") blocked = true;
   }
-  const tiles = await Promise.all(jobs);
-  const ok = tiles.filter((x) => x.im);
-  let mode = ok.length >= Math.max(1, tiles.length * 0.7) ? "osm" : "schema";
-  if (mode === "osm") for (const { im, tx, ty } of ok) g.drawImage(im, tx * TILE - ox, ty * TILE - oy);
-  else drawSchemaGrid(g, T);
+  const mode = source ? "osm" : "schema";
+  if (!source) drawSchemaGrid(g, T);
 
   /* Route */
   const path = (arr) => { g.beginPath(); arr.forEach((p, i) => { const q = to(p); i ? g.lineTo(q.x, q.y) : g.moveTo(q.x, q.y); }); };
@@ -125,7 +135,7 @@ async function renderMap(t, { road = true, onStatus = () => {}, noTiles = false,
   }
 
   /* Quellenangabe */
-  const credit = mode === "osm" ? "© OpenStreetMap-Mitwirkende" : "Schemakarte (ohne Kartenhintergrund)";
+  const credit = source ? source.credit : "Schemakarte (ohne Kartenhintergrund)";
   g.font = "15px Helvetica, Arial, sans-serif"; g.textAlign = "right"; g.textBaseline = "alphabetic";
   const cw = g.measureText(credit).width + 14;
   g.fillStyle = "rgba(255,255,255,.85)"; g.fillRect(MAP_W - cw, MAP_H - 24, cw, 24);
@@ -134,7 +144,7 @@ async function renderMap(t, { road = true, onStatus = () => {}, noTiles = false,
   let src;
   try { src = cv.toDataURL("image/jpeg", 0.88); }
   catch (e) { /* Canvas durch fremde Kacheln gesperrt: Schemakarte */ return renderMap(t, { noTiles: true, pre: { ...info, geom } }); }
-  return { src, w: MAP_W, h: MAP_H, mode, km: info.km, legs: info.legs };
+  return { src, w: MAP_W, h: MAP_H, mode, source: source ? source.id : "", blocked, km: info.km, legs: info.legs };
 }
 
 function drawSchemaGrid(g, T) {
