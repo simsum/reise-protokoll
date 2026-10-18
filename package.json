@@ -1,13 +1,13 @@
 {
   "name": "reise-protokoll",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Reisetagebuch als PDF: Vorlagen nach Reiseart, Deckseite mit Übersicht und Routenkarte – läuft komplett im Browser.",
   "license": "MIT",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "test": "node scripts/build.mjs && node test/e2e.mjs && node test/projekt.mjs"
+    "test": "node scripts/build.mjs && node test/e2e.mjs && node test/projekt.mjs && node test/wetter.mjs"
   },
   "devDependencies": {
     "exifr": "7.1.3",

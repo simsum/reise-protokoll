@@ -41,6 +41,7 @@ main { flex: 1; display: flex; min-height: 0; }
 .row > * { min-width: 0; }
 .row.two > .f { flex: 1; }
 .wx { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 6px; }
+.wxhint { margin: -4px 0 10px; }
 .chk { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
 small { color: var(--mut); font-size: 12px; }
 .geo.ok { color: #2f6b4f; }
@@ -136,7 +137,7 @@ body.dragging::after { content: "Fotos hier ablegen (oder ein Projekt-PDF zum Ö
 
 <div id="app">
   <header class="top">
-    <div class="brand"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s6.5-5.7 6.5-11a6.5 6.5 0 1 0-13 0C5.5 15.3 12 21 12 21z"/><circle cx="12" cy="10" r="2.4"/></svg> Reise-Protokoll <span class="ver">v0.3.0</span></div>
+    <div class="brand"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s6.5-5.7 6.5-11a6.5 6.5 0 1 0-13 0C5.5 15.3 12 21 12 21z"/><circle cx="12" cy="10" r="2.4"/></svg> Reise-Protokoll <span class="ver">v0.4.0</span></div>
     <div class="grow"></div>
     <select id="demo" title="Beispielreise laden">
       <option value="">Beispiel laden …</option>
@@ -306,7 +307,7 @@ const blankPlace = () => ({ name: "", lat: null, lon: null });
 function newDay(date = "") {
   return {
     id: uid(), date, place: blankPlace(), from: "", km: "", drive: "", title: "", lodging: "",
-    weather: "", tmin: "", tmax: "", text: "", plan: "",
+    weather: "", tmin: "", tmax: "", wxAuto: null, text: "", plan: "",
     highlights: "", costs: [], photos: [],
   };
 }
@@ -317,7 +318,7 @@ function newTrip(template = "rundreise") {
     startPlace: blankPlace(), destination: blankPlace(), roundTrip: false,
     days: [], summary: "", summaryAuto: true,
     route: { auto: true, road: true, points: [], km: null, legs: [], mapSig: "" },
-    mapImg: "", mapUser: false, coverPhoto: "", projData: true, embed: "original", ruled: true, costPage: true,
+    mapImg: "", mapUser: false, coverPhoto: "", projData: true, embed: "original", capWeather: true, wxLine: false, ruled: true, costPage: true,
   };
 }
 
@@ -340,7 +341,7 @@ function normalizeTrip(t) {
 /* Ältere oder unvollständige Fotos ergänzen (Arbeitskopie `src` ist Pflicht). */
 function normPhoto(p) {
   const bw = p.bw || p.w || 1, bh = p.bh || p.h || 1;
-  const o = { id: uid(), name: "Foto", type: "", mod: 0, size: 0, file: null, src: "", vsrc: "", gps: null, day: "", time: "", dayFromFile: false, note: "", rot: 0, crop: null, marks: [], ...p, bw, bh };
+  const o = { id: uid(), name: "Foto", type: "", mod: 0, size: 0, file: null, src: "", vsrc: "", gps: null, day: "", time: "", dayFromFile: false, note: "", rot: 0, crop: null, marks: [], wx: null, weather: "", weatherSrc: "", wxTried: false, ...p, bw, bh };
   o.w = o.w || bw; o.h = o.h || bh;
   return o;
 }
@@ -878,7 +879,7 @@ function dayPages(t, i, T, warns) {
   const bodyBottom = shown.length ? stripY - 16 : BOTTOM - 4;
   if (shown.length) {
     const g = 10, w = (CW - g * (shown.length - 1)) / shown.length;
-    shown.forEach((p, k) => photoBlock(pg, p, MX + k * (w + g), stripY, w, stripH, 3, T, warns, `Tag ${i + 1}`));
+    shown.forEach((p, k) => photoBlock(pg, p, MX + k * (w + g), stripY, w, stripH, 3, T, warns, `Tag ${i + 1}`, t.wxLine));
   }
 
   /* Text links */
@@ -906,7 +907,7 @@ function dayPages(t, i, T, warns) {
   for (let k = 0; k < more.length; k += per) {
     const p3 = new Pg(T); out.push(p3);
     const y0 = miniHeader(p3, `Tag ${i + 1} · Fotos`, title), chunk = more.slice(k, k + per);
-    galleryCells(chunk.length, MX, y0, CW, BOTTOM - y0).forEach((c, n) => photoBlock(p3, chunk[n], c.x, c.y, c.w, c.h, 6, T, warns, `Tag ${i + 1}`));
+    galleryCells(chunk.length, MX, y0, CW, BOTTOM - y0).forEach((c, n) => photoBlock(p3, chunk[n], c.x, c.y, c.w, c.h, 6, T, warns, `Tag ${i + 1}`, t.wxLine));
   }
   return out;
 }
@@ -914,11 +915,13 @@ function dayPages(t, i, T, warns) {
 /* Rahmen für n Fotos (1–6) in einer Fläche; Höhen begrenzt, damit nichts überlang wird */
 /* ---------- Foto mit Markierungen, Bildunterschrift und Notizen zu den Nummern ----------
    Hat das Foto Markierungen, wird es ganz gezeigt (Rand bleibt frei), sonst füllt es den Rahmen. */
-function photoBlock(pg, p, x, y, w, h, maxLines, T, warns, where) {
+function photoBlock(pg, p, x, y, w, h, maxLines, T, warns, where, wxLine) {
   const v = photoView(p), LH = 10.5, lines = [];
   const cap = (p.note || "").trim();
+  const wxl = wxLine && p.weather ? (p.time ? p.time.slice(0, 5) + " Uhr · " : "") + p.weather : "";
   if (cap) wrapAll(cap, "I", 8.5, w).forEach((l) => lines.push({ t: l, f: "I" }));
   NUMS(p).forEach((m, k) => { if ((m.note || "").trim()) wrapAll(m.note, "R", 8, w - 14).forEach((l, n) => lines.push({ t: l, f: "R", n: n ? 0 : k + 1, c: m.c })); });
+  if (wxl) wrapAll(wxl, "R", 7.5, w).slice(0, 2).forEach((l) => lines.push({ t: fitT(l, "R", 7.5, w), f: "R", wx: true }));
   let shown = lines;
   if (lines.length > maxLines) { shown = lines.slice(0, maxLines); shown[maxLines - 1] = { ...shown[maxLines - 1], t: fitT(shown[maxLines - 1].t + " …", shown[maxLines - 1].f, 8.5, w - 14) }; warns.push(`${where}: Eine Bildunterschrift ist zu lang und wird gekürzt.`); }
   const th = shown.length ? shown.length * LH + 5 : 0, ih = Math.max(20, h - th);
@@ -934,7 +937,7 @@ function photoBlock(pg, p, x, y, w, h, maxLines, T, warns, where) {
       pg.rect(x, ty + 0.5, 8, 8, { fill: l.c, r: 4 });
       pg.text(x + 4, ty + 1.9, String(l.n), { f: "B", s: 5.8, c: numInk(l.c), a: "c" });
     }
-    pg.text(l.f === "I" ? x : x + 12, ty, l.t, { f: l.f, s: l.f === "I" ? 8.5 : 8, c: l.f === "I" ? T.ink : T.muted });
+    pg.text(l.f === "I" || l.wx ? x : x + 12, ty, l.t, { f: l.f, s: l.f === "I" ? 8.5 : l.wx ? 7.5 : 8, c: l.f === "I" ? T.ink : T.muted });
   });
 }
 
@@ -1414,6 +1417,7 @@ async function makePhoto(file, meta) {
     id: uid(), name: file.name || "Foto", type: file.type || "", mod: file.lastModified || 0, size: file.size || 0, file,
     src: reuse ? await blobToDataUrl(file) : cv.toDataURL("image/jpeg", 0.85), bw: cv.width, bh: cv.height, w: cv.width, h: cv.height, vsrc: "",
     gps: null, day: "", time: "", dayFromFile: false, note: "", rot: 0, crop: null, marks: [],
+    wx: null, weather: "", weatherSrc: "", wxTried: false,
   };
   if (meta) return applyPhotoMeta(p, meta);
   let ex = null;
@@ -1433,7 +1437,7 @@ async function makePhoto(file, meta) {
 /* Gespeicherte Angaben übernehmen; Markierungen und Ausschnitt an die Größe der Arbeitskopie anpassen. */
 function applyPhotoMeta(p, m) {
   p.id = m.id || p.id; p.name = m.name || p.name; p.gps = m.gps; p.day = m.day; p.time = m.time; p.dayFromFile = !!m.dayFromFile; p.note = m.note;
-  p.rot = m.rot;
+  p.rot = m.rot; p.wx = m.wx; p.weather = m.weather; p.weatherSrc = m.weatherSrc; p.wxTried = !!(m.wx || m.weather);
   const f = m.bw > 0 ? p.bw / m.bw : 1;
   const sc = (o) => { const q = { ...o }; for (const k of ["x", "y", "x2", "y2", "r"]) if (k in q) q[k] = q[k] * f; return q; };
   p.marks = m.marks.map(sc);
@@ -1587,6 +1591,12 @@ function cleanMark(m) {
   else { if (!isNum(m.r) || m.r <= 0) return null; o.r = m.r; if (m.t === "num") o.note = clipStr(m.note, 500); }
   return o;
 }
+function cleanWx(x) {
+  if (!x || typeof x !== "object" || !["brightsky", "openmeteo"].includes(x.src)) return null;
+  const o = { src: x.src, kind: oneOf(x.kind, ["", ...WEATHER.map((w) => w.id)], ""), cond: clipStr(x.cond, 40), model: x.model === "era5" ? "era5" : "", station: clipStr(x.station, 60) };
+  for (const k of ["t", "feels", "hum", "wind", "dir", "gust", "rain", "cloud", "press", "dist"]) o[k] = wxNum(x[k]);
+  return o;
+}
 function cleanPhotoMeta(g, seen) {
   g = g && typeof g === "object" ? g : {};
   return {
@@ -1594,6 +1604,7 @@ function cleanPhotoMeta(g, seen) {
     att: /^\d{4}$/.test(g.att) ? g.att : null, shrunk: !!g.shrunk, day: cleanIso(g.day), time: /^\d\d:\d\d:\d\d$/.test(g.time) ? g.time : "", dayFromFile: !!g.dayFromFile,
     gps: cleanGeo(g.gps), note: clipStr(g.note, 1000), rot: oneOf(g.rot, [0, 1, 2, 3], 0), crop: cleanCrop(g.crop),
     marks: (Array.isArray(g.marks) ? g.marks : []).slice(0, 300).map(cleanMark).filter(Boolean), bw: num(g.bw, 1, 20000, 0), bh: num(g.bh, 1, 20000, 0),
+    wx: cleanWx(g.wx), weather: clipStr(g.weather, 300), weatherSrc: oneOf(g.weatherSrc, ["", "brightsky", "openmeteo", "manual"], ""),
   };
 }
 function cleanTrip(j) {
@@ -1605,7 +1616,7 @@ function cleanTrip(j) {
     currency: typeof t.currency === "string" && /^[A-Z]{3}$/.test(t.currency) ? t.currency : "EUR", start: cleanIso(t.start),
     startPlace: cleanPlace(t.startPlace), destination: cleanPlace(t.destination), roundTrip: !!t.roundTrip,
     summary: clipStr(t.summary, 4000), summaryAuto: t.summaryAuto !== false, mapUser: !!t.mapUser, ruled: t.ruled !== false, costPage: t.costPage !== false,
-    projData: t.projData !== false, embed: oneOf(t.embed, ["original", "work"], "original"),
+    projData: t.projData !== false, capWeather: t.capWeather !== false, wxLine: !!t.wxLine, embed: oneOf(t.embed, ["original", "work"], "original"),
     mapW: num(t.mapW, 1, 20000, 0), mapH: num(t.mapH, 1, 20000, 0), coverW: num(t.coverW, 1, 20000, 0), coverH: num(t.coverH, 1, 20000, 0),
     hasMap: !!t.hasMap, hasCover: !!t.hasCover,
     route: {
@@ -1617,7 +1628,7 @@ function cleanTrip(j) {
       d = d && typeof d === "object" ? d : {};
       return {
         id: cleanId(d.id, seen), date: cleanIso(d.date), place: cleanPlace(d.place), from: clipStr(d.from, 200), km: clipStr(d.km, 20), drive: clipStr(d.drive, 20),
-        title: clipStr(d.title, 200), lodging: clipStr(d.lodging, 200), weather: oneOf(d.weather, ["", ...WEATHER.map((w) => w.id)], ""), tmin: clipStr(d.tmin, 12), tmax: clipStr(d.tmax, 12),
+        title: clipStr(d.title, 200), lodging: clipStr(d.lodging, 200), weather: oneOf(d.weather, ["", ...WEATHER.map((w) => w.id)], ""), tmin: clipStr(d.tmin, 12), tmax: clipStr(d.tmax, 12), wxAuto: typeof d.wxAuto === "boolean" ? d.wxAuto : null,
         text: clipStr(d.text, 20000), plan: clipStr(d.plan, 8000), highlights: clipStr(d.highlights, 4000),
         costs: (Array.isArray(d.costs) ? d.costs : []).slice(0, 200).map((c) => ({ id: cleanId(c && c.id, seen), l: clipStr(c && c.l, 200), cat: oneOf(c && c.cat, CATS.map((k) => k.id), "sonstiges"), a: clipStr(c && c.a, 20) })),
         photos: (Array.isArray(d.photos) ? d.photos : []).slice(0, 500).map((g) => cleanPhotoMeta(g, photoIds)),
@@ -1630,7 +1641,12 @@ function cleanTrip(j) {
 
 /* ---------- Schreiben ---------- */
 function jsonOfTrip(t, attOf, shrunk) {
-  const o = JSON.parse(JSON.stringify(t, (k, v) => (k === "src" || k === "vsrc" || k === "file" || k === "mapImg" || k === "coverPhoto" ? undefined : v)));
+  // Bilddaten gehören nicht in die JSON (sie stehen als Anhänge im PDF); `src` nur bei Fotos weglassen (die Wetterquelle heißt auch so)
+  const o = JSON.parse(JSON.stringify(t, function (k, v) {
+    if (k === "mapImg" || k === "coverPhoto") return undefined;
+    if ((k === "src" || k === "vsrc" || k === "file") && typeof this.bw === "number") return undefined;
+    return v;
+  }));
   o.days.forEach((d) => d.photos.forEach((p) => { p.att = attOf.get(p.id) || null; p.shrunk = shrunk; }));
   o.hasMap = !!t.mapImg; o.hasCover = !!t.coverPhoto;
   return { app: "Reise-Protokoll", format: FORMAT, created: new Date().toISOString(), trip: o };
@@ -1723,6 +1739,140 @@ async function readProjectPdf(file, onProgress) {
   return { trip: t, missing, unreadable, total };
 }
 
+/* ===== 78-weather.js ===== */
+/* ---------- Wetter zur Aufnahmezeit (wie im Foto-Protokoll) ----------
+   Für Fotos mit EXIF-Aufnahmezeit und GPS wird das Wetter der nächsten vollen Stunde abgefragt:
+   zuerst Bright Sky (DWD, Station im Umkreis von 30 km), sonst Open-Meteo. Die Kamerazeit hat keine
+   Zeitzone und gilt als Ortszeit am Aufnahmeort. Aus den Fotos eines Tages entstehen Wetter und
+   Temperaturspanne des Tages (nur solange sie nicht von Hand geändert wurden). */
+let wxState = "unknown"; // unknown | ok | blocked
+const wxCache = new Map();
+let wxChain = Promise.resolve(), wxLast = 0;
+const wxNum = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+
+const WX_ICON = { "clear-day": "sonnig", "clear-night": "klar", "partly-cloudy-day": "teils bewölkt", "partly-cloudy-night": "teils bewölkt", cloudy: "bewölkt", fog: "Nebel", wind: "windig", rain: "Regen", sleet: "Schneeregen", snow: "Schnee", hail: "Hagel", thunderstorm: "Gewitter" };
+const WX_COND = { dry: "trocken", fog: "Nebel", rain: "Regen", sleet: "Schneeregen", snow: "Schnee", hail: "Hagel", thunderstorm: "Gewitter" };
+const WMO_DE = { 1: "heiter", 2: "teils bewölkt", 3: "bedeckt", 45: "Nebel", 48: "Reifnebel", 51: "leichter Nieselregen", 53: "Nieselregen", 55: "starker Nieselregen", 56: "gefrierender Nieselregen", 57: "gefrierender Nieselregen",
+  61: "leichter Regen", 63: "Regen", 65: "starker Regen", 66: "gefrierender Regen", 67: "gefrierender Regen", 71: "leichter Schneefall", 73: "Schneefall", 75: "starker Schneefall", 77: "Schneegriesel",
+  80: "leichte Regenschauer", 81: "Regenschauer", 82: "starke Regenschauer", 85: "Schneeschauer", 86: "starke Schneeschauer", 95: "Gewitter", 96: "Gewitter mit Hagel", 99: "Gewitter mit Hagel" };
+/* Zuordnung zu den Wettersymbolen der Tagesseite (WEATHER in 10-model.js) */
+const KIND_OF_ICON = { "clear-day": "sun", "clear-night": "sun", "partly-cloudy-day": "partly", "partly-cloudy-night": "partly", cloudy: "cloud", fog: "fog", wind: "cloud", rain: "rain", sleet: "snow", snow: "snow", hail: "storm", thunderstorm: "storm" };
+const kindOfWmo = (c) => (c === 0 ? "sun" : c === 1 || c === 2 ? "partly" : c === 3 ? "cloud" : c === 45 || c === 48 ? "fog" : c >= 95 ? "storm" : (c >= 71 && c <= 77) || c === 85 || c === 86 ? "snow" : c >= 51 ? "rain" : "");
+const kindOfCloud = (c) => (c === null ? "" : c < 25 ? "sun" : c < 60 ? "partly" : "cloud");
+const DIRS = ["N", "NNO", "NO", "ONO", "O", "OSO", "SO", "SSO", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
+const compass = (deg) => DIRS[Math.round((((deg % 360) + 360) % 360) / 22.5) % 16];
+const wxCloudWord = (c) => (c === null ? "" : c < 15 ? "klar" : c < 40 ? "heiter" : c < 75 ? "teils bewölkt" : c < 95 ? "überwiegend bewölkt" : "bedeckt");
+
+/* Kurze Zeile (unter dem Foto) und volle Zeile (Hinweis im Editor) */
+function wxText(x, full) {
+  if (!x) return "";
+  const n0 = (v) => String(Math.round(v)), n1 = (v) => fmtNum(v, 1), has = (v) => wxNum(v) !== null;
+  const parts = [x.cond || ""];
+  if (has(x.t)) parts.push(n1(x.t) + " °C" + (full && has(x.feels) && Math.abs(x.feels - x.t) >= 1 ? ` (gefühlt ${n1(x.feels)} °C)` : ""));
+  if (has(x.wind)) parts.push(`Wind ${n0(x.wind)} km/h` + (has(x.dir) ? " aus " + compass(x.dir) : "") + (full && has(x.gust) && x.gust > x.wind + 1 ? `, Böen ${n0(x.gust)} km/h` : ""));
+  if (has(x.rain) && x.rain > 0) parts.push(`Niederschlag ${n1(x.rain)} mm/h`);
+  if (full) {
+    if (has(x.hum)) parts.push(`Luftfeuchte ${n0(x.hum)} %`);
+    if (has(x.press)) parts.push(`Luftdruck ${n0(x.press)} hPa`);
+    parts.push("Quelle: " + (x.src === "brightsky" ? (x.station ? `DWD Station ${x.station}${has(x.dist) ? " (" + n1(x.dist / 1000) + " km)" : ""}` : "DWD") : x.model === "era5" ? "Open-Meteo, ERA5-Modell" : "Open-Meteo"));
+  } else parts.push(x.src === "brightsky" ? "DWD" : "Open-Meteo");
+  return parts.filter(Boolean).join(" · ");
+}
+
+/* nächste volle Stunde als Wandzeit (die Uhrzeit wird nur zum Rechnen als UTC behandelt) */
+function wxHour(day, time) {
+  const [y, m, d] = day.split("-").map(Number), [H, M] = time.split(":").map(Number), q = (n) => String(n).padStart(2, "0");
+  const t = new Date(Date.UTC(y, m - 1, d, H, M + 30));
+  return { day: `${t.getUTCFullYear()}-${q(t.getUTCMonth() + 1)}-${q(t.getUTCDate())}`, hh: q(t.getUTCHours()) };
+}
+
+async function brightSky(g, h) {
+  const ts = `${h.day}T${h.hh}:00`;
+  const r = await fetch(`https://api.brightsky.dev/weather?lat=${g.lat.toFixed(4)}&lon=${g.lon.toFixed(4)}&date=${ts}&last_date=${ts}&tz=Europe/Berlin&max_dist=30000`, { signal: AbortSignal.timeout(12000) });
+  if (r.status === 404) return null; // keine Station im Umkreis (z. B. im Ausland)
+  if (!r.ok) throw new Error("Bright Sky " + r.status);
+  const j = await r.json(), w = j.weather && j.weather[0];
+  if (!w || wxNum(w.temperature) === null) return null;
+  const st = (j.sources || []).find((s) => s.id === w.source_id), cl = wxNum(w.cloud_cover);
+  return { src: "brightsky", kind: KIND_OF_ICON[w.icon] || kindOfCloud(cl), cond: WX_ICON[w.icon] || WX_COND[w.condition] || wxCloudWord(cl), t: wxNum(w.temperature), hum: wxNum(w.relative_humidity),
+    wind: wxNum(w.wind_speed), dir: wxNum(w.wind_direction), gust: wxNum(w.wind_gust_speed), rain: wxNum(w.precipitation), cloud: cl, press: wxNum(w.pressure_msl),
+    station: st ? clipStr(st.station_name, 60) : "", dist: st ? wxNum(st.distance) : null };
+}
+
+async function openMeteo(g, h) {
+  const age = (Date.now() - Date.UTC(+h.day.slice(0, 4), +h.day.slice(5, 7) - 1, +h.day.slice(8, 10))) / 864e5;
+  if (age < -1) return null; // Datum in der Zukunft: kein Wetter
+  const era5 = age > 80; // die Vorhersage-Schnittstelle reicht rund 90 Tage zurück, ältere Tage kommen aus dem Archiv
+  const vars = "temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code,pressure_msl,cloud_cover,wind_speed_10m,wind_direction_10m,wind_gusts_10m,is_day";
+  const r = await fetch(`https://${era5 ? "archive-api" : "api"}.open-meteo.com/v1/${era5 ? "archive" : "forecast"}?latitude=${g.lat.toFixed(4)}&longitude=${g.lon.toFixed(4)}&start_date=${h.day}&end_date=${h.day}&hourly=${vars}&timezone=auto`, { signal: AbortSignal.timeout(12000) });
+  if (r.status === 400) return null;
+  if (!r.ok) throw new Error("Open-Meteo " + r.status);
+  const j = await r.json(), hr = j.hourly, i = hr && Array.isArray(hr.time) ? hr.time.indexOf(`${h.day}T${h.hh}:00`) : -1;
+  if (i < 0) return null;
+  const v = (k) => wxNum(hr[k] && hr[k][i]);
+  if (v("temperature_2m") === null) return null;
+  const code = v("weather_code");
+  return { src: "openmeteo", model: era5 ? "era5" : "", kind: kindOfWmo(code) || kindOfCloud(v("cloud_cover")), cond: code === 0 ? (v("is_day") === 0 ? "klar" : "sonnig") : WMO_DE[code] || wxCloudWord(v("cloud_cover")),
+    t: v("temperature_2m"), feels: v("apparent_temperature"), hum: v("relative_humidity_2m"), wind: v("wind_speed_10m"), dir: v("wind_direction_10m"), gust: v("wind_gusts_10m"),
+    rain: v("precipitation"), cloud: v("cloud_cover"), press: v("pressure_msl") };
+}
+
+async function fetchWx(g, h) { // Bright Sky zuerst, bei fehlender Station oder Fehler Open-Meteo
+  let netErr = null;
+  try { const r = await brightSky(g, h); if (r) return r; } catch (e) { netErr = e; }
+  try { return await openMeteo(g, h); } catch (e) { throw netErr || e; }
+}
+
+/* ---------- Anwendung auf Fotos und Tage ---------- */
+const ownerDay = (p) => S.trip.days.find((d) => d.photos.includes(p));
+const wxWanted = (p) => S.trip.capWeather && p.gps && p.day && p.time && !p.dayFromFile && p.weatherSrc !== "manual" && !p.wx && !p.wxTried && !!ownerDay(p);
+const wxMayFill = (d) => d.wxAuto === true || (d.wxAuto == null && !d.weather && !String(d.tmin).trim() && !String(d.tmax).trim());
+const KIND_PRIO = ["storm", "snow", "rain", "fog", "cloud", "partly", "sun"];
+
+/* Wetter und Temperaturspanne eines Tages aus den Fotos (Mehrheit der Wetterlagen, bei Gleichstand die „schlechtere“) */
+function deriveDayWeather(d) {
+  if (!wxMayFill(d)) return false;
+  const ws = d.photos.map((p) => p.wx).filter((x) => x && x.t != null);
+  if (!ws.length) return false;
+  const ts = ws.map((x) => x.t), count = {};
+  ws.forEach((x) => { if (x.kind) count[x.kind] = (count[x.kind] || 0) + 1; });
+  const best = KIND_PRIO.filter((k) => count[k]).sort((a, b) => count[b] - count[a])[0];
+  d.tmin = String(Math.round(Math.min(...ts))); d.tmax = String(Math.round(Math.max(...ts)));
+  if (best) d.weather = best;
+  d.wxAuto = true;
+  return true;
+}
+
+function queueWeather(p) { wxChain = wxChain.then(() => resolveWeather(p)).catch(() => {}); }
+function queueAllWeather() { S.trip.days.forEach((d) => d.photos.forEach(queueWeather)); }
+
+async function resolveWeather(p) {
+  if (!wxWanted(p) || wxState === "blocked") return;
+  const h = wxHour(p.day, p.time), key = `${p.gps.lat.toFixed(2)},${p.gps.lon.toFixed(2)},${h.day}T${h.hh}`;
+  let wx = wxCache.get(key);
+  if (!wx) {
+    const wait = 350 - (Date.now() - wxLast); if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    wxLast = Date.now();
+    try { wx = await fetchWx(p.gps, h); if (wx) wxCache.set(key, wx); wxState = "ok"; }
+    catch (e) {
+      console.warn("Wetter", e);
+      if (wxState !== "ok") { wxState = "blocked"; toast("Wetterdaten sind nicht erreichbar (kein Internet oder gesperrt)."); }
+      return;
+    }
+  }
+  if (!wxWanted(p)) return;
+  p.wxTried = true;
+  if (wx) { p.wx = { ...wx }; p.weather = wxText(wx); p.weatherSrc = wx.src; const d = ownerDay(p); if (d) deriveDayWeather(d); }
+  changed(); if (S.tab === "days") renderPanel();
+}
+
+/* Wetter eines Tages neu aus den Fotos ermitteln (hebt eine manuelle Änderung auf) */
+function resetDayWeather(d) {
+  wxState = "unknown"; d.wxAuto = true;
+  d.photos.forEach((p) => { if (p.weatherSrc !== "manual") { p.wx = null; p.weather = ""; p.weatherSrc = ""; } p.wxTried = false; });
+  d.photos.forEach(queueWeather);
+}
+
 /* ===== 80-ui.js ===== */
 /* ---------- Oberfläche ---------- */
 const S = { trip: newTrip(), tab: "trip", open: new Set(), newPoint: blankPlace(), busy: false };
@@ -1766,6 +1916,9 @@ function panelTrip() {
   <h3>Seiten</h3>
   ${chk("Linien zum Handschreiben in freien Textbereichen", "ruled", t.ruled)}
   ${chk("Kostenübersicht am Ende", "costPage", t.costPage)}
+  <h3>Wetter</h3>
+  ${chk("Wetter aus den Fotodaten ermitteln (Koordinaten und Aufnahmezeit gehen dafür an DWD/Bright Sky bzw. Open-Meteo)", "capWeather", t.capWeather)}
+  ${chk("Wetter unter den Fotos anzeigen", "wxLine", t.wxLine)}
   <h3>PDF speichern</h3>
   ${chk("Bearbeitungsdaten und Fotos im PDF speichern (PDF lässt sich später wieder öffnen und weiterbearbeiten)", "projData", t.projData)}
   ${selFld("Fotos im PDF einbetten", "embed", t.embed, [["original", "Originaldateien (volle Qualität, EXIF, großes PDF)"], ["work", "Arbeitskopien (1600 px, kleines PDF)"]])}
@@ -1787,7 +1940,7 @@ const DAY_FIELDS = {
   km: (d) => fld("Kilometer", `d:${d.id}.km`, d.km, { inputmode: "decimal" }),
   drive: (d) => fld("Fahrzeit (Std:Min)", `d:${d.id}.drive`, d.drive, { ph: "2:30" }),
   title: (d) => fld("Titel des Tages", `d:${d.id}.title`, d.title, { ph: "z. B. Salzkammergut" }),
-  weather: (d) => `<div class="wx">${selFld("Wetter", `d:${d.id}.weather`, d.weather, [["", "–"], ...WEATHER.map((w) => [w.id, w.name])])}${fld("Min °C", `d:${d.id}.tmin`, d.tmin, { inputmode: "decimal" })}${fld("Max °C", `d:${d.id}.tmax`, d.tmax, { inputmode: "decimal" })}</div>`,
+  weather: (d) => `<div class="wx">${selFld("Wetter", `d:${d.id}.weather`, d.weather, [["", "–"], ...WEATHER.map((w) => [w.id, w.name])])}${fld("Min °C", `d:${d.id}.tmin`, d.tmin, { inputmode: "decimal" })}${fld("Max °C", `d:${d.id}.tmax`, d.tmax, { inputmode: "decimal" })}</div>${wxHint(d)}`,
   lodging: (d) => fld("Unterkunft", `d:${d.id}.lodging`, d.lodging),
   text: (d) => fld(S.trip.template === "kurztrip" ? "Notizen" : "Tagebuch", `d:${d.id}.text`, d.text, { rows: 7, ph: "Was haben wir erlebt?" }),
   plan: (d) => fld("Tagesplan (eine Zeile pro Punkt, Uhrzeit vorn)", `d:${d.id}.plan`, d.plan, { rows: 7, ph: "09:30 Frühstück im Café, 11:00 Stadtrundgang, …" }),
@@ -1795,6 +1948,15 @@ const DAY_FIELDS = {
   costs: (d) => `<div class="f"><span>Ausgaben <b data-sum="${d.id}">${dayCosts(d) ? "· " + money(dayCosts(d), S.trip.currency) : ""}</b></span>${d.costs.map((c) => `<div class="cost"><input data-k="d:${d.id}.costs.${c.id}.l" value="${esc(c.l)}" placeholder="Bezeichnung"><select data-k="d:${d.id}.costs.${c.id}.cat">${CATS.map((k) => `<option value="${k.id}" ${k.id === c.cat ? "selected" : ""}>${esc(k.name)}</option>`).join("")}</select><input data-k="d:${d.id}.costs.${c.id}.a" value="${esc(c.a)}" inputmode="decimal" placeholder="0,00"><button class="ico" data-act="delCost" data-day="${d.id}" data-id="${c.id}" title="Entfernen">×</button></div>`).join("")}<button data-act="addCost" data-day="${d.id}">+ Ausgabe</button></div>`,
   photos: (d) => `<div class="f"><span>Fotos (${d.photos.length})</span>${d.photos.map((p) => photoCard(d, p)).join("")}<label class="drop" style="padding:6px;margin:0">+ Fotos wählen<input type="file" accept="image/*,.heic,.heif" multiple hidden data-photos="${d.id}"></label></div>`,
 };
+
+/* Hinweis unter dem Wetter eines Tages: automatisch aus Fotodaten oder Knopf zum Ermitteln */
+function wxHint(d) {
+  if (!S.trip.capWeather) return "";
+  const can = d.photos.some((p) => p.gps && p.day && p.time && !p.dayFromFile);
+  if (!can) return "";
+  const n = d.photos.filter((p) => p.wx).length;
+  return `<div class="wxhint"><small>${d.wxAuto && n ? `Aus ${n} Fotodaten ermittelt (DWD/Open-Meteo).` : "Wetter lässt sich aus den Fotodaten ermitteln."}</small> <button class="ghost" data-act="resetWx" data-day="${d.id}">${n ? "neu ermitteln" : "ermitteln"}</button></div>`;
+}
 
 function daySummary(i) {
   const d = S.trip.days[i], name = dayPlaceName(S.trip, d);
@@ -1888,6 +2050,8 @@ document.addEventListener("input", (e) => {
   if (!key) return;
   const r = getRef(key); if (!r) return;
   r.obj[r.prop] = el.type === "checkbox" ? el.checked : el.value;
+  if (/^d:[^.]+\.(weather|tmin|tmax)$/.test(key)) { const wd = dayOf(key.split(".")[0].slice(2)); if (wd) wd.wxAuto = false; }
+  if (key === "capWeather" && el.checked) { wxState = "unknown"; queueAllWeather(); }
   if (key === "route.auto" && el.checked) t_resetRoute();
   if (key === "summaryAuto" && el.checked) { S.trip.summary = suggestSummary(S.trip); const sm = $('[data-k="summary"]'); if (sm) sm.value = S.trip.summary; }
   const card = el.closest("details.day");
@@ -1930,6 +2094,7 @@ document.addEventListener("click", async (e) => {
       changed(); renderPanel(); break;
     }
     case "theme": t.theme = id; changed(); renderPanel(); break;
+    case "resetWx": { const d = dayOf(dayId); if (d) { wxState = "unknown"; resetDayWeather(d); toast("Wetter wird aus den Fotodaten ermittelt …"); } break; }
     case "addDay": {
       const last = t.days[t.days.length - 1], d = newDay(last && last.date ? addDays(last.date, 1) : t.start || "");
       if (TEMPLATES[t.template].fixedPlace) d.place = { ...t.destination };
@@ -2042,7 +2207,7 @@ async function addPhotosToDay(dayId, files) {
   const d = dayOf(dayId); if (!d) return;
   const { list, bad } = await readPhotos(files.filter(isImageFile));
   d.photos.push(...list); d.photos.sort(photoSort);
-  S.open.add(dayId); changed(); renderPanel();
+  S.open.add(dayId); changed(); renderPanel(); queueAllWeather();
   toast(bad ? `${list.length} Fotos hinzugefügt, ${bad} nicht lesbar.` : `${list.length} Fotos hinzugefügt.`);
 }
 
@@ -2065,7 +2230,7 @@ async function addPhotos(files) {
   const first = made.length ? made.slice().sort(byDate)[0] : null;
   if (!t.start && first && first.date) t.start = first.date;
   const noDate = list.filter((p) => p.dayFromFile).length;
-  changed(); S.tab = "days"; made.forEach((d) => S.open.add(d.id)); renderPanel();
+  changed(); S.tab = "days"; made.forEach((d) => S.open.add(d.id)); renderPanel(); queueAllWeather();
   toast(`${list.length} Fotos zugeordnet${made.length ? `, ${made.length} ${made.length === 1 ? "neuer Tag" : "neue Tage"} angelegt` : ""}${bad ? `, ${bad} nicht lesbar` : ""}${noDate ? `. Bei ${noDate} fehlte das Aufnahmedatum (Dateidatum verwendet)` : ""}.`, 8000);
   /* Orte der neuen Tage aus dem GPS des jeweils letzten Fotos (Abendort), langsam im Hintergrund */
   for (const d of made) {
@@ -2265,6 +2430,7 @@ function loadTrip(t, fresh) {
   refreshDerived(S.trip);
   S.tab = "trip";
   renderPanel(); renderPreview(); scheduleSave();
+  queueAllWeather();
 }
 const hasContent = () => S.trip.days.length > 0 || S.trip.title.trim() !== "";
 

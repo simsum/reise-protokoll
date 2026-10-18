@@ -195,7 +195,7 @@ function dayPages(t, i, T, warns) {
   const bodyBottom = shown.length ? stripY - 16 : BOTTOM - 4;
   if (shown.length) {
     const g = 10, w = (CW - g * (shown.length - 1)) / shown.length;
-    shown.forEach((p, k) => photoBlock(pg, p, MX + k * (w + g), stripY, w, stripH, 3, T, warns, `Tag ${i + 1}`));
+    shown.forEach((p, k) => photoBlock(pg, p, MX + k * (w + g), stripY, w, stripH, 3, T, warns, `Tag ${i + 1}`, t.wxLine));
   }
 
   /* Text links */
@@ -223,7 +223,7 @@ function dayPages(t, i, T, warns) {
   for (let k = 0; k < more.length; k += per) {
     const p3 = new Pg(T); out.push(p3);
     const y0 = miniHeader(p3, `Tag ${i + 1} · Fotos`, title), chunk = more.slice(k, k + per);
-    galleryCells(chunk.length, MX, y0, CW, BOTTOM - y0).forEach((c, n) => photoBlock(p3, chunk[n], c.x, c.y, c.w, c.h, 6, T, warns, `Tag ${i + 1}`));
+    galleryCells(chunk.length, MX, y0, CW, BOTTOM - y0).forEach((c, n) => photoBlock(p3, chunk[n], c.x, c.y, c.w, c.h, 6, T, warns, `Tag ${i + 1}`, t.wxLine));
   }
   return out;
 }
@@ -231,11 +231,13 @@ function dayPages(t, i, T, warns) {
 /* Rahmen für n Fotos (1–6) in einer Fläche; Höhen begrenzt, damit nichts überlang wird */
 /* ---------- Foto mit Markierungen, Bildunterschrift und Notizen zu den Nummern ----------
    Hat das Foto Markierungen, wird es ganz gezeigt (Rand bleibt frei), sonst füllt es den Rahmen. */
-function photoBlock(pg, p, x, y, w, h, maxLines, T, warns, where) {
+function photoBlock(pg, p, x, y, w, h, maxLines, T, warns, where, wxLine) {
   const v = photoView(p), LH = 10.5, lines = [];
   const cap = (p.note || "").trim();
+  const wxl = wxLine && p.weather ? (p.time ? p.time.slice(0, 5) + " Uhr · " : "") + p.weather : "";
   if (cap) wrapAll(cap, "I", 8.5, w).forEach((l) => lines.push({ t: l, f: "I" }));
   NUMS(p).forEach((m, k) => { if ((m.note || "").trim()) wrapAll(m.note, "R", 8, w - 14).forEach((l, n) => lines.push({ t: l, f: "R", n: n ? 0 : k + 1, c: m.c })); });
+  if (wxl) wrapAll(wxl, "R", 7.5, w).slice(0, 2).forEach((l) => lines.push({ t: fitT(l, "R", 7.5, w), f: "R", wx: true }));
   let shown = lines;
   if (lines.length > maxLines) { shown = lines.slice(0, maxLines); shown[maxLines - 1] = { ...shown[maxLines - 1], t: fitT(shown[maxLines - 1].t + " …", shown[maxLines - 1].f, 8.5, w - 14) }; warns.push(`${where}: Eine Bildunterschrift ist zu lang und wird gekürzt.`); }
   const th = shown.length ? shown.length * LH + 5 : 0, ih = Math.max(20, h - th);
@@ -251,7 +253,7 @@ function photoBlock(pg, p, x, y, w, h, maxLines, T, warns, where) {
       pg.rect(x, ty + 0.5, 8, 8, { fill: l.c, r: 4 });
       pg.text(x + 4, ty + 1.9, String(l.n), { f: "B", s: 5.8, c: numInk(l.c), a: "c" });
     }
-    pg.text(l.f === "I" ? x : x + 12, ty, l.t, { f: l.f, s: l.f === "I" ? 8.5 : 8, c: l.f === "I" ? T.ink : T.muted });
+    pg.text(l.f === "I" || l.wx ? x : x + 12, ty, l.t, { f: l.f, s: l.f === "I" ? 8.5 : l.wx ? 7.5 : 8, c: l.f === "I" ? T.ink : T.muted });
   });
 }
 

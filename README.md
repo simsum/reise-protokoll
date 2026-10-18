@@ -20,6 +20,7 @@ Weitere Vorlagen und Farbschemata sind je ein Eintrag im Code, siehe [CLAUDE.md]
 1. **Reise:** Vorlage, Titel, Reisende, Startort, Design.
 2. **Tage:** Tage anlegen (einzeln oder für einen Zeitraum) und ausfüllen. **Fotos hinzufügen** (Knopf oben, Ziehen auf die Seite oder die Fläche im Reiter) nimmt beliebig viele Fotos auf einmal: Die Tage entstehen aus den Aufnahmedaten, die Fotos werden nach Uhrzeit einsortiert, der Ort eines neuen Tages kommt aus dem GPS der Fotos. HEIC-Fotos (iPhone) werden umgewandelt. Zu jedem Foto gibt es eine Bildunterschrift, Drehen, Ausschnitt und **Markieren** (Kreis, Pfeil, nummerierte Markierung mit Notiz). Das alles erscheint im PDF unter dem Foto.
 3. **Karte:** Die Route entsteht automatisch aus Startort, Tagesorten und Foto-GPS und lässt sich von Hand ändern. „Karte erzeugen“ setzt ein Bild aus OpenStreetMap-Kacheln mit der Route zusammen (Straßenroute über OSRM oder Luftlinie). Das Bild ist danach fest. Alternativ ein eigenes Bild (Screenshot) hochladen. Die berechneten Kilometer und Fahrzeiten lassen sich in die Tage übernehmen.
+   **Wetter:** Wetter und Temperaturspanne eines Tages werden automatisch aus den Fotodaten ermittelt (Aufnahmezeit und Ort jedes Fotos, wie im Foto-Protokoll). Von Hand geänderte Werte bleiben unangetastet, „neu ermitteln“ holt sie erneut. Optional steht die Wetterzeile des Fotos unter dem Bild.
 4. **Zusammenfassung:** Vorschlag aus Tagen, Highlights, Kosten, Wetter und Fotos, jederzeit von Hand änderbar.
 5. **PDF erstellen.** Im PDF stecken als Anhänge alle Einstellungen und Eingaben, die Fotos (Originale oder 1600-px-Kopien, wählbar), Karte und Titelfoto. Mit **PDF öffnen** (oder das PDF auf die Seite ziehen) lässt sich das PDF jederzeit wieder bearbeiten, auch mit allen Markierungen. Der Stand wird außerdem automatisch im Browser gesichert.
 
@@ -29,7 +30,8 @@ Weitere Vorlagen und Farbschemata sind je ein Eintrag im Code, siehe [CLAUDE.md]
 
 - Alle Eingaben bleiben im Browser (IndexedDB) beziehungsweise in der Projektdatei.
 - Ins Netz gehen nur: Ortssuche und Ortsnamen aus GPS ([Nominatim](https://nominatim.org/), höchstens eine Anfrage pro Sekunde), Kartenkacheln ([OpenStreetMap](https://www.openstreetmap.org/copyright)) und die Straßenroute ([OSRM](https://project-osrm.org/) Demo-Server) – jeweils nur Koordinaten bzw. Suchtext, nie Fotos. Ohne Internet bleibt das Tool bis auf Suche und Karte nutzbar; die Karte wird dann als Schemakarte gezeichnet.
-- Beim Öffnen werden pdf-lib (cdnjs) und exifr (jsDelivr) geladen.
+- **Wetter** (Standard: an, abschaltbar im Reiter „Reise“): Für Fotos mit EXIF-Aufnahmezeit und GPS gehen **Koordinaten und Aufnahmedatum** pro Foto an [Bright Sky](https://brightsky.dev/) (Daten des Deutschen Wetterdienstes, Station im Umkreis von 30 km) oder sonst an [Open-Meteo](https://open-meteo.com/). Open-Meteo ist nach seinen Bedingungen nur für nicht kommerzielle Nutzung kostenlos. Das Wetter gilt für die nächste Station bzw. das Wettermodell, nicht für den genauen Standort. Fotos ohne EXIF-Zeit bekommen kein automatisches Wetter.
+- Beim Öffnen werden pdf-lib (cdnjs) und exifr (jsDelivr) geladen, HEIC-Fotos laden bei Bedarf heic2any.
 
 ## Entwicklung
 

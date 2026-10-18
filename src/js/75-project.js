@@ -25,6 +25,12 @@ function cleanMark(m) {
   else { if (!isNum(m.r) || m.r <= 0) return null; o.r = m.r; if (m.t === "num") o.note = clipStr(m.note, 500); }
   return o;
 }
+function cleanWx(x) {
+  if (!x || typeof x !== "object" || !["brightsky", "openmeteo"].includes(x.src)) return null;
+  const o = { src: x.src, kind: oneOf(x.kind, ["", ...WEATHER.map((w) => w.id)], ""), cond: clipStr(x.cond, 40), model: x.model === "era5" ? "era5" : "", station: clipStr(x.station, 60) };
+  for (const k of ["t", "feels", "hum", "wind", "dir", "gust", "rain", "cloud", "press", "dist"]) o[k] = wxNum(x[k]);
+  return o;
+}
 function cleanPhotoMeta(g, seen) {
   g = g && typeof g === "object" ? g : {};
   return {
@@ -32,6 +38,7 @@ function cleanPhotoMeta(g, seen) {
     att: /^\d{4}$/.test(g.att) ? g.att : null, shrunk: !!g.shrunk, day: cleanIso(g.day), time: /^\d\d:\d\d:\d\d$/.test(g.time) ? g.time : "", dayFromFile: !!g.dayFromFile,
     gps: cleanGeo(g.gps), note: clipStr(g.note, 1000), rot: oneOf(g.rot, [0, 1, 2, 3], 0), crop: cleanCrop(g.crop),
     marks: (Array.isArray(g.marks) ? g.marks : []).slice(0, 300).map(cleanMark).filter(Boolean), bw: num(g.bw, 1, 20000, 0), bh: num(g.bh, 1, 20000, 0),
+    wx: cleanWx(g.wx), weather: clipStr(g.weather, 300), weatherSrc: oneOf(g.weatherSrc, ["", "brightsky", "openmeteo", "manual"], ""),
   };
 }
 function cleanTrip(j) {
@@ -43,7 +50,7 @@ function cleanTrip(j) {
     currency: typeof t.currency === "string" && /^[A-Z]{3}$/.test(t.currency) ? t.currency : "EUR", start: cleanIso(t.start),
     startPlace: cleanPlace(t.startPlace), destination: cleanPlace(t.destination), roundTrip: !!t.roundTrip,
     summary: clipStr(t.summary, 4000), summaryAuto: t.summaryAuto !== false, mapUser: !!t.mapUser, ruled: t.ruled !== false, costPage: t.costPage !== false,
-    projData: t.projData !== false, embed: oneOf(t.embed, ["original", "work"], "original"),
+    projData: t.projData !== false, capWeather: t.capWeather !== false, wxLine: !!t.wxLine, embed: oneOf(t.embed, ["original", "work"], "original"),
     mapW: num(t.mapW, 1, 20000, 0), mapH: num(t.mapH, 1, 20000, 0), coverW: num(t.coverW, 1, 20000, 0), coverH: num(t.coverH, 1, 20000, 0),
     hasMap: !!t.hasMap, hasCover: !!t.hasCover,
     route: {
@@ -55,7 +62,7 @@ function cleanTrip(j) {
       d = d && typeof d === "object" ? d : {};
       return {
         id: cleanId(d.id, seen), date: cleanIso(d.date), place: cleanPlace(d.place), from: clipStr(d.from, 200), km: clipStr(d.km, 20), drive: clipStr(d.drive, 20),
-        title: clipStr(d.title, 200), lodging: clipStr(d.lodging, 200), weather: oneOf(d.weather, ["", ...WEATHER.map((w) => w.id)], ""), tmin: clipStr(d.tmin, 12), tmax: clipStr(d.tmax, 12),
+        title: clipStr(d.title, 200), lodging: clipStr(d.lodging, 200), weather: oneOf(d.weather, ["", ...WEATHER.map((w) => w.id)], ""), tmin: clipStr(d.tmin, 12), tmax: clipStr(d.tmax, 12), wxAuto: typeof d.wxAuto === "boolean" ? d.wxAuto : null,
         text: clipStr(d.text, 20000), plan: clipStr(d.plan, 8000), highlights: clipStr(d.highlights, 4000),
         costs: (Array.isArray(d.costs) ? d.costs : []).slice(0, 200).map((c) => ({ id: cleanId(c && c.id, seen), l: clipStr(c && c.l, 200), cat: oneOf(c && c.cat, CATS.map((k) => k.id), "sonstiges"), a: clipStr(c && c.a, 20) })),
         photos: (Array.isArray(d.photos) ? d.photos : []).slice(0, 500).map((g) => cleanPhotoMeta(g, photoIds)),
@@ -68,7 +75,12 @@ function cleanTrip(j) {
 
 /* ---------- Schreiben ---------- */
 function jsonOfTrip(t, attOf, shrunk) {
-  const o = JSON.parse(JSON.stringify(t, (k, v) => (k === "src" || k === "vsrc" || k === "file" || k === "mapImg" || k === "coverPhoto" ? undefined : v)));
+  // Bilddaten gehören nicht in die JSON (sie stehen als Anhänge im PDF); `src` nur bei Fotos weglassen (die Wetterquelle heißt auch so)
+  const o = JSON.parse(JSON.stringify(t, function (k, v) {
+    if (k === "mapImg" || k === "coverPhoto") return undefined;
+    if ((k === "src" || k === "vsrc" || k === "file") && typeof this.bw === "number") return undefined;
+    return v;
+  }));
   o.days.forEach((d) => d.photos.forEach((p) => { p.att = attOf.get(p.id) || null; p.shrunk = shrunk; }));
   o.hasMap = !!t.mapImg; o.hasCover = !!t.coverPhoto;
   return { app: "Reise-Protokoll", format: FORMAT, created: new Date().toISOString(), trip: o };

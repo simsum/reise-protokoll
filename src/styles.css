@@ -40,6 +40,7 @@ main { flex: 1; display: flex; min-height: 0; }
 .row > * { min-width: 0; }
 .row.two > .f { flex: 1; }
 .wx { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 6px; }
+.wxhint { margin: -4px 0 10px; }
 .chk { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
 small { color: var(--mut); font-size: 12px; }
 .geo.ok { color: #2f6b4f; }

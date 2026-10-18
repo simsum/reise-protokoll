@@ -40,6 +40,9 @@ function panelTrip() {
   <h3>Seiten</h3>
   ${chk("Linien zum Handschreiben in freien Textbereichen", "ruled", t.ruled)}
   ${chk("Kostenübersicht am Ende", "costPage", t.costPage)}
+  <h3>Wetter</h3>
+  ${chk("Wetter aus den Fotodaten ermitteln (Koordinaten und Aufnahmezeit gehen dafür an DWD/Bright Sky bzw. Open-Meteo)", "capWeather", t.capWeather)}
+  ${chk("Wetter unter den Fotos anzeigen", "wxLine", t.wxLine)}
   <h3>PDF speichern</h3>
   ${chk("Bearbeitungsdaten und Fotos im PDF speichern (PDF lässt sich später wieder öffnen und weiterbearbeiten)", "projData", t.projData)}
   ${selFld("Fotos im PDF einbetten", "embed", t.embed, [["original", "Originaldateien (volle Qualität, EXIF, großes PDF)"], ["work", "Arbeitskopien (1600 px, kleines PDF)"]])}
@@ -61,7 +64,7 @@ const DAY_FIELDS = {
   km: (d) => fld("Kilometer", `d:${d.id}.km`, d.km, { inputmode: "decimal" }),
   drive: (d) => fld("Fahrzeit (Std:Min)", `d:${d.id}.drive`, d.drive, { ph: "2:30" }),
   title: (d) => fld("Titel des Tages", `d:${d.id}.title`, d.title, { ph: "z. B. Salzkammergut" }),
-  weather: (d) => `<div class="wx">${selFld("Wetter", `d:${d.id}.weather`, d.weather, [["", "–"], ...WEATHER.map((w) => [w.id, w.name])])}${fld("Min °C", `d:${d.id}.tmin`, d.tmin, { inputmode: "decimal" })}${fld("Max °C", `d:${d.id}.tmax`, d.tmax, { inputmode: "decimal" })}</div>`,
+  weather: (d) => `<div class="wx">${selFld("Wetter", `d:${d.id}.weather`, d.weather, [["", "–"], ...WEATHER.map((w) => [w.id, w.name])])}${fld("Min °C", `d:${d.id}.tmin`, d.tmin, { inputmode: "decimal" })}${fld("Max °C", `d:${d.id}.tmax`, d.tmax, { inputmode: "decimal" })}</div>${wxHint(d)}`,
   lodging: (d) => fld("Unterkunft", `d:${d.id}.lodging`, d.lodging),
   text: (d) => fld(S.trip.template === "kurztrip" ? "Notizen" : "Tagebuch", `d:${d.id}.text`, d.text, { rows: 7, ph: "Was haben wir erlebt?" }),
   plan: (d) => fld("Tagesplan (eine Zeile pro Punkt, Uhrzeit vorn)", `d:${d.id}.plan`, d.plan, { rows: 7, ph: "09:30 Frühstück im Café, 11:00 Stadtrundgang, …" }),
@@ -69,6 +72,15 @@ const DAY_FIELDS = {
   costs: (d) => `<div class="f"><span>Ausgaben <b data-sum="${d.id}">${dayCosts(d) ? "· " + money(dayCosts(d), S.trip.currency) : ""}</b></span>${d.costs.map((c) => `<div class="cost"><input data-k="d:${d.id}.costs.${c.id}.l" value="${esc(c.l)}" placeholder="Bezeichnung"><select data-k="d:${d.id}.costs.${c.id}.cat">${CATS.map((k) => `<option value="${k.id}" ${k.id === c.cat ? "selected" : ""}>${esc(k.name)}</option>`).join("")}</select><input data-k="d:${d.id}.costs.${c.id}.a" value="${esc(c.a)}" inputmode="decimal" placeholder="0,00"><button class="ico" data-act="delCost" data-day="${d.id}" data-id="${c.id}" title="Entfernen">×</button></div>`).join("")}<button data-act="addCost" data-day="${d.id}">+ Ausgabe</button></div>`,
   photos: (d) => `<div class="f"><span>Fotos (${d.photos.length})</span>${d.photos.map((p) => photoCard(d, p)).join("")}<label class="drop" style="padding:6px;margin:0">+ Fotos wählen<input type="file" accept="image/*,.heic,.heif" multiple hidden data-photos="${d.id}"></label></div>`,
 };
+
+/* Hinweis unter dem Wetter eines Tages: automatisch aus Fotodaten oder Knopf zum Ermitteln */
+function wxHint(d) {
+  if (!S.trip.capWeather) return "";
+  const can = d.photos.some((p) => p.gps && p.day && p.time && !p.dayFromFile);
+  if (!can) return "";
+  const n = d.photos.filter((p) => p.wx).length;
+  return `<div class="wxhint"><small>${d.wxAuto && n ? `Aus ${n} Fotodaten ermittelt (DWD/Open-Meteo).` : "Wetter lässt sich aus den Fotodaten ermitteln."}</small> <button class="ghost" data-act="resetWx" data-day="${d.id}">${n ? "neu ermitteln" : "ermitteln"}</button></div>`;
+}
 
 function daySummary(i) {
   const d = S.trip.days[i], name = dayPlaceName(S.trip, d);
@@ -162,6 +174,8 @@ document.addEventListener("input", (e) => {
   if (!key) return;
   const r = getRef(key); if (!r) return;
   r.obj[r.prop] = el.type === "checkbox" ? el.checked : el.value;
+  if (/^d:[^.]+\.(weather|tmin|tmax)$/.test(key)) { const wd = dayOf(key.split(".")[0].slice(2)); if (wd) wd.wxAuto = false; }
+  if (key === "capWeather" && el.checked) { wxState = "unknown"; queueAllWeather(); }
   if (key === "route.auto" && el.checked) t_resetRoute();
   if (key === "summaryAuto" && el.checked) { S.trip.summary = suggestSummary(S.trip); const sm = $('[data-k="summary"]'); if (sm) sm.value = S.trip.summary; }
   const card = el.closest("details.day");
@@ -204,6 +218,7 @@ document.addEventListener("click", async (e) => {
       changed(); renderPanel(); break;
     }
     case "theme": t.theme = id; changed(); renderPanel(); break;
+    case "resetWx": { const d = dayOf(dayId); if (d) { wxState = "unknown"; resetDayWeather(d); toast("Wetter wird aus den Fotodaten ermittelt …"); } break; }
     case "addDay": {
       const last = t.days[t.days.length - 1], d = newDay(last && last.date ? addDays(last.date, 1) : t.start || "");
       if (TEMPLATES[t.template].fixedPlace) d.place = { ...t.destination };
@@ -316,7 +331,7 @@ async function addPhotosToDay(dayId, files) {
   const d = dayOf(dayId); if (!d) return;
   const { list, bad } = await readPhotos(files.filter(isImageFile));
   d.photos.push(...list); d.photos.sort(photoSort);
-  S.open.add(dayId); changed(); renderPanel();
+  S.open.add(dayId); changed(); renderPanel(); queueAllWeather();
   toast(bad ? `${list.length} Fotos hinzugefügt, ${bad} nicht lesbar.` : `${list.length} Fotos hinzugefügt.`);
 }
 
@@ -339,7 +354,7 @@ async function addPhotos(files) {
   const first = made.length ? made.slice().sort(byDate)[0] : null;
   if (!t.start && first && first.date) t.start = first.date;
   const noDate = list.filter((p) => p.dayFromFile).length;
-  changed(); S.tab = "days"; made.forEach((d) => S.open.add(d.id)); renderPanel();
+  changed(); S.tab = "days"; made.forEach((d) => S.open.add(d.id)); renderPanel(); queueAllWeather();
   toast(`${list.length} Fotos zugeordnet${made.length ? `, ${made.length} ${made.length === 1 ? "neuer Tag" : "neue Tage"} angelegt` : ""}${bad ? `, ${bad} nicht lesbar` : ""}${noDate ? `. Bei ${noDate} fehlte das Aufnahmedatum (Dateidatum verwendet)` : ""}.`, 8000);
   /* Orte der neuen Tage aus dem GPS des jeweils letzten Fotos (Abendort), langsam im Hintergrund */
   for (const d of made) {
@@ -539,6 +554,7 @@ function loadTrip(t, fresh) {
   refreshDerived(S.trip);
   S.tab = "trip";
   renderPanel(); renderPreview(); scheduleSave();
+  queueAllWeather();
 }
 const hasContent = () => S.trip.days.length > 0 || S.trip.title.trim() !== "";
 
