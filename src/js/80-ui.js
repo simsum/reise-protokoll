@@ -123,8 +123,11 @@ function panelMap() {
   const canLegs = r.auto && r.legs && r.legs.length && r.legs.length === r.points.length - 1 && r.points.every(hasGeo);
   return `<h3>Route</h3>
   ${chk("Orte automatisch aus Startort, Tagen und Foto-GPS bilden", "route.auto", r.auto)}
-  ${r.points.length ? r.points.map((p, i) => `<div class="pt"><span class="n">${i + 1}</span>${placeFld("", `route.points.${p.id}`, p).replace("<span></span>", "")}<span class="row"><button class="ico" data-act="ptUp" data-id="${p.id}">↑</button><button class="ico" data-act="ptDown" data-id="${p.id}">↓</button><button class="ico" data-act="ptDel" data-id="${p.id}">×</button></span></div>`).join("") : "<p><small>Noch keine Orte. Startort, Tagesorte oder Fotos mit GPS liefern sie automatisch, oder unten von Hand ergänzen.</small></p>"}
-  ${placeFld("Ort am Ende hinzufügen", "$new", S.newPoint)}
+  ${(() => { let nr = 0; return r.points.length ? r.points.map((p) => `<div class="pt"><span class="n ${p.via ? "via" : ""}">${p.via ? "·" : ++nr}</span><div>${placeFld("", `route.points.${p.id}`, p).replace("<span></span>", "")}${chk("nur für die Route (nicht auf der Karte zeigen)", `route.points.${p.id}.via`, p.via)}</div><span class="row"><button class="ico" data-act="ptUp" data-id="${p.id}">↑</button><button class="ico" data-act="ptDown" data-id="${p.id}">↓</button><button class="ico" data-act="ptDel" data-id="${p.id}">×</button></span></div>`).join("") : "<p><small>Noch keine Orte. Startort, Tagesorte oder Fotos mit GPS liefern sie automatisch, oder unten von Hand ergänzen.</small></p>"; })()}
+  <h3>Ort hinzufügen</h3>
+  ${placeFld("Ort suchen", "$new", S.newPoint)}
+  ${chk("nur für die Route (nicht auf der Karte zeigen): lenkt die Strecke über diesen Ort, z. B. eine Brücke oder Passstraße", "$new.via", S.newPoint.via)}
+  ${selFld("Einfügen", "$new.after", S.newPoint.after || "", [["", "am Ende"], ...r.points.map((p, i) => [String(i), `nach Punkt ${i + 1}: ${p.name}`])])}
   <h3>Karte</h3>
   ${chk("Straßenroute berechnen (OSRM, sonst Luftlinie)", "route.road", r.road)}
   <div class="btnrow"><button class="primary" data-act="makeMap" id="mapBtn">Karte erzeugen</button><label class="drop" style="padding:5px 10px;margin:0;display:inline-block">Eigenes Bild …<input type="file" accept="image/*" hidden id="mapFile"></label>${t.mapImg ? `<button data-act="delMap">Karte entfernen</button>` : ""}${canLegs ? `<button data-act="applyLegs" title="Trägt Kilometer und Fahrzeit der berechneten Straßenroute in die Tage ein">km und Fahrzeit in Tage übernehmen</button>` : ""}</div>
@@ -328,7 +331,8 @@ async function doSearch(key, box) {
 function pickPlace(b) {
   const key = b.dataset.key, r = window._results[key][+b.dataset.i], t = S.trip;
   if (key === "$new") {
-    t.route.points.push({ id: uid(), name: r.name, lat: r.lat, lon: r.lon, day: -1 }); t.route.auto = false;
+    const np = S.newPoint, at = np.after !== undefined && np.after !== "" ? Math.min(+np.after + 1, t.route.points.length) : t.route.points.length;
+    t.route.points.splice(at, 0, { id: uid(), name: r.name, lat: r.lat, lon: r.lon, day: -1, via: !!np.via }); t.route.auto = false;
     S.newPoint = blankPlace();
   } else {
     const ref = getRef(key + ".name"); if (!ref) return;

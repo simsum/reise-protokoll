@@ -79,6 +79,8 @@ details.day .body { padding: 4px 12px 10px; border-top: 1px solid var(--line); p
 .pt { display: grid; grid-template-columns: 22px 1fr auto; gap: 6px; align-items: start; margin-bottom: 6px; }
 .pt .n { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--ui); color: #fff; font-size: 12px; margin-top: 4px; }
 .pt .f { margin: 0; }
+.pt .n.via { background: var(--mut); }
+.pt .chk { font-size: 12px; margin: 2px 0 0; }
 .mapimg { width: 100%; border-radius: 8px; border: 1px solid var(--line); display: block; margin-top: 8px; }
 .note { background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412; border-radius: 8px; padding: 6px 10px; margin: 8px 0; font-size: 12px; }
 .stat { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--line); }

@@ -147,7 +147,7 @@ function coverPage(t, st, T, warns) {
     pg.text(PW / 2, my + mh / 2 + 10, "Karte noch nicht erzeugt (Reiter „Karte“)", { s: 9, c: T.muted, a: "c" });
     warns.push("Die Karte für die Deckseite fehlt noch (Reiter „Karte“).");
   }
-  const pts = t.route.points.map((p) => p.name).filter(Boolean);
+  const pts = t.route.points.filter((p) => !p.via).map((p) => p.name).filter(Boolean); // Routenpunkte ohne Anzeige bleiben weg
   if (pts.length) pg.text(MX, my + mh + 7, fitT(pts.join("  –  "), "R", 8, CW), { s: 8, c: T.muted });
 
   /* Zusammenfassung */
@@ -284,7 +284,7 @@ function photoLines(t, p, w, maxLines, warns, where) {
   if (head) add(head, "B", 8, "ink");
   if (t.capPlace && p.place) add(p.place, "R", 8, "ink");
   if (t.capGps && p.gps) L.push({ t: gpsText(p.gps), f: "R", s: 7.5, c: "acc", url: mapUrl(p.gps), n: 0, x: 0 });
-  if (t.wxLine && p.weather) add((p.time ? p.time.slice(0, 5) + " Uhr · " : "") + p.weather, "R", 7.5, "muted");
+  if (t.wxLine && p.weather) add(p.weather, "R", 7.5, "muted");
   if (t.capNote && (p.note || "").trim()) add(p.note.trim(), "I", 8.5, "ink");
   if (t.capMarks) NUMS(p).forEach((m, k) => { if ((m.note || "").trim()) add(m.note.trim(), "R", 8, "muted", { n: k + 1, col: m.c }); });
   if (t.capFile && p.name) add("Datei: " + p.name, "R", 7.5, "muted");

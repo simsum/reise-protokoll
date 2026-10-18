@@ -80,6 +80,8 @@ details.day .body { padding: 4px 12px 10px; border-top: 1px solid var(--line); p
 .pt { display: grid; grid-template-columns: 22px 1fr auto; gap: 6px; align-items: start; margin-bottom: 6px; }
 .pt .n { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--ui); color: #fff; font-size: 12px; margin-top: 4px; }
 .pt .f { margin: 0; }
+.pt .n.via { background: var(--mut); }
+.pt .chk { font-size: 12px; margin: 2px 0 0; }
 .mapimg { width: 100%; border-radius: 8px; border: 1px solid var(--line); display: block; margin-top: 8px; }
 .note { background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412; border-radius: 8px; padding: 6px 10px; margin: 8px 0; font-size: 12px; }
 .stat { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--line); }
@@ -138,7 +140,7 @@ body.dragging::after { content: "Fotos hier ablegen (oder ein Projekt-PDF zum Ö
 
 <div id="app">
   <header class="top">
-    <div class="brand"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s6.5-5.7 6.5-11a6.5 6.5 0 1 0-13 0C5.5 15.3 12 21 12 21z"/><circle cx="12" cy="10" r="2.4"/></svg> Reise-Protokoll <span class="ver">v0.8.1</span></div>
+    <div class="brand"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s6.5-5.7 6.5-11a6.5 6.5 0 1 0-13 0C5.5 15.3 12 21 12 21z"/><circle cx="12" cy="10" r="2.4"/></svg> Reise-Protokoll <span class="ver">v0.9.0</span></div>
     <div class="grow"></div>
     <select id="demo" title="Beispielreise laden">
       <option value="">Beispiel laden …</option>
@@ -819,7 +821,7 @@ function coverPage(t, st, T, warns) {
     pg.text(PW / 2, my + mh / 2 + 10, "Karte noch nicht erzeugt (Reiter „Karte“)", { s: 9, c: T.muted, a: "c" });
     warns.push("Die Karte für die Deckseite fehlt noch (Reiter „Karte“).");
   }
-  const pts = t.route.points.map((p) => p.name).filter(Boolean);
+  const pts = t.route.points.filter((p) => !p.via).map((p) => p.name).filter(Boolean); // Routenpunkte ohne Anzeige bleiben weg
   if (pts.length) pg.text(MX, my + mh + 7, fitT(pts.join("  –  "), "R", 8, CW), { s: 8, c: T.muted });
 
   /* Zusammenfassung */
@@ -956,7 +958,7 @@ function photoLines(t, p, w, maxLines, warns, where) {
   if (head) add(head, "B", 8, "ink");
   if (t.capPlace && p.place) add(p.place, "R", 8, "ink");
   if (t.capGps && p.gps) L.push({ t: gpsText(p.gps), f: "R", s: 7.5, c: "acc", url: mapUrl(p.gps), n: 0, x: 0 });
-  if (t.wxLine && p.weather) add((p.time ? p.time.slice(0, 5) + " Uhr · " : "") + p.weather, "R", 7.5, "muted");
+  if (t.wxLine && p.weather) add(p.weather, "R", 7.5, "muted");
   if (t.capNote && (p.note || "").trim()) add(p.note.trim(), "I", 8.5, "ink");
   if (t.capMarks) NUMS(p).forEach((m, k) => { if ((m.note || "").trim()) add(m.note.trim(), "R", 8, "muted", { n: k + 1, col: m.c }); });
   if (t.capFile && p.name) add("Datei: " + p.name, "R", 7.5, "muted");
@@ -1352,7 +1354,7 @@ const mapProj = (lat, lon, z) => {
 };
 
 function mapSignature(t) {
-  return JSON.stringify([t.route.points.filter(hasGeo).map((p) => [p.name, +p.lat.toFixed(3), +p.lon.toFixed(3)]), !!t.route.road, t.theme]);
+  return JSON.stringify([t.route.points.filter(hasGeo).map((p) => [p.name, +p.lat.toFixed(3), +p.lon.toFixed(3), !!p.via]), !!t.route.road, t.theme]);
 }
 
 /* Straßenroute über OSRM (öffentlicher Demo-Server, nur für wenige Anfragen gedacht). */
@@ -1470,8 +1472,8 @@ async function renderMap(t, { road = true, onStatus = () => {}, noTiles = false,
   }
 
   /* Marker mit Nummer und Name; doppelte Orte (Rückkehr zum Start) nur einmal */
-  const marks = [];
-  pts.forEach((p, i) => {
+  const marks = []; // Punkte „nur für die Route“ (via) lenken die Strecke, bekommen aber keine Marke und keine Nummer
+  pts.filter((p) => !p.via).forEach((p, i) => {
     const prev = marks.find((m) => haversine(m.p, p) < 1);
     if (prev) { prev.nums.push(i + 1); return; }
     marks.push({ p, nums: [i + 1], name: p.name });
@@ -1510,7 +1512,7 @@ async function renderMap(t, { road = true, onStatus = () => {}, noTiles = false,
   let src;
   try { src = cv.toDataURL("image/jpeg", 0.88); }
   catch (e) { /* Canvas durch fremde Kacheln gesperrt: Schemakarte */ return renderMap(t, { noTiles: true, pre: { ...info, geom } }); }
-  return { src, w: MAP_W, h: MAP_H, mode, source: source ? source.id : "", sourceName: source ? source.name : "", blocked, km: info.km, legs: info.legs };
+  return { src, w: MAP_W, h: MAP_H, mode, labels: marks.map((m) => m.name), source: source ? source.id : "", sourceName: source ? source.name : "", blocked, km: info.km, legs: info.legs };
 }
 
 function drawSchemaGrid(g, T) {
@@ -1884,7 +1886,7 @@ function cleanTrip(j) {
     route: {
       auto: r.auto !== false, road: r.road !== false, km: num(r.km, 0, 1e6, null), mapSig: clipStr(r.mapSig, 4000),
       legs: (Array.isArray(r.legs) ? r.legs : []).slice(0, 300).map((l) => ({ km: num(l && l.km, 0, 1e6, 0), min: num(l && l.min, 0, 1e6, 0) })),
-      points: (Array.isArray(r.points) ? r.points : []).slice(0, 300).map((p) => ({ id: cleanId(p && p.id, seen), ...cleanPlace(p), day: Number.isInteger(p && p.day) ? p.day : -1 })).filter((p) => p.name),
+      points: (Array.isArray(r.points) ? r.points : []).slice(0, 300).map((p) => ({ id: cleanId(p && p.id, seen), ...cleanPlace(p), day: Number.isInteger(p && p.day) ? p.day : -1, via: !!(p && p.via) })).filter((p) => p.name),
     },
     days: (Array.isArray(t.days) ? t.days : []).slice(0, 400).map((d) => {
       d = d && typeof d === "object" ? d : {};
@@ -2393,8 +2395,11 @@ function panelMap() {
   const canLegs = r.auto && r.legs && r.legs.length && r.legs.length === r.points.length - 1 && r.points.every(hasGeo);
   return `<h3>Route</h3>
   ${chk("Orte automatisch aus Startort, Tagen und Foto-GPS bilden", "route.auto", r.auto)}
-  ${r.points.length ? r.points.map((p, i) => `<div class="pt"><span class="n">${i + 1}</span>${placeFld("", `route.points.${p.id}`, p).replace("<span></span>", "")}<span class="row"><button class="ico" data-act="ptUp" data-id="${p.id}">↑</button><button class="ico" data-act="ptDown" data-id="${p.id}">↓</button><button class="ico" data-act="ptDel" data-id="${p.id}">×</button></span></div>`).join("") : "<p><small>Noch keine Orte. Startort, Tagesorte oder Fotos mit GPS liefern sie automatisch, oder unten von Hand ergänzen.</small></p>"}
-  ${placeFld("Ort am Ende hinzufügen", "$new", S.newPoint)}
+  ${(() => { let nr = 0; return r.points.length ? r.points.map((p) => `<div class="pt"><span class="n ${p.via ? "via" : ""}">${p.via ? "·" : ++nr}</span><div>${placeFld("", `route.points.${p.id}`, p).replace("<span></span>", "")}${chk("nur für die Route (nicht auf der Karte zeigen)", `route.points.${p.id}.via`, p.via)}</div><span class="row"><button class="ico" data-act="ptUp" data-id="${p.id}">↑</button><button class="ico" data-act="ptDown" data-id="${p.id}">↓</button><button class="ico" data-act="ptDel" data-id="${p.id}">×</button></span></div>`).join("") : "<p><small>Noch keine Orte. Startort, Tagesorte oder Fotos mit GPS liefern sie automatisch, oder unten von Hand ergänzen.</small></p>"; })()}
+  <h3>Ort hinzufügen</h3>
+  ${placeFld("Ort suchen", "$new", S.newPoint)}
+  ${chk("nur für die Route (nicht auf der Karte zeigen): lenkt die Strecke über diesen Ort, z. B. eine Brücke oder Passstraße", "$new.via", S.newPoint.via)}
+  ${selFld("Einfügen", "$new.after", S.newPoint.after || "", [["", "am Ende"], ...r.points.map((p, i) => [String(i), `nach Punkt ${i + 1}: ${p.name}`])])}
   <h3>Karte</h3>
   ${chk("Straßenroute berechnen (OSRM, sonst Luftlinie)", "route.road", r.road)}
   <div class="btnrow"><button class="primary" data-act="makeMap" id="mapBtn">Karte erzeugen</button><label class="drop" style="padding:5px 10px;margin:0;display:inline-block">Eigenes Bild …<input type="file" accept="image/*" hidden id="mapFile"></label>${t.mapImg ? `<button data-act="delMap">Karte entfernen</button>` : ""}${canLegs ? `<button data-act="applyLegs" title="Trägt Kilometer und Fahrzeit der berechneten Straßenroute in die Tage ein">km und Fahrzeit in Tage übernehmen</button>` : ""}</div>
@@ -2598,7 +2603,8 @@ async function doSearch(key, box) {
 function pickPlace(b) {
   const key = b.dataset.key, r = window._results[key][+b.dataset.i], t = S.trip;
   if (key === "$new") {
-    t.route.points.push({ id: uid(), name: r.name, lat: r.lat, lon: r.lon, day: -1 }); t.route.auto = false;
+    const np = S.newPoint, at = np.after !== undefined && np.after !== "" ? Math.min(+np.after + 1, t.route.points.length) : t.route.points.length;
+    t.route.points.splice(at, 0, { id: uid(), name: r.name, lat: r.lat, lon: r.lon, day: -1, via: !!np.via }); t.route.auto = false;
     S.newPoint = blankPlace();
   } else {
     const ref = getRef(key + ".name"); if (!ref) return;

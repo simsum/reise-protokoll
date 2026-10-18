@@ -76,6 +76,36 @@ ok((await page.evaluate(() => S.trip.route.legs.length)) === 4, "Teilstrecken de
 await page.click('[data-act="applyLegs"]');
 ok((await page.evaluate(() => S.trip.days[0].km)) === "150", "km aus Route in Tag übernommen");
 
+console.log("Routenpunkt nur für die Route");
+{
+  const r = await page.evaluate(async () => {
+    const t = S.trip, pts = t.route.points, base = await renderMap(t, { road: false, noTiles: true });
+    t.route.points = [pts[0], { id: "viax", name: "Nur-Route", lat: 48.0, lon: 12.3, day: -1, via: true }, ...pts.slice(1)];
+    const withVia = await renderMap(t, { road: false, noTiles: true });
+    t.route.points = pts;
+    return { base: base.labels, withVia: withVia.labels, sig: mapSignature({ ...t, route: { ...t.route, points: [pts[0], { name: "x", lat: 48, lon: 12, via: true }] } }) !== mapSignature({ ...t, route: { ...t.route, points: [pts[0], { name: "x", lat: 48, lon: 12 }] } }) };
+  });
+  ok(r.withVia.join() === r.base.join() && !r.withVia.includes("Nur-Route"), "Routenpunkt „nur für die Route“ erscheint nicht auf der Karte");
+  ok(r.sig, "Kartenhinweis „Route geändert“ berücksichtigt auch diese Einstellung");
+  ok(await page.evaluate(() => { const t = S.trip; t.route.points.splice(1, 0, { id: "v2", name: "Via", lat: 48.0, lon: 12.3, day: -1, via: true }); const x = cleanTrip(jsonOfTrip(t, new Map(), new Map())); t.route.points.splice(1, 1); return x.route.points[1].via === true && x.route.points[0].via === false; }), "Einstellung bleibt im Projekt-PDF erhalten");
+}
+
+{
+  await page.evaluate(() => { S.tab = "map"; renderPanel(); });
+  ok((await page.locator('[data-k="route.points.' + (await page.evaluate(() => S.trip.route.points[0].id)) + '.via"]').count()) === 1 && (await page.locator('[data-k="$new.via"]').count()) === 1, "Karte: Kästchen „nur für die Route“ je Punkt und beim Hinzufügen");
+  const x = await page.evaluate(() => {
+    window._results = { $new: [{ name: "ViaOrt", lat: 48.2, lon: 12.1, info: "x" }] };
+    const before = S.trip.route.points.length;
+    S.newPoint = { ...blankPlace(), via: true, after: "0" };
+    pickPlace({ dataset: { key: "$new", i: "0" } });
+    const p = S.trip.route.points;
+    const r = [before + 1 === p.length, p[1].name, p[1].via, S.trip.route.auto];
+    p.splice(1, 1); S.trip.route.auto = true; rebuildRoute(S.trip); renderPanel();
+    return r;
+  });
+  ok(x.join() === "true,ViaOrt,true,false", "Ort mit „nur für die Route“ wird nach Punkt 1 eingefügt");
+}
+
 console.log("Kartenanbieter (aus der lokalen Datei: erst OSM.de, dann Esri, OSM zuletzt)");
 const regen = async () => {
   await page.evaluate(() => { S.trip.mapImg = ""; S.trip.mapSource = ""; renderPanel(); });

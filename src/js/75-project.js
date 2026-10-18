@@ -59,7 +59,7 @@ function cleanTrip(j) {
     route: {
       auto: r.auto !== false, road: r.road !== false, km: num(r.km, 0, 1e6, null), mapSig: clipStr(r.mapSig, 4000),
       legs: (Array.isArray(r.legs) ? r.legs : []).slice(0, 300).map((l) => ({ km: num(l && l.km, 0, 1e6, 0), min: num(l && l.min, 0, 1e6, 0) })),
-      points: (Array.isArray(r.points) ? r.points : []).slice(0, 300).map((p) => ({ id: cleanId(p && p.id, seen), ...cleanPlace(p), day: Number.isInteger(p && p.day) ? p.day : -1 })).filter((p) => p.name),
+      points: (Array.isArray(r.points) ? r.points : []).slice(0, 300).map((p) => ({ id: cleanId(p && p.id, seen), ...cleanPlace(p), day: Number.isInteger(p && p.day) ? p.day : -1, via: !!(p && p.via) })).filter((p) => p.name),
     },
     days: (Array.isArray(t.days) ? t.days : []).slice(0, 400).map((d) => {
       d = d && typeof d === "object" ? d : {};

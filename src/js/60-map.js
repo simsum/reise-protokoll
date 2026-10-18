@@ -9,7 +9,7 @@ const mapProj = (lat, lon, z) => {
 };
 
 function mapSignature(t) {
-  return JSON.stringify([t.route.points.filter(hasGeo).map((p) => [p.name, +p.lat.toFixed(3), +p.lon.toFixed(3)]), !!t.route.road, t.theme]);
+  return JSON.stringify([t.route.points.filter(hasGeo).map((p) => [p.name, +p.lat.toFixed(3), +p.lon.toFixed(3), !!p.via]), !!t.route.road, t.theme]);
 }
 
 /* Straßenroute über OSRM (öffentlicher Demo-Server, nur für wenige Anfragen gedacht). */
@@ -127,8 +127,8 @@ async function renderMap(t, { road = true, onStatus = () => {}, noTiles = false,
   }
 
   /* Marker mit Nummer und Name; doppelte Orte (Rückkehr zum Start) nur einmal */
-  const marks = [];
-  pts.forEach((p, i) => {
+  const marks = []; // Punkte „nur für die Route“ (via) lenken die Strecke, bekommen aber keine Marke und keine Nummer
+  pts.filter((p) => !p.via).forEach((p, i) => {
     const prev = marks.find((m) => haversine(m.p, p) < 1);
     if (prev) { prev.nums.push(i + 1); return; }
     marks.push({ p, nums: [i + 1], name: p.name });
@@ -167,7 +167,7 @@ async function renderMap(t, { road = true, onStatus = () => {}, noTiles = false,
   let src;
   try { src = cv.toDataURL("image/jpeg", 0.88); }
   catch (e) { /* Canvas durch fremde Kacheln gesperrt: Schemakarte */ return renderMap(t, { noTiles: true, pre: { ...info, geom } }); }
-  return { src, w: MAP_W, h: MAP_H, mode, source: source ? source.id : "", sourceName: source ? source.name : "", blocked, km: info.km, legs: info.legs };
+  return { src, w: MAP_W, h: MAP_H, mode, labels: marks.map((m) => m.name), source: source ? source.id : "", sourceName: source ? source.name : "", blocked, km: info.km, legs: info.legs };
 }
 
 function drawSchemaGrid(g, T) {
