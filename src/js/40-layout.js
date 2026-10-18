@@ -8,7 +8,7 @@
      line  {x1,y1,x2,y2,c,sw}                  Linie
      t     {x,y,text,s,f,c,a,ls}               Text; y = Oberkante, a = l|c|r, ls = Buchstabenabstand
      path  {x,y,w,h,vw,vh,d,fill,stroke,sw}    SVG-Pfad im Raster vw×vh (Symbole)
-     img   {x,y,w,h,src,iw,ih}                 Bild, füllt den Rahmen (zugeschnitten)         */
+     img   {x,y,w,h,src,iw,ih,pid}             Bild, füllt den Rahmen (zugeschnitten); pid = Foto-ID (Büroklammer im PDF)         */
 const PW = 595.28, PH = 841.89, MX = 40, CW = PW - 2 * MX, BOTTOM = 790;
 
 class Pg {
@@ -22,7 +22,7 @@ class Pg {
     this.ops.push({ k: "t", x, y, text: clean(text), s: o.s || 10, f: o.f || "R", c: o.c || this.T.ink, a: o.a || "l", ls: o.ls || 0 });
   }
   icon(name, x, y, s, c, sw = 1.6) { this.ops.push({ k: "path", x, y, w: s, h: s, vw: 24, vh: 24, d: ICONS[name] || ICONS.sun, fill: null, stroke: c, sw }); }
-  img(x, y, w, h, src, iw, ih) { this.ops.push({ k: "img", x, y, w, h, src, iw: iw || w, ih: ih || h }); }
+  img(x, y, w, h, src, iw, ih, pid) { this.ops.push({ k: "img", x, y, w, h, src, iw: iw || w, ih: ih || h, pid }); }
   label(x, y, text, c, a) { this.text(x, y, String(text).toUpperCase(), { f: "B", s: 7.5, c: c || this.T.accent, ls: 1.4, a }); }
 }
 
@@ -190,12 +190,12 @@ function dayPages(t, i, T, warns) {
     pg.text(x + 35, y + 25, fitT(v || "–", "R", 9.5, bw - 46), { s: 9.5, c: v ? T.ink : T.muted });
   });
 
-  /* Fotos (die ersten drei als Streifen) */
-  const shown = d.photos.slice(0, 3), stripY = BOTTOM - 104;
-  const bodyBottom = shown.length ? stripY - 18 : BOTTOM - 4;
+  /* Fotos (die ersten drei als Streifen, mit Bildunterschrift) */
+  const shown = d.photos.slice(0, 3), stripH = 132, stripY = BOTTOM - stripH;
+  const bodyBottom = shown.length ? stripY - 16 : BOTTOM - 4;
   if (shown.length) {
-    const g = 8, w = (CW - g * (shown.length - 1)) / shown.length;
-    shown.forEach((p, k) => pg.img(MX + k * (w + g), stripY, w, 104, p.src, p.w, p.h));
+    const g = 10, w = (CW - g * (shown.length - 1)) / shown.length;
+    shown.forEach((p, k) => photoBlock(pg, p, MX + k * (w + g), stripY, w, stripH, 3, T, warns, `Tag ${i + 1}`));
   }
 
   /* Text links */
@@ -223,12 +223,61 @@ function dayPages(t, i, T, warns) {
   for (let k = 0; k < more.length; k += per) {
     const p3 = new Pg(T); out.push(p3);
     const y0 = miniHeader(p3, `Tag ${i + 1} · Fotos`, title), chunk = more.slice(k, k + per);
-    galleryCells(chunk.length, MX, y0, CW, BOTTOM - y0).forEach((c, n) => p3.img(c.x, c.y, c.w, c.h, chunk[n].src, chunk[n].w, chunk[n].h));
+    galleryCells(chunk.length, MX, y0, CW, BOTTOM - y0).forEach((c, n) => photoBlock(p3, chunk[n], c.x, c.y, c.w, c.h, 6, T, warns, `Tag ${i + 1}`));
   }
   return out;
 }
 
 /* Rahmen für n Fotos (1–6) in einer Fläche; Höhen begrenzt, damit nichts überlang wird */
+/* ---------- Foto mit Markierungen, Bildunterschrift und Notizen zu den Nummern ----------
+   Hat das Foto Markierungen, wird es ganz gezeigt (Rand bleibt frei), sonst füllt es den Rahmen. */
+function photoBlock(pg, p, x, y, w, h, maxLines, T, warns, where) {
+  const v = photoView(p), LH = 10.5, lines = [];
+  const cap = (p.note || "").trim();
+  if (cap) wrapAll(cap, "I", 8.5, w).forEach((l) => lines.push({ t: l, f: "I" }));
+  NUMS(p).forEach((m, k) => { if ((m.note || "").trim()) wrapAll(m.note, "R", 8, w - 14).forEach((l, n) => lines.push({ t: l, f: "R", n: n ? 0 : k + 1, c: m.c })); });
+  let shown = lines;
+  if (lines.length > maxLines) { shown = lines.slice(0, maxLines); shown[maxLines - 1] = { ...shown[maxLines - 1], t: fitT(shown[maxLines - 1].t + " …", shown[maxLines - 1].f, 8.5, w - 14) }; warns.push(`${where}: Eine Bildunterschrift ist zu lang und wird gekürzt.`); }
+  const th = shown.length ? shown.length * LH + 5 : 0, ih = Math.max(20, h - th);
+  const marked = viewMarks(p).length > 0;
+  let r = { x, y, w, h: ih };
+  if (marked) { const k = Math.min(w / v.w, ih / v.h); r = { w: v.w * k, h: v.h * k }; r.x = x + (w - r.w) / 2; r.y = y; }
+  pg.img(r.x, r.y, r.w, r.h, v.src, v.w, v.h, p.id);
+  pg.rect(r.x, r.y, r.w, r.h, { stroke: T.rule, sw: 0.5 });
+  if (marked) drawMarks(pg, p, r, v);
+  shown.forEach((l, k) => {
+    const ty = y + ih + 5 + k * LH;
+    if (l.n) {
+      pg.rect(x, ty + 0.5, 8, 8, { fill: l.c, r: 4 });
+      pg.text(x + 4, ty + 1.9, String(l.n), { f: "B", s: 5.8, c: numInk(l.c), a: "c" });
+    }
+    pg.text(l.f === "I" ? x : x + 12, ty, l.t, { f: l.f, s: l.f === "I" ? 8.5 : 8, c: l.f === "I" ? T.ink : T.muted });
+  });
+}
+
+/* Markierungen als Vektoren über dem Foto (Rahmen r, Ansicht v) */
+function drawMarks(pg, p, r, v) {
+  const vm = viewMarks(p), nums = vm.filter((q) => q.t === "num"), sc = r.w / v.w;
+  const path = (d, o) => pg.ops.push({ k: "path", x: r.x, y: r.y, w: r.w, h: r.h, vw: v.w, vh: v.h, d, fill: o.fill || null, stroke: o.stroke || null, sw: o.sw || 0, fo: o.fo, so: o.so });
+  for (const pass of ["halo", "color"]) {
+    for (const m of vm) {
+      const g = markGeom(m, p), halo = pass === "halo", col = halo ? haloOf(m.c) : m.c, op = halo ? 0.85 : 1;
+      if (g.num) {
+        const d = circlePath(m.x, m.y, g.r);
+        if (halo) path(d, { fill: col, fo: op, stroke: col, so: op, sw: g.sw * 2.4 });
+        else {
+          path(d, { fill: col });
+          const sz = g.r * 1.3 * sc;
+          pg.text(r.x + m.x * sc, r.y + m.y * sc - 0.4865 * sz, String(nums.indexOf(m) + 1), { f: "B", s: sz, c: numInk(m.c), a: "c" });
+        }
+        continue;
+      }
+      g.stroke.forEach((d) => path(d, { stroke: col, so: op, sw: halo ? g.sw * 2.2 : g.sw }));
+      g.fill.forEach((d) => path(d, halo ? { fill: col, fo: op, stroke: col, so: op, sw: g.sw * 1.2 } : { fill: col }));
+    }
+  }
+}
+
 function galleryCells(n, x, y, w, h) {
   const g = 12, half = (w - g) / 2, cap = (v) => Math.min(v, 300), out = [];
   const rows = (cols, nr) => { const ch = cap((h - g * (nr - 1)) / nr); return ch; };

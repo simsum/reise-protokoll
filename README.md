@@ -18,10 +18,12 @@ Weitere Vorlagen und Farbschemata sind je ein Eintrag im Code, siehe [CLAUDE.md]
 ## Ablauf
 
 1. **Reise:** Vorlage, Titel, Reisende, Startort, Design.
-2. **Tage:** Tage anlegen (einzeln oder für einen Zeitraum). Fotos auf die Fläche ziehen: Sie werden nach Aufnahmedatum den Tagen zugeordnet, fehlende Tage entstehen dabei, der Ort kommt aus dem GPS der Fotos.
+2. **Tage:** Tage anlegen (einzeln oder für einen Zeitraum) und ausfüllen. **Fotos hinzufügen** (Knopf oben, Ziehen auf die Seite oder die Fläche im Reiter) nimmt beliebig viele Fotos auf einmal: Die Tage entstehen aus den Aufnahmedaten, die Fotos werden nach Uhrzeit einsortiert, der Ort eines neuen Tages kommt aus dem GPS der Fotos. HEIC-Fotos (iPhone) werden umgewandelt. Zu jedem Foto gibt es eine Bildunterschrift, Drehen, Ausschnitt und **Markieren** (Kreis, Pfeil, nummerierte Markierung mit Notiz). Das alles erscheint im PDF unter dem Foto.
 3. **Karte:** Die Route entsteht automatisch aus Startort, Tagesorten und Foto-GPS und lässt sich von Hand ändern. „Karte erzeugen“ setzt ein Bild aus OpenStreetMap-Kacheln mit der Route zusammen (Straßenroute über OSRM oder Luftlinie). Das Bild ist danach fest. Alternativ ein eigenes Bild (Screenshot) hochladen. Die berechneten Kilometer und Fahrzeiten lassen sich in die Tage übernehmen.
 4. **Zusammenfassung:** Vorschlag aus Tagen, Highlights, Kosten, Wetter und Fotos, jederzeit von Hand änderbar.
-5. **PDF erstellen** oder **Speichern** (Projektdatei `.reise.json` mit Fotos und Karte). Der Stand wird außerdem automatisch im Browser gesichert.
+5. **PDF erstellen.** Im PDF stecken als Anhänge alle Einstellungen und Eingaben, die Fotos (Originale oder 1600-px-Kopien, wählbar), Karte und Titelfoto. Mit **PDF öffnen** (oder das PDF auf die Seite ziehen) lässt sich das PDF jederzeit wieder bearbeiten, auch mit allen Markierungen. Der Stand wird außerdem automatisch im Browser gesichert.
+
+> Die Anhänge zeigen Adobe Acrobat, Foxit, PDF-XChange und Firefox an (Büroklammer neben dem Foto). Der PDF-Viewer von Chrome und Edge zeigt sie nicht an, zum Weiterbearbeiten stört das nicht. Wird das PDF in einem anderen Programm gespeichert oder gedruckt, gehen die Anhänge oft verloren. Die Bearbeitungsdaten stehen im Klartext im PDF, wer das nicht möchte, schaltet die Option „Bearbeitungsdaten und Fotos im PDF speichern“ aus.
 
 ## Datenschutz und Netzwerk
 
@@ -45,5 +47,4 @@ Aufbau und Regeln stehen in [CLAUDE.md](CLAUDE.md).
 - Weitere Vorlagen (Städtereise mit Tagesplan, Wanderung, Strandurlaub)
 - Wetter automatisch zum Tag und Ort abrufen (Open-Meteo)
 - Eigene Schriften im PDF, Seitenformate (A5, Querformat)
-- Projektdaten im PDF einbetten, damit sich ein PDF wieder öffnen lässt
 - Fotos mit Bildunterschrift, Kartenausschnitt pro Tag

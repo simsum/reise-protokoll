@@ -25,7 +25,7 @@ function pageHtml(pg) {
       const w = tw(o.text, o.f, o.s, o.ls), x = o.a === "c" ? o.x - w / 2 : o.a === "r" ? o.x - w : o.x;
       h += `<div class="ab t" style="left:${X(x)};top:${Y(o.y)};font-size:${U(o.s)};color:${o.c};${FONT_CSS[o.f]};${o.ls ? "letter-spacing:" + U(o.ls) + ";" : ""}">${esc(o.text)}</div>`;
     } else if (o.k === "path") {
-      h += `<svg class="ab" style="${box(o)}" viewBox="0 0 ${o.vw} ${o.vh}"><path d="${o.d}" fill="${o.fill || "none"}" stroke="${o.stroke || "none"}" stroke-width="${o.sw}" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+      h += `<svg class="ab" style="${box(o)}" viewBox="0 0 ${o.vw} ${o.vh}"><path d="${o.d}" fill="${o.fill || "none"}" stroke="${o.stroke || "none"}" stroke-width="${o.sw}"${o.fo != null ? ` fill-opacity="${o.fo}"` : ""}${o.so != null ? ` stroke-opacity="${o.so}"` : ""} stroke-linecap="round" stroke-linejoin="round"/></svg>`;
     } else if (o.k === "img") {
       h += `<img class="ab im" style="${box(o)}" src="${o.src}" alt="">`;
     }
@@ -40,7 +40,8 @@ function bytesOfDataUrl(u) {
   return a;
 }
 
-async function buildPdf(pages, meta, onProgress) {
+/* attachments: [{name, bytes, mime, desc, rel, pid}] werden als Dateianhänge eingebettet (pid: Foto, dessen Seite eine Büroklammer bekommt). */
+async function buildPdf(pages, meta, attachments, onProgress) {
   const L = PDFLib, doc = await L.PDFDocument.create();
   doc.setTitle(meta.title || "Reiseprotokoll"); doc.setCreator("Reise-Protokoll"); doc.setProducer("Reise-Protokoll (pdf-lib)");
   if (meta.author) doc.setAuthor(meta.author);
@@ -54,8 +55,18 @@ async function buildPdf(pages, meta, onProgress) {
   };
   const rrPath = (w, h, r) => `M${r} 0H${w - r}A${r} ${r} 0 0 1 ${w} ${r}V${h - r}A${r} ${r} 0 0 1 ${w - r} ${h}H${r}A${r} ${r} 0 0 1 0 ${h - r}V${r}A${r} ${r} 0 0 1 ${r} 0Z`;
 
+  /* Anhänge vorbereiten */
+  const ctx = doc.context, specs = new Map(), ef = [];
+  for (const a of attachments || []) {
+    const sref = ctx.register(ctx.stream(a.bytes, { Type: "EmbeddedFile", Subtype: a.mime, Params: { Size: a.bytes.length, ModDate: L.PDFString.fromDate(new Date()) } }));
+    const fs = ctx.register(ctx.obj({ Type: "Filespec", F: L.PDFString.of(clean(a.name)), UF: L.PDFHexString.fromText(a.name), EF: { F: sref, UF: sref }, Desc: L.PDFHexString.fromText(a.desc || ""), AFRelationship: a.rel || "Data" }));
+    ef.push({ key: a.name, fs });
+    if (a.pid) specs.set(a.pid, { fs, name: a.name, size: a.bytes.length });
+  }
+  const clipped = new Set();
+
   for (let n = 0; n < pages.length; n++) {
-    const pg = pages[n], page = doc.addPage([pg.W, pg.H]), Y = (y) => pg.H - y;
+    const pg = pages[n], page = doc.addPage([pg.W, pg.H]), Y = (y) => pg.H - y, annots = [];
     for (const o of pg.ops) {
       if (o.k === "rect") {
         const opt = {};
@@ -76,8 +87,8 @@ async function buildPdf(pages, meta, onProgress) {
         }
       } else if (o.k === "path") {
         const opt = { x: o.x, y: Y(o.y), scale: o.w / o.vw, borderLineCap: L.LineCapStyle.Round };
-        if (o.fill) opt.color = rgbOf(o.fill);
-        if (o.stroke) { opt.borderColor = rgbOf(o.stroke); opt.borderWidth = o.sw; }
+        if (o.fill) { opt.color = rgbOf(o.fill); if (o.fo != null) opt.opacity = o.fo; }
+        if (o.stroke) { opt.borderColor = rgbOf(o.stroke); opt.borderWidth = o.sw; if (o.so != null) opt.borderOpacity = o.so; }
         page.drawSvgPath(o.d, opt);
       } else if (o.k === "img") {
         const im = await embed(o.src), s = Math.max(o.w / im.width, o.h / im.height);
@@ -86,9 +97,28 @@ async function buildPdf(pages, meta, onProgress) {
           L.lineTo(o.x + o.w, Y(o.y)), L.lineTo(o.x, Y(o.y)), L.closePath(), L.clip(), L.endPath());
         page.drawImage(im, { x: o.x + (o.w - dw) / 2, y: Y(o.y + o.h) + (o.h - dh) / 2, width: dw, height: dh });
         page.pushOperators(L.popGraphicsState());
+        const sp = o.pid && specs.get(o.pid);
+        if (sp && !clipped.has(o.pid)) {
+          clipped.add(o.pid);
+          annots.push(ctx.register(ctx.obj({ Type: "Annot", Subtype: "FileAttachment", Rect: [o.x, Y(o.y) - 16, o.x + 12, Y(o.y)], FS: sp.fs, Name: "Paperclip",
+            Contents: L.PDFHexString.fromText("Foto: " + sp.name), T: L.PDFHexString.fromText("Reise-Protokoll"), C: [0.12, 0.44, 0.55], F: 24, P: page.ref })));
+        }
       }
     }
+    if (annots.length) page.node.set(L.PDFName.of("Annots"), ctx.obj(annots));
     if (onProgress) onProgress(n + 1, pages.length);
+  }
+  if (ef.length) {
+    const arr = [];
+    ef.sort((a, b) => (a.key < b.key ? -1 : 1)).forEach((e) => arr.push(L.PDFHexString.fromText(e.key), e.fs));
+    doc.catalog.set(L.PDFName.of("Names"), ctx.obj({ EmbeddedFiles: ctx.obj({ Names: ctx.obj(arr) }) }));
+    doc.catalog.set(L.PDFName.of("AF"), ctx.obj(ef.map((e) => e.fs)));
+  }
+  if (ef.length) {
+    const arr = [];
+    ef.sort((a, b) => (a.key < b.key ? -1 : 1)).forEach((e) => arr.push(L.PDFHexString.fromText(e.key), e.fs));
+    doc.catalog.set(L.PDFName.of("Names"), ctx.obj({ EmbeddedFiles: ctx.obj({ Names: ctx.obj(arr) }) }));
+    doc.catalog.set(L.PDFName.of("AF"), ctx.obj(ef.map((e) => e.fs)));
   }
   return doc.save({ useObjectStreams: true });
 }

@@ -39,7 +39,19 @@ function panelTrip() {
   <div class="themes">${Object.entries(THEMES).map(([id, th]) => `<button class="theme ${id === t.theme ? "on" : ""}" data-act="theme" data-id="${id}"><i style="background:${th.accent}"></i>${esc(th.name)}</button>`).join("")}</div>
   <h3>Seiten</h3>
   ${chk("Linien zum Handschreiben in freien Textbereichen", "ruled", t.ruled)}
-  ${chk("Kostenübersicht am Ende", "costPage", t.costPage)}`;
+  ${chk("Kostenübersicht am Ende", "costPage", t.costPage)}
+  <h3>PDF speichern</h3>
+  ${chk("Bearbeitungsdaten und Fotos im PDF speichern (PDF lässt sich später wieder öffnen und weiterbearbeiten)", "projData", t.projData)}
+  ${selFld("Fotos im PDF einbetten", "embed", t.embed, [["original", "Originaldateien (volle Qualität, EXIF, großes PDF)"], ["work", "Arbeitskopien (1600 px, kleines PDF)"]])}
+  <small>${embedEstimate(t)}</small>`;
+}
+
+function embedEstimate(t) {
+  const ph = t.days.flatMap((d) => d.photos);
+  if (!ph.length) return "Noch keine Fotos.";
+  const orig = ph.reduce((s, p) => s + (p.file ? p.file.size : p.size || 0), 0), work = ph.reduce((s, p) => s + p.src.length * 0.75, 0);
+  const mb = (n) => fmtNum(n / 1048576, 1) + " MB";
+  return `${ph.length} Fotos: etwa ${mb(t.embed === "work" || !orig ? work : orig)} zusätzlich im PDF${t.projData ? "" : " (nur wenn die Bearbeitungsdaten gespeichert werden)"}.`;
 }
 
 /* ---------- Reiter „Tage“ ---------- */
@@ -55,7 +67,7 @@ const DAY_FIELDS = {
   plan: (d) => fld("Tagesplan (eine Zeile pro Punkt, Uhrzeit vorn)", `d:${d.id}.plan`, d.plan, { rows: 7, ph: "09:30 Frühstück im Café, 11:00 Stadtrundgang, …" }),
   highlights: (d) => fld("Highlights (eine pro Zeile)", `d:${d.id}.highlights`, d.highlights, { rows: 3 }),
   costs: (d) => `<div class="f"><span>Ausgaben <b data-sum="${d.id}">${dayCosts(d) ? "· " + money(dayCosts(d), S.trip.currency) : ""}</b></span>${d.costs.map((c) => `<div class="cost"><input data-k="d:${d.id}.costs.${c.id}.l" value="${esc(c.l)}" placeholder="Bezeichnung"><select data-k="d:${d.id}.costs.${c.id}.cat">${CATS.map((k) => `<option value="${k.id}" ${k.id === c.cat ? "selected" : ""}>${esc(k.name)}</option>`).join("")}</select><input data-k="d:${d.id}.costs.${c.id}.a" value="${esc(c.a)}" inputmode="decimal" placeholder="0,00"><button class="ico" data-act="delCost" data-day="${d.id}" data-id="${c.id}" title="Entfernen">×</button></div>`).join("")}<button data-act="addCost" data-day="${d.id}">+ Ausgabe</button></div>`,
-  photos: (d) => `<div class="f"><span>Fotos (${d.photos.length})</span><div class="thumbs">${d.photos.map((p) => `<div class="thumb"><img src="${p.src}" alt=""><button data-act="delPhoto" data-day="${d.id}" data-id="${p.id}" title="Entfernen">×</button></div>`).join("")}</div><label class="drop" style="padding:6px;margin:0">+ Fotos wählen<input type="file" accept="image/*" multiple hidden data-photos="${d.id}"></label></div>`,
+  photos: (d) => `<div class="f"><span>Fotos (${d.photos.length})</span>${d.photos.map((p) => photoCard(d, p)).join("")}<label class="drop" style="padding:6px;margin:0">+ Fotos wählen<input type="file" accept="image/*,.heic,.heif" multiple hidden data-photos="${d.id}"></label></div>`,
 };
 
 function daySummary(i) {
@@ -170,7 +182,7 @@ document.addEventListener("toggle", (e) => {
 document.addEventListener("change", (e) => {
   const el = e.target;
   if (el.matches("[data-photos]")) addPhotosToDay(el.dataset.photos, [...el.files]);
-  else if (el.id === "photoAll") distributePhotos([...el.files]);
+  else if (el.id === "photoAll" || el.id === "photoGlobal") { addPhotos([...el.files]); el.value = ""; }
   else if (el.id === "mapFile") useOwnMap(el.files[0]);
   else if (el.id === "coverFile") useCover(el.files[0]);
   else if (el.id === "openFile") openProject(el.files[0]);
@@ -234,9 +246,26 @@ document.addEventListener("click", async (e) => {
     case "resum": t.summary = suggestSummary(t); t.summaryAuto = true; changed(); renderPanel(); break;
     case "new": if (confirm("Alle Eingaben verwerfen und neu beginnen?")) loadTrip(newTrip(t.template), true); break;
     case "open": $("#openFile").click(); break;
-    case "save": saveProject(); break;
+    case "addPhotos": $("#photoGlobal").click(); break;
+    case "photoMark": { const p = dayOf(dayId).photos.find((x) => x.id === id); if (p) openEditor(p); break; }
+    case "photoRotL": case "photoRotR": { const p = dayOf(dayId).photos.find((x) => x.id === id); if (p) { await rotatePhoto(p, b.dataset.act === "photoRotR" ? 1 : -1); changed(); renderPanel(); } break; }
+    case "photoUp": case "photoDown": {
+      const d = dayOf(dayId), i = d.photos.findIndex((x) => x.id === id), j = i + (b.dataset.act === "photoUp" ? -1 : 1);
+      if (j >= 0 && j < d.photos.length) { [d.photos[i], d.photos[j]] = [d.photos[j], d.photos[i]]; changed(); renderPanel(); }
+      break;
+    }
     case "pdf": makePdf(); break;
   }
+});
+
+/* Dateien irgendwo auf die Seite ziehen: PDF = Projekt öffnen, Bilder = Fotos hinzufügen */
+["dragenter", "dragover"].forEach((ev) => document.addEventListener(ev, (e) => { if (e.dataTransfer && [...e.dataTransfer.types].includes("Files")) { e.preventDefault(); document.body.classList.add("dragging"); } }));
+["dragleave", "drop"].forEach((ev) => document.addEventListener(ev, (e) => { if (ev === "dragleave" && e.relatedTarget) return; document.body.classList.remove("dragging"); }));
+document.addEventListener("drop", (e) => {
+  if (!e.dataTransfer || !e.dataTransfer.files.length) return;
+  e.preventDefault();
+  const files = [...e.dataTransfer.files], pdf = files.find(isPdfFile);
+  if (pdf) openProject(pdf); else addPhotos(files);
 });
 
 const byDate = (a, b) => (a.date || "9999").localeCompare(b.date || "9999");
@@ -270,42 +299,187 @@ function bindDrop() {
   const z = $("#dropAll"); if (!z) return;
   z.addEventListener("dragover", (e) => { e.preventDefault(); z.classList.add("over"); });
   z.addEventListener("dragleave", () => z.classList.remove("over"));
-  z.addEventListener("drop", (e) => { e.preventDefault(); z.classList.remove("over"); distributePhotos([...e.dataTransfer.files]); });
 }
-const isImg = (f) => /^image\//.test(f.type) || /\.(jpe?g|png|webp)$/i.test(f.name);
 
-async function readAll(files) {
-  const out = [];
-  for (const f of files.filter(isImg)) {
-    try { out.push(await readPhoto(f)); } catch (e) { toast(`„${f.name}“ konnte nicht gelesen werden (HEIC bitte vorher in JPEG wandeln).`); }
+/* Dateien einlesen (mit Fortschritt); Fehler zählen, nicht abbrechen */
+async function readPhotos(files) {
+  const out = []; let bad = 0, k = 0;
+  for (const f of files) {
+    toast(`Fotos werden gelesen … ${++k}/${files.length}`, 120000);
+    try { out.push(await makePhoto(f)); } catch (e) { console.warn(f.name, e); bad++; }
   }
-  return out;
+  return { list: out, bad };
 }
+const photoSort = (a, b) => (a.day + " " + a.time).localeCompare(b.day + " " + b.time);
+
 async function addPhotosToDay(dayId, files) {
   const d = dayOf(dayId); if (!d) return;
-  toast("Fotos werden gelesen …", 20000);
-  d.photos.push(...(await readAll(files)));
-  S.open.add(dayId); changed(); renderPanel(); toast("Fotos hinzugefügt.");
+  const { list, bad } = await readPhotos(files.filter(isImageFile));
+  d.photos.push(...list); d.photos.sort(photoSort);
+  S.open.add(dayId); changed(); renderPanel();
+  toast(bad ? `${list.length} Fotos hinzugefügt, ${bad} nicht lesbar.` : `${list.length} Fotos hinzugefügt.`);
 }
-async function distributePhotos(files) {
-  const t = S.trip;
-  toast("Fotos werden gelesen …", 60000);
-  const list = (await readAll(files)).sort((a, b) => (a.day || "").localeCompare(b.day || ""));
-  let made = 0, nameJobs = [];
+
+/* Mehrere Fotos auf einmal: Tage entstehen aus den Aufnahmedaten, Orte aus dem GPS der Fotos. */
+async function addPhotos(files) {
+  const imgs = [...files].filter(isImageFile), t = S.trip, fixed = TEMPLATES[t.template].fixedPlace;
+  if (!imgs.length) { toast("Keine Bilddateien gefunden."); return; }
+  const { list, bad } = await readPhotos(imgs);
+  list.sort(photoSort);
+  const made = [], touched = new Set();
   for (const p of list) {
     let d = p.day ? t.days.find((x) => x.date === p.day) : t.days[t.days.length - 1];
     if (!d) {
-      d = newDay(p.day); if (TEMPLATES[t.template].fixedPlace) d.place = { ...t.destination };
-      t.days.push(d); t.days.sort(byDate); made++;
-      if (p.gps && !TEMPLATES[t.template].fixedPlace) nameJobs.push([d, p.gps]);
+      d = newDay(p.day); if (fixed) d.place = { ...t.destination };
+      t.days.push(d); t.days.sort(byDate); made.push(d);
     }
-    d.photos.push(p);
+    d.photos.push(p); touched.add(d);
   }
+  touched.forEach((d) => d.photos.sort(photoSort));
+  const first = made.length ? made.slice().sort(byDate)[0] : null;
+  if (!t.start && first && first.date) t.start = first.date;
+  const noDate = list.filter((p) => p.dayFromFile).length;
+  changed(); S.tab = "days"; made.forEach((d) => S.open.add(d.id)); renderPanel();
+  toast(`${list.length} Fotos zugeordnet${made.length ? `, ${made.length} ${made.length === 1 ? "neuer Tag" : "neue Tage"} angelegt` : ""}${bad ? `, ${bad} nicht lesbar` : ""}${noDate ? `. Bei ${noDate} fehlte das Aufnahmedatum (Dateidatum verwendet)` : ""}.`, 8000);
+  /* Orte der neuen Tage aus dem GPS des jeweils letzten Fotos (Abendort), langsam im Hintergrund */
+  for (const d of made) {
+    const g = d.photos.filter((p) => p.gps).map((p) => p.gps).pop();
+    if (!g || (fixed ? t.destination.name : d.place.name)) continue;
+    try {
+      const name = await reversePlace(g.lat, g.lon);
+      if (!name) continue;
+      if (fixed) { if (!t.destination.name) { t.destination = { name, lat: g.lat, lon: g.lon }; t.days.forEach((x) => { if (!x.place.name) x.place = { ...t.destination }; }); } }
+      else if (!d.place.name) d.place = { name, lat: g.lat, lon: g.lon };
+      changed(); if (S.tab === "days") renderPanel();
+    } catch (e) { break; }
+  }
+}
+
+/* ---------- Foto-Karten im Tages-Editor ---------- */
+function photoCard(d, p) {
+  const nm = NUMS(p).length, info = [p.day ? fmtDate(p.day, { day: "numeric", month: "short" }) + (p.time ? " " + p.time.slice(0, 5) : "") : "", p.gps ? "GPS" : "", nm ? `${nm} Nummern` : "", p.marks.length - nm > 0 ? "Markierungen" : ""].filter(Boolean).join(" · ");
+  const k = `d:${d.id}.photos.${p.id}`;
+  return `<div class="pcard"><img class="pthumb" src="${p.vsrc || p.src}" alt=""><div class="pbody">
+    <input data-k="${k}.note" value="${esc(p.note)}" placeholder="Bildunterschrift / Anmerkung">
+    <small>${esc(p.name)}${info ? " · " + esc(info) : ""}</small>
+    <div class="btnrow" style="margin:4px 0 0"><button data-act="photoMark" data-day="${d.id}" data-id="${p.id}">Markieren …</button><button class="ico" data-act="photoRotL" data-day="${d.id}" data-id="${p.id}" title="Links drehen">⟲</button><button class="ico" data-act="photoRotR" data-day="${d.id}" data-id="${p.id}" title="Rechts drehen">⟳</button><button class="ico" data-act="photoUp" data-day="${d.id}" data-id="${p.id}" title="Früher">↑</button><button class="ico" data-act="photoDown" data-day="${d.id}" data-id="${p.id}" title="Später">↓</button><button class="ico" data-act="delPhoto" data-day="${d.id}" data-id="${p.id}" title="Entfernen">×</button></div></div></div>`;
+}
+
+/* ---------- Editor: Markieren, Drehen, Ausschnitt (wie im Foto-Protokoll) ---------- */
+let edP = null, edTool = "circle", edColor = "#E3242B", edDraft = null, edCrop = false, edRect = null, edStart = null, edFull = "";
+try { const s = JSON.parse(localStorage.getItem("reiseprotokoll.ed") || "null"); if (s) { edTool = s.t || edTool; edColor = s.c || edColor; } } catch (e) { /* ohne Speicher */ }
+function syncEdButtons() {
+  $$("#edTool button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === edTool)));
+  $$("#edColor button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === edColor)));
+  try { localStorage.setItem("reiseprotokoll.ed", JSON.stringify({ t: edTool, c: edColor })); } catch (e) { /* ohne Speicher */ }
+}
+async function openEditor(p) {
+  edP = p; edCrop = false; edRect = null; edStart = null;
+  $("#edName").textContent = p.name;
+  syncEdButtons();
+  await edLoadImage();
+  $("#editor").hidden = false;
+}
+/* Ansicht (gedreht, zugeschnitten); im Ausschnitt-Modus das ganze gedrehte Bild */
+async function edLoadImage() {
+  const p = edP; if (!p) return;
+  if (edCrop) {
+    const [rw, rh] = rotDims(p), c = document.createElement("canvas"); c.width = rw; c.height = rh;
+    const bmp = await bitmapOf(p); drawView(c.getContext("2d"), bmp, p, rw, rh, true); bmp.close();
+    edFull = c.toDataURL("image/jpeg", 0.85);
+  }
+  const v = viewBox(p, edCrop);
+  $("#edPic").src = edCrop ? edFull : p.vsrc || p.src;
+  $("#edImg").style.aspectRatio = `${v.w} / ${v.h}`;
+  $("#edSvg").setAttribute("viewBox", `0 0 ${v.w} ${v.h}`);
+  $("#editor").classList.toggle("cropping", edCrop);
+  $("#edCrop").setAttribute("aria-pressed", String(edCrop));
+  $("#edCropReset").disabled = !p.crop;
+  $("#edHint").hidden = edCrop; $("#edHintCrop").hidden = !edCrop;
+  drawEd(); renderEdNotes();
+}
+function closeEditor() {
+  $("#editor").hidden = true; edDraft = null; edRect = null; edCrop = false; edStart = null; edP = null;
   changed(); renderPanel();
-  toast(`${list.length} Fotos zugeordnet${made ? `, ${made} neue Tage angelegt` : ""}.`);
-  for (const [d, g] of nameJobs) {
-    try { const name = await reversePlace(g.lat, g.lon); if (name && !d.place.name) { d.place = { name, lat: g.lat, lon: g.lon }; changed(); if (S.tab === "days") renderPanel(); } } catch (e) { break; }
-  }
+}
+function cropOverlay() {
+  const [rw, rh] = rotDims(edP), c = edRect || edP.crop; if (!c) return "";
+  return `<path d="M0 0H${rw}V${rh}H0Z M${c.x} ${c.y}h${c.w}v${c.h}h${-c.w}Z" fill="rgba(0,0,0,.55)" fill-rule="evenodd"/>`
+    + `<rect x="${c.x}" y="${c.y}" width="${c.w}" height="${c.h}" fill="none" stroke="#fff" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
+}
+function drawEd() {
+  if (!edP) return;
+  $("#edSvg").innerHTML = marksSvgInner(edP, { full: edCrop, extra: edDraft }) + (edCrop ? cropOverlay() : "");
+  $("#edUndo").disabled = !edP.marks.length; $("#edClear").disabled = !edP.marks.length;
+  const v = viewBox(edP, edCrop), n = NUMS(edP).length;
+  $("#edImg").style.width = `min(100%, calc((100dvh - ${250 + (n ? 30 + 40 * Math.min(n, 4) : 0)}px) * ${(v.w / v.h).toFixed(4)}))`;
+}
+function renderEdNotes() {
+  const box = $("#edNotes"), nums = NUMS(edP);
+  box.hidden = !nums.length;
+  box.innerHTML = nums.length ? `<span class="lbl">Notizen zu den Nummern</span>` + nums.map((m, k) =>
+    `<div class="nrow"><span class="bdg2" style="background:${m.c};color:${numInk(m.c)}">${k + 1}</span><input type="text" data-k="${k}" value="${esc(m.note || "")}" placeholder="Was ist hier? z. B. schöner Aussichtspunkt" aria-label="Notiz zu Nummer ${k + 1}"><button type="button" data-k="${k}" aria-label="Nummer ${k + 1} entfernen">×</button></div>`).join("") : "";
+  drawEd();
+}
+function edPoint(e) {
+  const rc = $("#edSvg").getBoundingClientRect(), v = viewBox(edP, edCrop);
+  return { x: clamp((e.clientX - rc.left) / rc.width * v.w, 0, v.w), y: clamp((e.clientY - rc.top) / rc.height * v.h, 0, v.h) };
+}
+const rectOf = (a, b) => ({ x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(a.x - b.x), h: Math.abs(a.y - b.y) });
+function shapeFrom(a, b) {
+  const base = Math.min(edP.w, edP.h), d = Math.hypot(b.x - a.x, b.y - a.y), drag = d > base * 0.02;
+  if (edTool === "circle") return { t: "circle", x: a.x, y: a.y, r: drag ? d : base * 0.075, c: edColor };
+  if (edTool === "num") return { t: "num", x: a.x, y: a.y, r: drag ? Math.min(base * 0.09, Math.max(base * 0.02, d)) : base * 0.036, c: edColor, note: "" };
+  if (drag) return { t: "arrow", x: a.x, y: a.y, x2: b.x, y2: b.y, c: edColor };
+  let vx = edP.w / 2 - a.x, vy = edP.h / 2 - a.y; const l = Math.hypot(vx, vy);
+  if (l < base * 0.05) { vx = -1; vy = -1; }
+  const n = Math.hypot(vx, vy);
+  return { t: "arrow", x: a.x, y: a.y, x2: a.x + vx / n * base * 0.2, y2: a.y + vy / n * base * 0.2, c: edColor };
+}
+function bindEditor() {
+  const svg = $("#edSvg");
+  svg.addEventListener("pointerdown", (e) => {
+    if (!edP) return; e.preventDefault(); svg.setPointerCapture(e.pointerId); edStart = edPoint(e);
+    if (edCrop) { edRect = null; return; }
+    edDraft = shapeFrom(edStart, edStart); drawEd();
+  });
+  svg.addEventListener("pointermove", (e) => {
+    if (!edStart) return;
+    if (edCrop) { edRect = rectOf(edStart, edPoint(e)); drawEd(); return; }
+    edDraft = shapeFrom(edStart, edPoint(e)); drawEd();
+  });
+  svg.addEventListener("pointerup", async (e) => {
+    if (!edStart) return;
+    if (edCrop) {
+      const r = rectOf(edStart, edPoint(e)); edStart = null; edRect = null;
+      const [rw, rh] = rotDims(edP);
+      if (r.w > rw * 0.05 && r.h > rh * 0.05) { edCrop = false; await setCrop(edP, r); await edLoadImage(); } else drawEd();
+      return;
+    }
+    const m = shapeFrom(edStart, edPoint(e));
+    edP.marks.push(unviewMark(edP, m)); edStart = null; edDraft = null; drawEd(); if (m.t === "num") renderEdNotes();
+  });
+  svg.addEventListener("pointercancel", () => { edStart = null; edDraft = null; edRect = null; drawEd(); });
+  $("#edNotes").addEventListener("input", (e) => { const k = e.target.dataset.k; if (k != null && edP) NUMS(edP)[+k].note = e.target.value; });
+  $("#edNotes").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-k]"); if (!b || !edP) return;
+    const m = NUMS(edP)[+b.dataset.k]; edP.marks.splice(edP.marks.indexOf(m), 1); renderEdNotes();
+  });
+  $("#edRotL").addEventListener("click", async () => { await rotatePhoto(edP, -1); await edLoadImage(); });
+  $("#edRotR").addEventListener("click", async () => { await rotatePhoto(edP, 1); await edLoadImage(); });
+  $("#edCrop").addEventListener("click", async () => { edCrop = !edCrop; edRect = null; await edLoadImage(); });
+  $("#edCropReset").addEventListener("click", async () => { edCrop = false; await setCrop(edP, null); await edLoadImage(); });
+  $("#edTool").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { edTool = b.dataset.v; syncEdButtons(); } });
+  $("#edColor").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { edColor = b.dataset.v; syncEdButtons(); } });
+  $("#edUndo").addEventListener("click", () => { edP.marks.pop(); renderEdNotes(); });
+  $("#edClear").addEventListener("click", () => { edP.marks = []; renderEdNotes(); });
+  $("#edDone").addEventListener("click", closeEditor);
+  $("#editor").addEventListener("click", (e) => { if (e.target.id === "editor") closeEditor(); });
+  document.addEventListener("keydown", (e) => {
+    if ($("#editor").hidden) return;
+    if (e.key === "Escape") closeEditor();
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && e.target.tagName !== "INPUT") { e.preventDefault(); edP.marks.pop(); renderEdNotes(); }
+  });
 }
 
 /* ---------- Karte ---------- */
@@ -358,36 +532,40 @@ function applyLegs() {
   changed(); renderPanel(); toast(n ? `Kilometer und Fahrzeit für ${n} Tage eingetragen.` : "Keine passenden Tage gefunden.");
 }
 
-/* ---------- Projekt: speichern, öffnen, PDF ---------- */
+/* ---------- Projekt: öffnen und PDF erstellen ---------- */
 function loadTrip(t, fresh) {
   S.trip = normalizeTrip(t); S.open = new Set(); S.newPoint = blankPlace();
   if (!fresh && S.trip.days[0]) S.open.add(S.trip.days[0].id);
   refreshDerived(S.trip);
-  S.tab = fresh ? "trip" : "trip";
+  S.tab = "trip";
   renderPanel(); renderPreview(); scheduleSave();
 }
-function saveProject() {
-  download(new Blob([JSON.stringify(S.trip)], { type: "application/json" }), safeName(S.trip.title) + ".reise.json");
-  toast("Projektdatei gespeichert (mit Fotos und Karte).");
-}
+const hasContent = () => S.trip.days.length > 0 || S.trip.title.trim() !== "";
+
+/* Ein Projekt-PDF öffnen (Einstellungen, Tage, Fotos, Karte kommen aus den Anhängen) */
 async function openProject(file) {
   if (!file) return;
+  if (hasContent() && !confirm("Das aktuelle Projekt wird durch das PDF ersetzt. Fortfahren?")) return;
   try {
-    const t = JSON.parse(await file.text());
-    if (!t || !Array.isArray(t.days)) throw new Error("kein Reiseprojekt");
-    loadTrip(t); toast("Projekt geöffnet.");
-  } catch (e) { toast("Die Datei ist kein gültiges Reise-Projekt."); }
-  $("#openFile").value = "";
+    toast("PDF wird gelesen …", 120000);
+    const r = await readProjectPdf(file, (n, N) => toast(`Fotos werden geladen … ${n}/${N}`, 120000));
+    loadTrip(r.trip);
+    const warn = [r.missing ? `${r.missing} Fotos fehlen im PDF` : "", r.unreadable ? `${r.unreadable} Fotos nicht lesbar` : ""].filter(Boolean).join(", ");
+    toast(warn ? `Projekt geöffnet (${warn}).` : "Projekt geöffnet.", warn ? 9000 : 3500);
+  } catch (e) { console.warn(e); toast(e.message || "Das PDF konnte nicht geöffnet werden.", 10000); }
+  const f = $("#openFile"); if (f) f.value = "";
 }
+
 async function makePdf() {
   const btn = $("#pdfBtn"); if (S.busy) return;
   if (!window.PDFLib) { toast("Die PDF-Bibliothek konnte nicht geladen werden (Internet nötig)."); return; }
   S.busy = true; btn.disabled = true;
   try {
-    const { pages } = layoutTrip(S.trip);
-    const bytes = await buildPdf(pages, { title: S.trip.title, author: S.trip.travelers }, (n, N) => (btn.textContent = `Seite ${n}/${N} …`));
-    download(new Blob([bytes], { type: "application/pdf" }), safeName(S.trip.title) + ".pdf");
-    toast("PDF erstellt.");
+    const t = S.trip, { pages } = layoutTrip(t);
+    const atts = t.projData ? await collectAttachments(t, (n, N) => (btn.textContent = `Fotos ${n}/${N} …`)) : [];
+    const bytes = await buildPdf(pages, { title: t.title, author: t.travelers }, atts, (n, N) => (btn.textContent = `Seite ${n}/${N} …`));
+    download(new Blob([bytes], { type: "application/pdf" }), safeName(t.title) + ".pdf");
+    toast(`PDF erstellt (${fmtNum(bytes.length / 1048576, 1)} MB${t.projData ? ", mit Bearbeitungsdaten" : ""}).`);
   } catch (e) { console.error(e); toast("PDF-Fehler: " + e.message); }
   S.busy = false; btn.disabled = false; btn.textContent = "PDF erstellen";
 }

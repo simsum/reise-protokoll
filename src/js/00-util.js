@@ -8,7 +8,11 @@ const uid = () => Math.random().toString(36).slice(2, 9);
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 /* ---------- Datum (immer als ISO-Text JJJJ-MM-TT, Rechnen in UTC) ---------- */
-const parseIso = (s) => (/^\d{4}-\d{2}-\d{2}$/.test(s || "") ? new Date(s + "T12:00:00Z") : null);
+function parseIso(s) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s || "")) return null;
+  const d = new Date(s + "T12:00:00Z");
+  return Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== s ? null : d; // z. B. 2026-02-31 ist ungültig
+}
 const isoOf = (d) => d.toISOString().slice(0, 10);
 const addDays = (iso, n) => isoOf(new Date(parseIso(iso).getTime() + n * 864e5));
 const diffDays = (a, b) => Math.round((parseIso(b) - parseIso(a)) / 864e5);

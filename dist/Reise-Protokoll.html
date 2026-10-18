@@ -100,11 +100,43 @@ svg.ab { overflow: visible; }
   main { flex-direction: column; }
   #side { width: auto; max-height: 55vh; border-right: 0; border-bottom: 1px solid var(--line); }
 }
+
+/* Foto-Karten */
+.pcard { display: flex; gap: 8px; border: 1px solid var(--line); border-radius: 8px; padding: 6px; margin-bottom: 6px; background: #fff; }
+.pthumb { width: 76px; height: 76px; object-fit: cover; border-radius: 6px; flex: none; }
+.pbody { flex: 1; min-width: 0; }
+.pbody input { width: 100%; border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; }
+.pbody small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; }
+body.dragging::after { content: "Fotos hier ablegen (oder ein Projekt-PDF zum Öffnen)"; position: fixed; inset: 8px; border: 3px dashed var(--ui); border-radius: 14px; background: rgba(31,111,139,.12); display: grid; place-items: center; font-size: 20px; color: var(--ui-d); z-index: 20; pointer-events: none; }
+
+/* Editor */
+.modal { position: fixed; inset: 0; background: rgba(15,25,32,.6); display: grid; place-items: center; padding: 14px; z-index: 15; }
+.ed { background: #fff; border-radius: 12px; width: min(1100px, 100%); max-height: 100%; overflow: auto; display: grid; gap: 10px; padding: 14px; }
+.ed-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.edname { overflow-wrap: anywhere; min-width: 0; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; padding: 6px 10px; }
+.seg button[aria-pressed="true"] { background: var(--ui); color: #fff; }
+.sw { display: inline-flex; gap: 6px; }
+.sw button { width: 26px; height: 26px; padding: 0; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--line); }
+.sw button[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--ui); }
+.hint { margin: 0; color: var(--mut); font-size: 13px; }
+.ed-stage { display: grid; place-items: center; background: var(--bg); border-radius: 8px; padding: 8px; }
+.ed-img { position: relative; max-width: 100%; }
+.ed-img img { display: block; width: 100%; height: 100%; user-select: none; -webkit-user-drag: none; }
+.ed-img svg { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; touch-action: none; }
+.modal.cropping #edTool, .modal.cropping #edColor { opacity: .35; pointer-events: none; }
+.modal.cropping .ed-img svg { cursor: cell; }
+.ed-notes { display: grid; gap: 6px; }
+.ed-notes .lbl { font-size: 12px; color: var(--mut); }
+.nrow { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.nrow input { width: 100%; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; }
+.bdg2 { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font: 700 12px/1 system-ui, sans-serif; }
 </style>
 
 <div id="app">
   <header class="top">
-    <div class="brand"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s6.5-5.7 6.5-11a6.5 6.5 0 1 0-13 0C5.5 15.3 12 21 12 21z"/><circle cx="12" cy="10" r="2.4"/></svg> Reise-Protokoll <span class="ver">v0.2.0</span></div>
+    <div class="brand"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s6.5-5.7 6.5-11a6.5 6.5 0 1 0-13 0C5.5 15.3 12 21 12 21z"/><circle cx="12" cy="10" r="2.4"/></svg> Reise-Protokoll <span class="ver">v0.3.0</span></div>
     <div class="grow"></div>
     <select id="demo" title="Beispielreise laden">
       <option value="">Beispiel laden …</option>
@@ -112,10 +144,11 @@ svg.ab { overflow: visible; }
       <option value="kurztrip">Beispiel Kurztrip</option>
     </select>
     <button data-act="new">Neu</button>
-    <button data-act="open">Öffnen</button>
-    <button data-act="save">Speichern</button>
+    <button data-act="addPhotos" title="Mehrere Fotos auf einmal: Tage entstehen aus den Aufnahmedaten">Fotos hinzufügen</button>
+    <button data-act="open" title="Ein mit Reise-Protokoll erstelltes PDF zum Weiterbearbeiten öffnen">PDF öffnen</button>
     <button class="primary" data-act="pdf" id="pdfBtn">PDF erstellen</button>
-    <input type="file" id="openFile" accept=".json,application/json" hidden>
+    <input type="file" id="openFile" accept=".pdf,application/pdf" hidden>
+    <input type="file" id="photoGlobal" accept="image/*,.heic,.heif" multiple hidden>
   </header>
   <main>
     <aside id="side">
@@ -138,6 +171,33 @@ svg.ab { overflow: visible; }
     </section>
   </main>
 </div>
+<div class="modal" id="editor" hidden role="dialog" aria-modal="true" aria-labelledby="edName">
+  <div class="ed">
+    <div class="ed-bar">
+      <b id="edName" class="edname"></b>
+      <span class="grow"></span>
+      <div class="seg" id="edTool" role="group" aria-label="Werkzeug">
+        <button type="button" data-v="circle">Kreis</button><button type="button" data-v="arrow">Pfeil</button><button type="button" data-v="num">Nummer</button>
+      </div>
+      <div class="sw" id="edColor" role="group" aria-label="Farbe">
+        <button type="button" data-v="#E3242B" style="background:#E3242B" aria-label="Rot"></button>
+        <button type="button" data-v="#FFC400" style="background:#FFC400" aria-label="Gelb"></button>
+        <button type="button" data-v="#1F6FEB" style="background:#1F6FEB" aria-label="Blau"></button>
+      </div>
+      <div class="seg" role="group" aria-label="Ansicht">
+        <button type="button" id="edRotL" title="Links drehen">⟲</button><button type="button" id="edRotR" title="Rechts drehen">⟳</button><button type="button" id="edCrop" aria-pressed="false" title="Ausschnitt wählen">Ausschnitt</button>
+      </div>
+      <button type="button" id="edCropReset" disabled>Ausschnitt aufheben</button>
+      <button type="button" id="edUndo">Rückgängig</button>
+      <button type="button" id="edClear">Alle entfernen</button>
+      <button type="button" class="primary" id="edDone">Fertig</button>
+    </div>
+    <p class="hint" id="edHintCrop" hidden>Ausschnitt wählen: Mit gedrückter Maustaste ein Rechteck aufziehen. Er gilt für Vorschau und PDF, die eingebettete Originaldatei bleibt unverändert. Markierungen außerhalb des Ausschnitts entfallen.</p>
+    <p class="hint" id="edHint">Auf die Stelle klicken, die markiert werden soll. Ziehen bestimmt die Größe von Kreis und Nummer bzw. Richtung und Länge des Pfeils. Zu jeder Nummer kannst du unten eine Notiz schreiben.</p>
+    <div class="ed-stage"><div class="ed-img" id="edImg"><img alt="" id="edPic"><svg id="edSvg"></svg></div></div>
+    <div class="ed-notes" id="edNotes" hidden></div>
+  </div>
+</div>
 <div id="toast" hidden></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
@@ -154,7 +214,11 @@ const uid = () => Math.random().toString(36).slice(2, 9);
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 /* ---------- Datum (immer als ISO-Text JJJJ-MM-TT, Rechnen in UTC) ---------- */
-const parseIso = (s) => (/^\d{4}-\d{2}-\d{2}$/.test(s || "") ? new Date(s + "T12:00:00Z") : null);
+function parseIso(s) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s || "")) return null;
+  const d = new Date(s + "T12:00:00Z");
+  return Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== s ? null : d; // z. B. 2026-02-31 ist ungültig
+}
 const isoOf = (d) => d.toISOString().slice(0, 10);
 const addDays = (iso, n) => isoOf(new Date(parseIso(iso).getTime() + n * 864e5));
 const diffDays = (a, b) => Math.round((parseIso(b) - parseIso(a)) / 864e5);
@@ -253,7 +317,7 @@ function newTrip(template = "rundreise") {
     startPlace: blankPlace(), destination: blankPlace(), roundTrip: false,
     days: [], summary: "", summaryAuto: true,
     route: { auto: true, road: true, points: [], km: null, legs: [], mapSig: "" },
-    mapImg: "", mapUser: false, coverPhoto: "", ruled: true, costPage: true,
+    mapImg: "", mapUser: false, coverPhoto: "", projData: true, embed: "original", ruled: true, costPage: true,
   };
 }
 
@@ -271,6 +335,14 @@ function normalizeTrip(t) {
     photos: Array.isArray(d.photos) ? d.photos : [],
   }));
   return out;
+}
+
+/* Ältere oder unvollständige Fotos ergänzen (Arbeitskopie `src` ist Pflicht). */
+function normPhoto(p) {
+  const bw = p.bw || p.w || 1, bh = p.bh || p.h || 1;
+  const o = { id: uid(), name: "Foto", type: "", mod: 0, size: 0, file: null, src: "", vsrc: "", gps: null, day: "", time: "", dayFromFile: false, note: "", rot: 0, crop: null, marks: [], ...p, bw, bh };
+  o.w = o.w || bw; o.h = o.h || bh;
+  return o;
 }
 
 /* ---------- Ableitungen ---------- */
@@ -619,7 +691,7 @@ function wrapMax(text, f, size, maxW, maxLines) {
      line  {x1,y1,x2,y2,c,sw}                  Linie
      t     {x,y,text,s,f,c,a,ls}               Text; y = Oberkante, a = l|c|r, ls = Buchstabenabstand
      path  {x,y,w,h,vw,vh,d,fill,stroke,sw}    SVG-Pfad im Raster vw×vh (Symbole)
-     img   {x,y,w,h,src,iw,ih}                 Bild, füllt den Rahmen (zugeschnitten)         */
+     img   {x,y,w,h,src,iw,ih,pid}             Bild, füllt den Rahmen (zugeschnitten); pid = Foto-ID (Büroklammer im PDF)         */
 const PW = 595.28, PH = 841.89, MX = 40, CW = PW - 2 * MX, BOTTOM = 790;
 
 class Pg {
@@ -633,7 +705,7 @@ class Pg {
     this.ops.push({ k: "t", x, y, text: clean(text), s: o.s || 10, f: o.f || "R", c: o.c || this.T.ink, a: o.a || "l", ls: o.ls || 0 });
   }
   icon(name, x, y, s, c, sw = 1.6) { this.ops.push({ k: "path", x, y, w: s, h: s, vw: 24, vh: 24, d: ICONS[name] || ICONS.sun, fill: null, stroke: c, sw }); }
-  img(x, y, w, h, src, iw, ih) { this.ops.push({ k: "img", x, y, w, h, src, iw: iw || w, ih: ih || h }); }
+  img(x, y, w, h, src, iw, ih, pid) { this.ops.push({ k: "img", x, y, w, h, src, iw: iw || w, ih: ih || h, pid }); }
   label(x, y, text, c, a) { this.text(x, y, String(text).toUpperCase(), { f: "B", s: 7.5, c: c || this.T.accent, ls: 1.4, a }); }
 }
 
@@ -801,12 +873,12 @@ function dayPages(t, i, T, warns) {
     pg.text(x + 35, y + 25, fitT(v || "–", "R", 9.5, bw - 46), { s: 9.5, c: v ? T.ink : T.muted });
   });
 
-  /* Fotos (die ersten drei als Streifen) */
-  const shown = d.photos.slice(0, 3), stripY = BOTTOM - 104;
-  const bodyBottom = shown.length ? stripY - 18 : BOTTOM - 4;
+  /* Fotos (die ersten drei als Streifen, mit Bildunterschrift) */
+  const shown = d.photos.slice(0, 3), stripH = 132, stripY = BOTTOM - stripH;
+  const bodyBottom = shown.length ? stripY - 16 : BOTTOM - 4;
   if (shown.length) {
-    const g = 8, w = (CW - g * (shown.length - 1)) / shown.length;
-    shown.forEach((p, k) => pg.img(MX + k * (w + g), stripY, w, 104, p.src, p.w, p.h));
+    const g = 10, w = (CW - g * (shown.length - 1)) / shown.length;
+    shown.forEach((p, k) => photoBlock(pg, p, MX + k * (w + g), stripY, w, stripH, 3, T, warns, `Tag ${i + 1}`));
   }
 
   /* Text links */
@@ -834,12 +906,61 @@ function dayPages(t, i, T, warns) {
   for (let k = 0; k < more.length; k += per) {
     const p3 = new Pg(T); out.push(p3);
     const y0 = miniHeader(p3, `Tag ${i + 1} · Fotos`, title), chunk = more.slice(k, k + per);
-    galleryCells(chunk.length, MX, y0, CW, BOTTOM - y0).forEach((c, n) => p3.img(c.x, c.y, c.w, c.h, chunk[n].src, chunk[n].w, chunk[n].h));
+    galleryCells(chunk.length, MX, y0, CW, BOTTOM - y0).forEach((c, n) => photoBlock(p3, chunk[n], c.x, c.y, c.w, c.h, 6, T, warns, `Tag ${i + 1}`));
   }
   return out;
 }
 
 /* Rahmen für n Fotos (1–6) in einer Fläche; Höhen begrenzt, damit nichts überlang wird */
+/* ---------- Foto mit Markierungen, Bildunterschrift und Notizen zu den Nummern ----------
+   Hat das Foto Markierungen, wird es ganz gezeigt (Rand bleibt frei), sonst füllt es den Rahmen. */
+function photoBlock(pg, p, x, y, w, h, maxLines, T, warns, where) {
+  const v = photoView(p), LH = 10.5, lines = [];
+  const cap = (p.note || "").trim();
+  if (cap) wrapAll(cap, "I", 8.5, w).forEach((l) => lines.push({ t: l, f: "I" }));
+  NUMS(p).forEach((m, k) => { if ((m.note || "").trim()) wrapAll(m.note, "R", 8, w - 14).forEach((l, n) => lines.push({ t: l, f: "R", n: n ? 0 : k + 1, c: m.c })); });
+  let shown = lines;
+  if (lines.length > maxLines) { shown = lines.slice(0, maxLines); shown[maxLines - 1] = { ...shown[maxLines - 1], t: fitT(shown[maxLines - 1].t + " …", shown[maxLines - 1].f, 8.5, w - 14) }; warns.push(`${where}: Eine Bildunterschrift ist zu lang und wird gekürzt.`); }
+  const th = shown.length ? shown.length * LH + 5 : 0, ih = Math.max(20, h - th);
+  const marked = viewMarks(p).length > 0;
+  let r = { x, y, w, h: ih };
+  if (marked) { const k = Math.min(w / v.w, ih / v.h); r = { w: v.w * k, h: v.h * k }; r.x = x + (w - r.w) / 2; r.y = y; }
+  pg.img(r.x, r.y, r.w, r.h, v.src, v.w, v.h, p.id);
+  pg.rect(r.x, r.y, r.w, r.h, { stroke: T.rule, sw: 0.5 });
+  if (marked) drawMarks(pg, p, r, v);
+  shown.forEach((l, k) => {
+    const ty = y + ih + 5 + k * LH;
+    if (l.n) {
+      pg.rect(x, ty + 0.5, 8, 8, { fill: l.c, r: 4 });
+      pg.text(x + 4, ty + 1.9, String(l.n), { f: "B", s: 5.8, c: numInk(l.c), a: "c" });
+    }
+    pg.text(l.f === "I" ? x : x + 12, ty, l.t, { f: l.f, s: l.f === "I" ? 8.5 : 8, c: l.f === "I" ? T.ink : T.muted });
+  });
+}
+
+/* Markierungen als Vektoren über dem Foto (Rahmen r, Ansicht v) */
+function drawMarks(pg, p, r, v) {
+  const vm = viewMarks(p), nums = vm.filter((q) => q.t === "num"), sc = r.w / v.w;
+  const path = (d, o) => pg.ops.push({ k: "path", x: r.x, y: r.y, w: r.w, h: r.h, vw: v.w, vh: v.h, d, fill: o.fill || null, stroke: o.stroke || null, sw: o.sw || 0, fo: o.fo, so: o.so });
+  for (const pass of ["halo", "color"]) {
+    for (const m of vm) {
+      const g = markGeom(m, p), halo = pass === "halo", col = halo ? haloOf(m.c) : m.c, op = halo ? 0.85 : 1;
+      if (g.num) {
+        const d = circlePath(m.x, m.y, g.r);
+        if (halo) path(d, { fill: col, fo: op, stroke: col, so: op, sw: g.sw * 2.4 });
+        else {
+          path(d, { fill: col });
+          const sz = g.r * 1.3 * sc;
+          pg.text(r.x + m.x * sc, r.y + m.y * sc - 0.4865 * sz, String(nums.indexOf(m) + 1), { f: "B", s: sz, c: numInk(m.c), a: "c" });
+        }
+        continue;
+      }
+      g.stroke.forEach((d) => path(d, { stroke: col, so: op, sw: halo ? g.sw * 2.2 : g.sw }));
+      g.fill.forEach((d) => path(d, halo ? { fill: col, fo: op, stroke: col, so: op, sw: g.sw * 1.2 } : { fill: col }));
+    }
+  }
+}
+
 function galleryCells(n, x, y, w, h) {
   const g = 12, half = (w - g) / 2, cap = (v) => Math.min(v, 300), out = [];
   const rows = (cols, nr) => { const ch = cap((h - g * (nr - 1)) / nr); return ch; };
@@ -992,7 +1113,7 @@ function pageHtml(pg) {
       const w = tw(o.text, o.f, o.s, o.ls), x = o.a === "c" ? o.x - w / 2 : o.a === "r" ? o.x - w : o.x;
       h += `<div class="ab t" style="left:${X(x)};top:${Y(o.y)};font-size:${U(o.s)};color:${o.c};${FONT_CSS[o.f]};${o.ls ? "letter-spacing:" + U(o.ls) + ";" : ""}">${esc(o.text)}</div>`;
     } else if (o.k === "path") {
-      h += `<svg class="ab" style="${box(o)}" viewBox="0 0 ${o.vw} ${o.vh}"><path d="${o.d}" fill="${o.fill || "none"}" stroke="${o.stroke || "none"}" stroke-width="${o.sw}" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+      h += `<svg class="ab" style="${box(o)}" viewBox="0 0 ${o.vw} ${o.vh}"><path d="${o.d}" fill="${o.fill || "none"}" stroke="${o.stroke || "none"}" stroke-width="${o.sw}"${o.fo != null ? ` fill-opacity="${o.fo}"` : ""}${o.so != null ? ` stroke-opacity="${o.so}"` : ""} stroke-linecap="round" stroke-linejoin="round"/></svg>`;
     } else if (o.k === "img") {
       h += `<img class="ab im" style="${box(o)}" src="${o.src}" alt="">`;
     }
@@ -1007,7 +1128,8 @@ function bytesOfDataUrl(u) {
   return a;
 }
 
-async function buildPdf(pages, meta, onProgress) {
+/* attachments: [{name, bytes, mime, desc, rel, pid}] werden als Dateianhänge eingebettet (pid: Foto, dessen Seite eine Büroklammer bekommt). */
+async function buildPdf(pages, meta, attachments, onProgress) {
   const L = PDFLib, doc = await L.PDFDocument.create();
   doc.setTitle(meta.title || "Reiseprotokoll"); doc.setCreator("Reise-Protokoll"); doc.setProducer("Reise-Protokoll (pdf-lib)");
   if (meta.author) doc.setAuthor(meta.author);
@@ -1021,8 +1143,18 @@ async function buildPdf(pages, meta, onProgress) {
   };
   const rrPath = (w, h, r) => `M${r} 0H${w - r}A${r} ${r} 0 0 1 ${w} ${r}V${h - r}A${r} ${r} 0 0 1 ${w - r} ${h}H${r}A${r} ${r} 0 0 1 0 ${h - r}V${r}A${r} ${r} 0 0 1 ${r} 0Z`;
 
+  /* Anhänge vorbereiten */
+  const ctx = doc.context, specs = new Map(), ef = [];
+  for (const a of attachments || []) {
+    const sref = ctx.register(ctx.stream(a.bytes, { Type: "EmbeddedFile", Subtype: a.mime, Params: { Size: a.bytes.length, ModDate: L.PDFString.fromDate(new Date()) } }));
+    const fs = ctx.register(ctx.obj({ Type: "Filespec", F: L.PDFString.of(clean(a.name)), UF: L.PDFHexString.fromText(a.name), EF: { F: sref, UF: sref }, Desc: L.PDFHexString.fromText(a.desc || ""), AFRelationship: a.rel || "Data" }));
+    ef.push({ key: a.name, fs });
+    if (a.pid) specs.set(a.pid, { fs, name: a.name, size: a.bytes.length });
+  }
+  const clipped = new Set();
+
   for (let n = 0; n < pages.length; n++) {
-    const pg = pages[n], page = doc.addPage([pg.W, pg.H]), Y = (y) => pg.H - y;
+    const pg = pages[n], page = doc.addPage([pg.W, pg.H]), Y = (y) => pg.H - y, annots = [];
     for (const o of pg.ops) {
       if (o.k === "rect") {
         const opt = {};
@@ -1043,8 +1175,8 @@ async function buildPdf(pages, meta, onProgress) {
         }
       } else if (o.k === "path") {
         const opt = { x: o.x, y: Y(o.y), scale: o.w / o.vw, borderLineCap: L.LineCapStyle.Round };
-        if (o.fill) opt.color = rgbOf(o.fill);
-        if (o.stroke) { opt.borderColor = rgbOf(o.stroke); opt.borderWidth = o.sw; }
+        if (o.fill) { opt.color = rgbOf(o.fill); if (o.fo != null) opt.opacity = o.fo; }
+        if (o.stroke) { opt.borderColor = rgbOf(o.stroke); opt.borderWidth = o.sw; if (o.so != null) opt.borderOpacity = o.so; }
         page.drawSvgPath(o.d, opt);
       } else if (o.k === "img") {
         const im = await embed(o.src), s = Math.max(o.w / im.width, o.h / im.height);
@@ -1053,9 +1185,28 @@ async function buildPdf(pages, meta, onProgress) {
           L.lineTo(o.x + o.w, Y(o.y)), L.lineTo(o.x, Y(o.y)), L.closePath(), L.clip(), L.endPath());
         page.drawImage(im, { x: o.x + (o.w - dw) / 2, y: Y(o.y + o.h) + (o.h - dh) / 2, width: dw, height: dh });
         page.pushOperators(L.popGraphicsState());
+        const sp = o.pid && specs.get(o.pid);
+        if (sp && !clipped.has(o.pid)) {
+          clipped.add(o.pid);
+          annots.push(ctx.register(ctx.obj({ Type: "Annot", Subtype: "FileAttachment", Rect: [o.x, Y(o.y) - 16, o.x + 12, Y(o.y)], FS: sp.fs, Name: "Paperclip",
+            Contents: L.PDFHexString.fromText("Foto: " + sp.name), T: L.PDFHexString.fromText("Reise-Protokoll"), C: [0.12, 0.44, 0.55], F: 24, P: page.ref })));
+        }
       }
     }
+    if (annots.length) page.node.set(L.PDFName.of("Annots"), ctx.obj(annots));
     if (onProgress) onProgress(n + 1, pages.length);
+  }
+  if (ef.length) {
+    const arr = [];
+    ef.sort((a, b) => (a.key < b.key ? -1 : 1)).forEach((e) => arr.push(L.PDFHexString.fromText(e.key), e.fs));
+    doc.catalog.set(L.PDFName.of("Names"), ctx.obj({ EmbeddedFiles: ctx.obj({ Names: ctx.obj(arr) }) }));
+    doc.catalog.set(L.PDFName.of("AF"), ctx.obj(ef.map((e) => e.fs)));
+  }
+  if (ef.length) {
+    const arr = [];
+    ef.sort((a, b) => (a.key < b.key ? -1 : 1)).forEach((e) => arr.push(L.PDFHexString.fromText(e.key), e.fs));
+    doc.catalog.set(L.PDFName.of("Names"), ctx.obj({ EmbeddedFiles: ctx.obj({ Names: ctx.obj(arr) }) }));
+    doc.catalog.set(L.PDFName.of("AF"), ctx.obj(ef.map((e) => e.fs)));
   }
   return doc.save({ useObjectStreams: true });
 }
@@ -1207,33 +1358,183 @@ function drawSchemaGrid(g, T) {
 }
 
 /* ===== 70-photos.js ===== */
-/* ---------- Fotos und Orte ----------
-   Fotos werden auf 1600 px verkleinert und als JPEG in der Reise gespeichert.
-   Aus EXIF kommen Aufnahmetag und GPS-Position. */
-const PHOTO_EDGE = 1600;
+/* ---------- Fotos ----------
+   Ein Foto hat die Originaldatei (`file`, bleibt unverändert) und eine Arbeitskopie `src`
+   (JPEG, höchstens PHOTO_EDGE px) für Vorschau und Seiten. Aus EXIF kommen Aufnahmetag, -zeit und GPS.
 
-function exifDay(raw) {
-  const m = /^(\d{4}):(\d{2}):(\d{2})/.exec(String(raw || ""));
-  return m ? `${m[1]}-${m[2]}-${m[3]}` : "";
+   Ansicht: Drehen (rot, 0–3 × 90° im Uhrzeigersinn) und Ausschnitt (crop, in Pixeln des gedrehten Bildes)
+   ändern nur die Ansicht `vsrc`. Markierungen (marks) liegen in Pixeln der Arbeitskopie (bw × bh) und werden
+   mit viewMarks() in die Ansicht umgerechnet. p.w × p.h ist die Größe der Ansicht. */
+const PHOTO_EDGE = 1600;
+const isHeic = (f) => /heic|heif/i.test(f.type || "") || /\.(heic|heif)$/i.test(f.name || "");
+const isPdfFile = (f) => f.type === "application/pdf" || /\.pdf$/i.test(f.name || "");
+const isImageFile = (f) => /^image\//.test(f.type || "") || /\.(jpe?g|png|webp|heic|heif|tiff?)$/i.test(f.name || "");
+
+let heicLib = null;
+function loadHeic() {
+  if (heicLib) return heicLib;
+  heicLib = new Promise((res, rej) => {
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js";
+    s.onload = () => (window.heic2any ? res(window.heic2any) : rej(new Error("heic2any fehlt")));
+    s.onerror = () => rej(new Error("HEIC-Konverter nicht ladbar"));
+    document.head.appendChild(s);
+  });
+  return heicLib;
 }
 
-async function readPhoto(file) {
-  const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+async function decodeFile(file) {
+  try { return await createImageBitmap(file, { imageOrientation: "from-image" }); }
+  catch (e) {
+    if (!isHeic(file)) throw e;
+    let out = await (await loadHeic())({ blob: file, toType: "image/jpeg", quality: 0.95 });
+    if (Array.isArray(out)) out = out[0];
+    return createImageBitmap(out, { imageOrientation: "from-image" });
+  }
+}
+
+const blobToDataUrl = (b) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(r.error); r.readAsDataURL(b); });
+const dataUrlToBlob = (u) => fetch(u).then((r) => r.blob());
+
+const exifParts = (raw) => {
+  const m = /^(\d{4}):(\d{2}):(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/.exec(String(raw || ""));
+  return m ? { day: `${m[1]}-${m[2]}-${m[3]}`, time: `${m[4]}:${m[5]}:${m[6]}` } : null;
+};
+
+/* Foto aus einer Datei; `meta` (aus einem Projekt-PDF) ersetzt das Lesen von EXIF. */
+async function makePhoto(file, meta) {
+  const bmp = await decodeFile(file);
   const s = Math.min(1, PHOTO_EDGE / Math.max(bmp.width, bmp.height));
   const cv = document.createElement("canvas");
-  cv.width = Math.round(bmp.width * s); cv.height = Math.round(bmp.height * s);
-  cv.getContext("2d").drawImage(bmp, 0, 0, cv.width, cv.height);
+  cv.width = Math.max(1, Math.round(bmp.width * s)); cv.height = Math.max(1, Math.round(bmp.height * s));
+  const g = cv.getContext("2d"); g.imageSmoothingQuality = "high"; g.drawImage(bmp, 0, 0, cv.width, cv.height);
   bmp.close && bmp.close();
-  let gps = null, day = "";
+  const reuse = meta && meta.shrunk && s === 1 && file.type === "image/jpeg";
+  const p = {
+    id: uid(), name: file.name || "Foto", type: file.type || "", mod: file.lastModified || 0, size: file.size || 0, file,
+    src: reuse ? await blobToDataUrl(file) : cv.toDataURL("image/jpeg", 0.85), bw: cv.width, bh: cv.height, w: cv.width, h: cv.height, vsrc: "",
+    gps: null, day: "", time: "", dayFromFile: false, note: "", rot: 0, crop: null, marks: [],
+  };
+  if (meta) return applyPhotoMeta(p, meta);
+  let ex = null;
   if (window.exifr) {
-    try { const g = await exifr.gps(file); if (g && Number.isFinite(g.latitude)) gps = { lat: g.latitude, lon: g.longitude }; } catch (e) { /* kein GPS */ }
-    try {
-      const x = await exifr.parse(file, { pick: ["DateTimeOriginal", "CreateDate"], reviveValues: false });
-      day = exifDay(x && (x.DateTimeOriginal || x.CreateDate));
-    } catch (e) { /* kein Datum */ }
+    try { const g2 = await exifr.gps(file); if (g2 && Number.isFinite(g2.latitude) && !(g2.latitude === 0 && g2.longitude === 0)) p.gps = { lat: g2.latitude, lon: g2.longitude }; } catch (e) { /* kein GPS */ }
+    try { const x = await exifr.parse(file, { pick: ["DateTimeOriginal", "CreateDate"], reviveValues: false }); ex = exifParts(x && (x.DateTimeOriginal || x.CreateDate)); } catch (e) { /* kein Datum */ }
   }
-  if (!day && file.lastModified) day = isoOf(new Date(file.lastModified));
-  return { id: uid(), name: file.name, src: cv.toDataURL("image/jpeg", 0.85), w: cv.width, h: cv.height, gps, day };
+  if (!ex && file.lastModified) {
+    const d = new Date(file.lastModified), q = (n) => String(n).padStart(2, "0");
+    ex = { day: `${d.getFullYear()}-${q(d.getMonth() + 1)}-${q(d.getDate())}`, time: `${q(d.getHours())}:${q(d.getMinutes())}:${q(d.getSeconds())}` };
+    p.dayFromFile = true;
+  }
+  if (ex) { p.day = ex.day; p.time = ex.time; }
+  return p;
+}
+
+/* Gespeicherte Angaben übernehmen; Markierungen und Ausschnitt an die Größe der Arbeitskopie anpassen. */
+function applyPhotoMeta(p, m) {
+  p.id = m.id || p.id; p.name = m.name || p.name; p.gps = m.gps; p.day = m.day; p.time = m.time; p.dayFromFile = !!m.dayFromFile; p.note = m.note;
+  p.rot = m.rot;
+  const f = m.bw > 0 ? p.bw / m.bw : 1;
+  const sc = (o) => { const q = { ...o }; for (const k of ["x", "y", "x2", "y2", "r"]) if (k in q) q[k] = q[k] * f; return q; };
+  p.marks = m.marks.map(sc);
+  p.crop = m.crop ? { x: m.crop.x * f, y: m.crop.y * f, w: m.crop.w * f, h: m.crop.h * f } : null;
+  const [rw, rh] = rotDims(p);
+  if (p.crop && (p.crop.x + p.crop.w > rw + 1 || p.crop.y + p.crop.h > rh + 1)) p.crop = null;
+  applyView(p);
+  return p;
+}
+
+/* ---------- Ansicht: Drehen und Ausschnitt ---------- */
+const rotDims = (p) => (p.rot % 2 ? [p.bh, p.bw] : [p.bw, p.bh]);
+const toRot = (p, x, y) => (p.rot === 1 ? [p.bh - y, x] : p.rot === 2 ? [p.bw - x, p.bh - y] : p.rot === 3 ? [y, p.bw - x] : [x, y]);
+const fromRot = (p, x, y) => (p.rot === 1 ? [y, p.bh - x] : p.rot === 2 ? [p.bw - x, p.bh - y] : p.rot === 3 ? [p.bw - y, x] : [x, y]);
+function viewBox(p, full) { const [rw, rh] = rotDims(p); return full || !p.crop ? { x: 0, y: 0, w: rw, h: rh } : p.crop; }
+function applyView(p) { const v = viewBox(p); p.w = v.w; p.h = v.h; }
+const mapMark = (m, f) => { const o = { ...m }; [o.x, o.y] = f(m.x, m.y); if (m.t === "arrow") [o.x2, o.y2] = f(m.x2, m.y2); return o; };
+function viewMarks(p, full) {
+  const v = viewBox(p, full), out = [];
+  for (const m of p.marks || []) {
+    const q = mapMark(m, (x, y) => { const [a, b] = toRot(p, x, y); return [a - v.x, b - v.y]; });
+    if (q.x < 0 || q.y < 0 || q.x > v.w || q.y > v.h) continue; // außerhalb des Ausschnitts
+    q.src = m; out.push(q);
+  }
+  return out;
+}
+const unviewMark = (p, m, full) => { const v = viewBox(p, full); return mapMark(m, (x, y) => fromRot(p, x + v.x, y + v.y)); };
+const NUMS = (p) => viewMarks(p).filter((q) => q.t === "num").map((q) => q.src);
+const ROT_T = [[1, 0, 0, 1], [0, 1, -1, 0], [-1, 0, 0, -1], [0, -1, 1, 0]];
+function drawView(g, bmp, p, w, h, full) {
+  const v = viewBox(p, full), [a, b, c, d] = ROT_T[p.rot];
+  g.save(); g.scale(w / v.w, h / v.h); g.translate(-v.x, -v.y);
+  g.transform(a, b, c, d, p.rot === 1 ? p.bh : p.rot === 2 ? p.bw : 0, p.rot === 2 ? p.bh : p.rot === 3 ? p.bw : 0);
+  g.imageSmoothingQuality = "high"; g.drawImage(bmp, 0, 0, p.bw, p.bh); g.restore();
+}
+const bitmapOf = async (p) => createImageBitmap(await dataUrlToBlob(p.src));
+
+/* Ansicht neu berechnen (nach Drehen oder Ausschnitt). Ohne beides ist die Ansicht die Arbeitskopie. */
+async function refreshView(p) {
+  applyView(p);
+  if (!p.rot && !p.crop) { p.vsrc = ""; return; }
+  const bmp = await bitmapOf(p), v = viewBox(p), k = Math.min(1, PHOTO_EDGE / Math.max(v.w, v.h));
+  const c = document.createElement("canvas"); c.width = Math.max(1, Math.round(v.w * k)); c.height = Math.max(1, Math.round(v.h * k));
+  const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height);
+  drawView(g, bmp, p, c.width, c.height); bmp.close();
+  p.vsrc = c.toDataURL("image/jpeg", 0.88);
+}
+/* Bild, Breite und Höhe der Ansicht für das Seitenlayout */
+const photoView = (p) => ({ src: p.vsrc || p.src, w: p.w || p.bw, h: p.h || p.bh });
+
+async function rotatePhoto(p, dir) { // dir: +1 im Uhrzeigersinn, -1 dagegen
+  const [rw, rh] = rotDims(p), c = p.crop;
+  if (c) p.crop = dir > 0 ? { x: rh - c.y - c.h, y: c.x, w: c.h, h: c.w } : { x: c.y, y: rw - c.x - c.w, w: c.h, h: c.w };
+  p.rot = (p.rot + dir + 4) % 4;
+  await refreshView(p);
+}
+async function setCrop(p, c) {
+  const [rw, rh] = rotDims(p);
+  if (c) {
+    const x = Math.max(0, Math.round(c.x)), y = Math.max(0, Math.round(c.y));
+    c = { x, y, w: Math.min(rw - x, Math.round(c.w)), h: Math.min(rh - y, Math.round(c.h)) };
+    if (c.w < rw * 0.05 || c.h < rh * 0.05 || (c.w >= rw && c.h >= rh)) c = null;
+  }
+  p.crop = c;
+  await refreshView(p);
+}
+
+/* ---------- Markierungen (Geometrie wie im Foto-Protokoll) ---------- */
+const haloOf = (c) => (c === "#FFC400" ? "#1A1A1A" : "#FFFFFF");
+const numInk = (c) => (c === "#FFC400" ? "#1A1A1A" : "#FFFFFF");
+const rnd = (n) => +n.toFixed(1);
+const circlePath = (x, y, R) => `M${rnd(x - R)} ${rnd(y)}A${rnd(R)} ${rnd(R)} 0 1 0 ${rnd(x + R)} ${rnd(y)}A${rnd(R)} ${rnd(R)} 0 1 0 ${rnd(x - R)} ${rnd(y)}Z`;
+function markGeom(m, p) {
+  const base = Math.min(p.bw || 1000, p.bh || 750), sw = Math.max(2, base * 0.0085);
+  if (m.t === "num") return { sw, num: true, r: Math.max(m.r, sw * 3) };
+  if (m.t === "circle") return { sw, stroke: [circlePath(m.x, m.y, Math.max(m.r, sw * 2))], fill: [] };
+  const dx = m.x - m.x2, dy = m.y - m.y2, len = Math.hypot(dx, dy) || 1, ux = dx / len, uy = dy / len;
+  const hl = Math.min(sw * 4.4, len * 0.6), hw = hl * 0.78;
+  const bx = m.x - ux * hl, by = m.y - uy * hl, sx = m.x - ux * hl * 0.7, sy = m.y - uy * hl * 0.7;
+  return {
+    sw, stroke: [`M${rnd(m.x2)} ${rnd(m.y2)}L${rnd(sx)} ${rnd(sy)}`],
+    fill: [`M${rnd(m.x)} ${rnd(m.y)}L${rnd(bx - uy * hw / 2)} ${rnd(by + ux * hw / 2)}L${rnd(bx + uy * hw / 2)} ${rnd(by - ux * hw / 2)}Z`],
+  };
+}
+
+/* Markierungen für die Bearbeitungsansicht als SVG-Inhalt (Koordinaten der Ansicht) */
+function marksSvgInner(p, opt = {}) {
+  const vm = viewMarks(p, opt.full); if (opt.extra) vm.push(opt.extra);
+  const nums = vm.filter((q) => q.t === "num"); let a = "", b = "";
+  for (const m of vm) {
+    const g = markGeom(m, p), halo = haloOf(m.c), hw = g.sw * 2.2;
+    if (g.num) {
+      const n = nums.indexOf(m) + 1, fs = (g.r * 1.3).toFixed(1);
+      a += `<circle cx="${m.x.toFixed(1)}" cy="${m.y.toFixed(1)}" r="${g.r.toFixed(1)}" fill="${halo}" fill-opacity=".85" stroke="${halo}" stroke-opacity=".85" stroke-width="${(g.sw * 2.4).toFixed(1)}"/>`;
+      b += `<circle cx="${m.x.toFixed(1)}" cy="${m.y.toFixed(1)}" r="${g.r.toFixed(1)}" fill="${m.c}"/><text x="${m.x.toFixed(1)}" y="${m.y.toFixed(1)}" dy=".36em" text-anchor="middle" font-family="Helvetica,Arial,sans-serif" font-weight="700" font-size="${fs}" fill="${numInk(m.c)}">${n}</text>`;
+      continue;
+    }
+    g.stroke.forEach((d) => { a += `<path d="${d}" fill="none" stroke="${halo}" stroke-opacity=".85" stroke-width="${hw}" stroke-linecap="round"/>`; b += `<path d="${d}" fill="none" stroke="${m.c}" stroke-width="${g.sw}" stroke-linecap="round"/>`; });
+    g.fill.forEach((d) => { a += `<path d="${d}" fill="${halo}" fill-opacity=".85" stroke="${halo}" stroke-opacity=".85" stroke-width="${hw - g.sw}" stroke-linejoin="round"/>`; b += `<path d="${d}" fill="${m.c}"/>`; });
+  }
+  return a + b;
 }
 
 /* ---------- Nominatim (OpenStreetMap): Suche und Ortsname, höchstens eine Anfrage pro Sekunde ---------- */
@@ -1256,6 +1557,170 @@ async function searchPlace(q) {
 async function reversePlace(lat, lon) {
   const r = await nominatim(`reverse?format=jsonv2&zoom=10&addressdetails=1&accept-language=de&lat=${lat}&lon=${lon}`);
   return placeNameOf(r) || "";
+}
+
+/* ===== 75-project.js ===== */
+/* ---------- Projektdaten im PDF ----------
+   Beim Erstellen hängt buildPdf() Dateien an das PDF an:
+     reise-protokoll-projekt.json   alle Einstellungen und Eingaben (ohne Bilddaten)
+     0001 <Name>, 0002 …            die Fotos (Original oder Arbeitskopie), `att` in der JSON verweist darauf
+     karte.jpg, titelfoto.jpg       Karte und Titelfoto
+   Ein solches PDF lässt sich wieder öffnen und weiterbearbeiten. Alles, was aus einem PDF gelesen wird,
+   ist unsicher und läuft vor jeder Verwendung durch cleanTrip(). */
+const PROJECT_FILE = "reise-protokoll-projekt.json", MAP_FILE = "karte.jpg", COVER_FILE = "titelfoto.jpg";
+const FORMAT = 1;
+
+/* ---------- Prüfen unsicherer Daten ---------- */
+const isNum = (v) => typeof v === "number" && Number.isFinite(v);
+const clipStr = (v, n = 4000) => (typeof v === "string" ? v.slice(0, n) : "");
+const num = (v, a, b, d) => (isNum(v) && v >= a && v <= b ? v : d);
+const oneOf = (v, list, d) => (list.includes(v) ? v : d);
+const cleanIso = (v) => (typeof v === "string" && parseIso(v) ? v : "");
+const cleanId = (v, seen) => { const s = typeof v === "string" && /^[A-Za-z0-9_-]{1,24}$/.test(v) && !/^__|^(constructor|prototype)$/.test(v) && !seen.has(v) ? v : uid(); seen.add(s); return s; };
+const cleanGeo = (g) => (g && isNum(g.lat) && isNum(g.lon) && Math.abs(g.lat) <= 90 && Math.abs(g.lon) <= 180 ? { lat: g.lat, lon: g.lon } : null);
+const cleanPlace = (p) => { const g = cleanGeo(p) || { lat: null, lon: null }; return { name: clipStr(p && p.name, 200), lat: g.lat, lon: g.lon }; };
+const cleanCrop = (c) => (c && [c.x, c.y, c.w, c.h].every(isNum) && c.x >= 0 && c.y >= 0 && c.w > 0 && c.h > 0 ? { x: c.x, y: c.y, w: c.w, h: c.h } : null);
+function cleanMark(m) {
+  if (!m || typeof m !== "object" || !["circle", "arrow", "num"].includes(m.t) || !isNum(m.x) || !isNum(m.y) || typeof m.c !== "string" || !/^#[0-9A-Fa-f]{6}$/.test(m.c)) return null;
+  const o = { t: m.t, x: m.x, y: m.y, c: m.c.toUpperCase() };
+  if (m.t === "arrow") { if (!isNum(m.x2) || !isNum(m.y2)) return null; o.x2 = m.x2; o.y2 = m.y2; }
+  else { if (!isNum(m.r) || m.r <= 0) return null; o.r = m.r; if (m.t === "num") o.note = clipStr(m.note, 500); }
+  return o;
+}
+function cleanPhotoMeta(g, seen) {
+  g = g && typeof g === "object" ? g : {};
+  return {
+    id: cleanId(g.id, seen), name: clipStr(g.name, 300) || "Foto", type: clipStr(g.type, 100), mod: num(g.mod, 0, 4e12, 0), size: num(g.size, 0, 1e11, 0),
+    att: /^\d{4}$/.test(g.att) ? g.att : null, shrunk: !!g.shrunk, day: cleanIso(g.day), time: /^\d\d:\d\d:\d\d$/.test(g.time) ? g.time : "", dayFromFile: !!g.dayFromFile,
+    gps: cleanGeo(g.gps), note: clipStr(g.note, 1000), rot: oneOf(g.rot, [0, 1, 2, 3], 0), crop: cleanCrop(g.crop),
+    marks: (Array.isArray(g.marks) ? g.marks : []).slice(0, 300).map(cleanMark).filter(Boolean), bw: num(g.bw, 1, 20000, 0), bh: num(g.bh, 1, 20000, 0),
+  };
+}
+function cleanTrip(j) {
+  if (!j || typeof j !== "object" || j.app !== "Reise-Protokoll" || !j.trip || typeof j.trip !== "object") return null;
+  const t = j.trip, base = newTrip(oneOf(t.template, Object.keys(TEMPLATES), "rundreise")), seen = new Set(), photoIds = new Set();
+  const r = t.route && typeof t.route === "object" ? t.route : {};
+  const out = {
+    ...base, theme: oneOf(t.theme, Object.keys(THEMES), "meer"), title: clipStr(t.title, 200), subtitle: clipStr(t.subtitle, 300), travelers: clipStr(t.travelers, 300),
+    currency: typeof t.currency === "string" && /^[A-Z]{3}$/.test(t.currency) ? t.currency : "EUR", start: cleanIso(t.start),
+    startPlace: cleanPlace(t.startPlace), destination: cleanPlace(t.destination), roundTrip: !!t.roundTrip,
+    summary: clipStr(t.summary, 4000), summaryAuto: t.summaryAuto !== false, mapUser: !!t.mapUser, ruled: t.ruled !== false, costPage: t.costPage !== false,
+    projData: t.projData !== false, embed: oneOf(t.embed, ["original", "work"], "original"),
+    mapW: num(t.mapW, 1, 20000, 0), mapH: num(t.mapH, 1, 20000, 0), coverW: num(t.coverW, 1, 20000, 0), coverH: num(t.coverH, 1, 20000, 0),
+    hasMap: !!t.hasMap, hasCover: !!t.hasCover,
+    route: {
+      auto: r.auto !== false, road: r.road !== false, km: num(r.km, 0, 1e6, null), mapSig: clipStr(r.mapSig, 4000),
+      legs: (Array.isArray(r.legs) ? r.legs : []).slice(0, 300).map((l) => ({ km: num(l && l.km, 0, 1e6, 0), min: num(l && l.min, 0, 1e6, 0) })),
+      points: (Array.isArray(r.points) ? r.points : []).slice(0, 300).map((p) => ({ id: cleanId(p && p.id, seen), ...cleanPlace(p), day: Number.isInteger(p && p.day) ? p.day : -1 })).filter((p) => p.name),
+    },
+    days: (Array.isArray(t.days) ? t.days : []).slice(0, 400).map((d) => {
+      d = d && typeof d === "object" ? d : {};
+      return {
+        id: cleanId(d.id, seen), date: cleanIso(d.date), place: cleanPlace(d.place), from: clipStr(d.from, 200), km: clipStr(d.km, 20), drive: clipStr(d.drive, 20),
+        title: clipStr(d.title, 200), lodging: clipStr(d.lodging, 200), weather: oneOf(d.weather, ["", ...WEATHER.map((w) => w.id)], ""), tmin: clipStr(d.tmin, 12), tmax: clipStr(d.tmax, 12),
+        text: clipStr(d.text, 20000), plan: clipStr(d.plan, 8000), highlights: clipStr(d.highlights, 4000),
+        costs: (Array.isArray(d.costs) ? d.costs : []).slice(0, 200).map((c) => ({ id: cleanId(c && c.id, seen), l: clipStr(c && c.l, 200), cat: oneOf(c && c.cat, CATS.map((k) => k.id), "sonstiges"), a: clipStr(c && c.a, 20) })),
+        photos: (Array.isArray(d.photos) ? d.photos : []).slice(0, 500).map((g) => cleanPhotoMeta(g, photoIds)),
+      };
+    }),
+  };
+  out.route.points.forEach((p) => { p.lat = Number.isFinite(p.lat) ? p.lat : null; p.lon = Number.isFinite(p.lon) ? p.lon : null; });
+  return out;
+}
+
+/* ---------- Schreiben ---------- */
+function jsonOfTrip(t, attOf, shrunk) {
+  const o = JSON.parse(JSON.stringify(t, (k, v) => (k === "src" || k === "vsrc" || k === "file" || k === "mapImg" || k === "coverPhoto" ? undefined : v)));
+  o.days.forEach((d) => d.photos.forEach((p) => { p.att = attOf.get(p.id) || null; p.shrunk = shrunk; }));
+  o.hasMap = !!t.mapImg; o.hasCover = !!t.coverPhoto;
+  return { app: "Reise-Protokoll", format: FORMAT, created: new Date().toISOString(), trip: o };
+}
+
+/* Alle Anhänge der Reise: Projektdaten, Fotos, Karte, Titelfoto */
+async function collectAttachments(t, onProgress) {
+  const list = [], attOf = new Map(), shrunk = t.embed === "work", photos = t.days.flatMap((d) => d.photos);
+  let n = 0;
+  for (const p of photos) {
+    n++;
+    const nr = String(n).padStart(4, "0");
+    let bytes, mime, name = p.name || "Foto", rel = "Source";
+    if (!shrunk && p.file) { bytes = new Uint8Array(await p.file.arrayBuffer()); mime = p.type || "application/octet-stream"; }
+    else { bytes = bytesOfDataUrl(p.src); mime = "image/jpeg"; rel = "Alternative"; if (!/\.jpe?g$/i.test(name)) name = name.replace(/\.[^.]+$/, "") + ".jpg"; }
+    const desc = ["Foto " + n, p.day ? fmtDate(p.day, { day: "numeric", month: "long", year: "numeric" }) : "", p.time ? p.time.slice(0, 5) + " Uhr" : "", p.gps ? `${p.gps.lat.toFixed(5)}, ${p.gps.lon.toFixed(5)}` : "", shrunk ? "Arbeitskopie (verkleinert)" : "Originaldatei"].filter(Boolean).join(" · ");
+    attOf.set(p.id, nr);
+    list.push({ name: `${nr} ${name}`, bytes, mime, desc, rel, pid: p.id });
+    if (onProgress) onProgress(n, photos.length);
+  }
+  if (t.mapImg) list.push({ name: MAP_FILE, bytes: bytesOfDataUrl(t.mapImg), mime: "image/jpeg", desc: "Karte der Deckseite", rel: "Data" });
+  if (t.coverPhoto) list.push({ name: COVER_FILE, bytes: bytesOfDataUrl(t.coverPhoto), mime: "image/jpeg", desc: "Titelfoto der Deckseite", rel: "Data" });
+  const json = new TextEncoder().encode(JSON.stringify(jsonOfTrip(t, attOf, shrunk)));
+  list.unshift({ name: PROJECT_FILE, bytes: json, mime: "application/json", desc: "Bearbeitungsdaten von Reise-Protokoll (Einstellungen, Tage, Notizen, Markierungen). Das PDF in Reise-Protokoll öffnen, um es weiterzubearbeiten.", rel: "Data" });
+  return list;
+}
+
+/* ---------- Lesen ---------- */
+async function readPdfAttachments(bytes) {
+  const { PDFDocument, PDFName, PDFDict, PDFArray, PDFRawStream, decodePDFRawStream } = PDFLib;
+  const doc = await PDFDocument.load(bytes, { ignoreEncryption: true, updateMetadata: false });
+  const names = doc.catalog.lookupMaybe(PDFName.of("Names"), PDFDict), tree = names && names.lookupMaybe(PDFName.of("EmbeddedFiles"), PDFDict);
+  const out = [], text = (o) => (o && typeof o.decodeText === "function" ? o.decodeText() : "");
+  const walk = (node, depth) => {
+    if (!node || depth > 8) return;
+    const arr = node.lookupMaybe(PDFName.of("Names"), PDFArray);
+    if (arr) for (let i = 0; i + 1 < arr.size(); i += 2) {
+      const spec = arr.lookupMaybe(i + 1, PDFDict), ef = spec && spec.lookupMaybe(PDFName.of("EF"), PDFDict), st = ef && ef.lookup(PDFName.of("F"));
+      if (!(st instanceof PDFRawStream)) continue;
+      let data; try { data = decodePDFRawStream(st).decode(); } catch (e) { continue; }
+      out.push({ name: text(spec.lookup(PDFName.of("UF"))) || text(arr.lookup(i)), bytes: data });
+    }
+    const kids = node.lookupMaybe(PDFName.of("Kids"), PDFArray);
+    if (kids) for (let i = 0; i < kids.size(); i++) walk(kids.lookupMaybe(i, PDFDict), depth + 1);
+  };
+  walk(tree, 0);
+  return out;
+}
+
+const looksJpeg = (b) => b.length > 4 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff;
+
+/* Liest ein Projekt-PDF und liefert die fertige Reise (mit Fotos). Wirft eine Fehlermeldung als Text. */
+async function readProjectPdf(file, onProgress) {
+  if (!window.PDFLib) throw new Error("Die PDF-Bibliothek konnte nicht geladen werden (Internet nötig).");
+  let found;
+  try { found = await readPdfAttachments(new Uint8Array(await file.arrayBuffer())); }
+  catch (e) { throw new Error("Das PDF konnte nicht gelesen werden."); }
+  const pe = found.find((a) => a.name === PROJECT_FILE);
+  if (!pe) throw new Error("In diesem PDF stehen keine Bearbeitungsdaten. Sie fehlen, wenn die Option „Bearbeitungsdaten im PDF speichern“ aus war oder ein anderes Programm das PDF verändert hat.");
+  let raw;
+  try { raw = JSON.parse(new TextDecoder().decode(pe.bytes)); } catch (e) { throw new Error("Die Bearbeitungsdaten im PDF sind beschädigt."); }
+  if (isNum(raw.format) && raw.format > FORMAT) throw new Error("Dieses PDF stammt aus einer neueren Version von Reise-Protokoll. Bitte die Seite aktualisieren.");
+  const t = cleanTrip(raw);
+  if (!t) throw new Error("Das PDF ist kein Reise-Protokoll.");
+
+  const asUrl = async (name) => { const a = found.find((x) => x.name === name); return a && looksJpeg(a.bytes) ? blobToDataUrl(new Blob([a.bytes], { type: "image/jpeg" })) : ""; };
+  t.mapImg = t.hasMap ? await asUrl(MAP_FILE) : ""; t.coverPhoto = t.hasCover ? await asUrl(COVER_FILE) : "";
+  if (!t.mapImg) t.mapW = t.mapH = 0;
+  if (!t.coverPhoto) t.coverW = t.coverH = 0;
+  delete t.hasMap; delete t.hasCover;
+
+  const metas = t.days.flatMap((d) => d.photos), total = metas.length;
+  let done = 0, missing = 0, unreadable = 0;
+  for (const d of t.days) {
+    const list = [];
+    for (const m of d.photos) {
+      const a = m.att && found.find((x) => x.name.startsWith(m.att + " "));
+      if (!a) { missing++; done++; continue; }
+      try {
+        const f = new File([a.bytes], m.name, { type: m.shrunk ? "image/jpeg" : m.type, lastModified: m.mod || Date.now() });
+        const p = await makePhoto(f, m);
+        await refreshView(p);
+        list.push(p);
+      } catch (e) { console.warn(e); unreadable++; }
+      if (onProgress) onProgress(++done, total);
+    }
+    d.photos = list;
+  }
+  t.route.mapSig = t.route.mapSig || "";
+  return { trip: t, missing, unreadable, total };
 }
 
 /* ===== 80-ui.js ===== */
@@ -1300,7 +1765,19 @@ function panelTrip() {
   <div class="themes">${Object.entries(THEMES).map(([id, th]) => `<button class="theme ${id === t.theme ? "on" : ""}" data-act="theme" data-id="${id}"><i style="background:${th.accent}"></i>${esc(th.name)}</button>`).join("")}</div>
   <h3>Seiten</h3>
   ${chk("Linien zum Handschreiben in freien Textbereichen", "ruled", t.ruled)}
-  ${chk("Kostenübersicht am Ende", "costPage", t.costPage)}`;
+  ${chk("Kostenübersicht am Ende", "costPage", t.costPage)}
+  <h3>PDF speichern</h3>
+  ${chk("Bearbeitungsdaten und Fotos im PDF speichern (PDF lässt sich später wieder öffnen und weiterbearbeiten)", "projData", t.projData)}
+  ${selFld("Fotos im PDF einbetten", "embed", t.embed, [["original", "Originaldateien (volle Qualität, EXIF, großes PDF)"], ["work", "Arbeitskopien (1600 px, kleines PDF)"]])}
+  <small>${embedEstimate(t)}</small>`;
+}
+
+function embedEstimate(t) {
+  const ph = t.days.flatMap((d) => d.photos);
+  if (!ph.length) return "Noch keine Fotos.";
+  const orig = ph.reduce((s, p) => s + (p.file ? p.file.size : p.size || 0), 0), work = ph.reduce((s, p) => s + p.src.length * 0.75, 0);
+  const mb = (n) => fmtNum(n / 1048576, 1) + " MB";
+  return `${ph.length} Fotos: etwa ${mb(t.embed === "work" || !orig ? work : orig)} zusätzlich im PDF${t.projData ? "" : " (nur wenn die Bearbeitungsdaten gespeichert werden)"}.`;
 }
 
 /* ---------- Reiter „Tage“ ---------- */
@@ -1316,7 +1793,7 @@ const DAY_FIELDS = {
   plan: (d) => fld("Tagesplan (eine Zeile pro Punkt, Uhrzeit vorn)", `d:${d.id}.plan`, d.plan, { rows: 7, ph: "09:30 Frühstück im Café, 11:00 Stadtrundgang, …" }),
   highlights: (d) => fld("Highlights (eine pro Zeile)", `d:${d.id}.highlights`, d.highlights, { rows: 3 }),
   costs: (d) => `<div class="f"><span>Ausgaben <b data-sum="${d.id}">${dayCosts(d) ? "· " + money(dayCosts(d), S.trip.currency) : ""}</b></span>${d.costs.map((c) => `<div class="cost"><input data-k="d:${d.id}.costs.${c.id}.l" value="${esc(c.l)}" placeholder="Bezeichnung"><select data-k="d:${d.id}.costs.${c.id}.cat">${CATS.map((k) => `<option value="${k.id}" ${k.id === c.cat ? "selected" : ""}>${esc(k.name)}</option>`).join("")}</select><input data-k="d:${d.id}.costs.${c.id}.a" value="${esc(c.a)}" inputmode="decimal" placeholder="0,00"><button class="ico" data-act="delCost" data-day="${d.id}" data-id="${c.id}" title="Entfernen">×</button></div>`).join("")}<button data-act="addCost" data-day="${d.id}">+ Ausgabe</button></div>`,
-  photos: (d) => `<div class="f"><span>Fotos (${d.photos.length})</span><div class="thumbs">${d.photos.map((p) => `<div class="thumb"><img src="${p.src}" alt=""><button data-act="delPhoto" data-day="${d.id}" data-id="${p.id}" title="Entfernen">×</button></div>`).join("")}</div><label class="drop" style="padding:6px;margin:0">+ Fotos wählen<input type="file" accept="image/*" multiple hidden data-photos="${d.id}"></label></div>`,
+  photos: (d) => `<div class="f"><span>Fotos (${d.photos.length})</span>${d.photos.map((p) => photoCard(d, p)).join("")}<label class="drop" style="padding:6px;margin:0">+ Fotos wählen<input type="file" accept="image/*,.heic,.heif" multiple hidden data-photos="${d.id}"></label></div>`,
 };
 
 function daySummary(i) {
@@ -1431,7 +1908,7 @@ document.addEventListener("toggle", (e) => {
 document.addEventListener("change", (e) => {
   const el = e.target;
   if (el.matches("[data-photos]")) addPhotosToDay(el.dataset.photos, [...el.files]);
-  else if (el.id === "photoAll") distributePhotos([...el.files]);
+  else if (el.id === "photoAll" || el.id === "photoGlobal") { addPhotos([...el.files]); el.value = ""; }
   else if (el.id === "mapFile") useOwnMap(el.files[0]);
   else if (el.id === "coverFile") useCover(el.files[0]);
   else if (el.id === "openFile") openProject(el.files[0]);
@@ -1495,9 +1972,26 @@ document.addEventListener("click", async (e) => {
     case "resum": t.summary = suggestSummary(t); t.summaryAuto = true; changed(); renderPanel(); break;
     case "new": if (confirm("Alle Eingaben verwerfen und neu beginnen?")) loadTrip(newTrip(t.template), true); break;
     case "open": $("#openFile").click(); break;
-    case "save": saveProject(); break;
+    case "addPhotos": $("#photoGlobal").click(); break;
+    case "photoMark": { const p = dayOf(dayId).photos.find((x) => x.id === id); if (p) openEditor(p); break; }
+    case "photoRotL": case "photoRotR": { const p = dayOf(dayId).photos.find((x) => x.id === id); if (p) { await rotatePhoto(p, b.dataset.act === "photoRotR" ? 1 : -1); changed(); renderPanel(); } break; }
+    case "photoUp": case "photoDown": {
+      const d = dayOf(dayId), i = d.photos.findIndex((x) => x.id === id), j = i + (b.dataset.act === "photoUp" ? -1 : 1);
+      if (j >= 0 && j < d.photos.length) { [d.photos[i], d.photos[j]] = [d.photos[j], d.photos[i]]; changed(); renderPanel(); }
+      break;
+    }
     case "pdf": makePdf(); break;
   }
+});
+
+/* Dateien irgendwo auf die Seite ziehen: PDF = Projekt öffnen, Bilder = Fotos hinzufügen */
+["dragenter", "dragover"].forEach((ev) => document.addEventListener(ev, (e) => { if (e.dataTransfer && [...e.dataTransfer.types].includes("Files")) { e.preventDefault(); document.body.classList.add("dragging"); } }));
+["dragleave", "drop"].forEach((ev) => document.addEventListener(ev, (e) => { if (ev === "dragleave" && e.relatedTarget) return; document.body.classList.remove("dragging"); }));
+document.addEventListener("drop", (e) => {
+  if (!e.dataTransfer || !e.dataTransfer.files.length) return;
+  e.preventDefault();
+  const files = [...e.dataTransfer.files], pdf = files.find(isPdfFile);
+  if (pdf) openProject(pdf); else addPhotos(files);
 });
 
 const byDate = (a, b) => (a.date || "9999").localeCompare(b.date || "9999");
@@ -1531,42 +2025,187 @@ function bindDrop() {
   const z = $("#dropAll"); if (!z) return;
   z.addEventListener("dragover", (e) => { e.preventDefault(); z.classList.add("over"); });
   z.addEventListener("dragleave", () => z.classList.remove("over"));
-  z.addEventListener("drop", (e) => { e.preventDefault(); z.classList.remove("over"); distributePhotos([...e.dataTransfer.files]); });
 }
-const isImg = (f) => /^image\//.test(f.type) || /\.(jpe?g|png|webp)$/i.test(f.name);
 
-async function readAll(files) {
-  const out = [];
-  for (const f of files.filter(isImg)) {
-    try { out.push(await readPhoto(f)); } catch (e) { toast(`„${f.name}“ konnte nicht gelesen werden (HEIC bitte vorher in JPEG wandeln).`); }
+/* Dateien einlesen (mit Fortschritt); Fehler zählen, nicht abbrechen */
+async function readPhotos(files) {
+  const out = []; let bad = 0, k = 0;
+  for (const f of files) {
+    toast(`Fotos werden gelesen … ${++k}/${files.length}`, 120000);
+    try { out.push(await makePhoto(f)); } catch (e) { console.warn(f.name, e); bad++; }
   }
-  return out;
+  return { list: out, bad };
 }
+const photoSort = (a, b) => (a.day + " " + a.time).localeCompare(b.day + " " + b.time);
+
 async function addPhotosToDay(dayId, files) {
   const d = dayOf(dayId); if (!d) return;
-  toast("Fotos werden gelesen …", 20000);
-  d.photos.push(...(await readAll(files)));
-  S.open.add(dayId); changed(); renderPanel(); toast("Fotos hinzugefügt.");
+  const { list, bad } = await readPhotos(files.filter(isImageFile));
+  d.photos.push(...list); d.photos.sort(photoSort);
+  S.open.add(dayId); changed(); renderPanel();
+  toast(bad ? `${list.length} Fotos hinzugefügt, ${bad} nicht lesbar.` : `${list.length} Fotos hinzugefügt.`);
 }
-async function distributePhotos(files) {
-  const t = S.trip;
-  toast("Fotos werden gelesen …", 60000);
-  const list = (await readAll(files)).sort((a, b) => (a.day || "").localeCompare(b.day || ""));
-  let made = 0, nameJobs = [];
+
+/* Mehrere Fotos auf einmal: Tage entstehen aus den Aufnahmedaten, Orte aus dem GPS der Fotos. */
+async function addPhotos(files) {
+  const imgs = [...files].filter(isImageFile), t = S.trip, fixed = TEMPLATES[t.template].fixedPlace;
+  if (!imgs.length) { toast("Keine Bilddateien gefunden."); return; }
+  const { list, bad } = await readPhotos(imgs);
+  list.sort(photoSort);
+  const made = [], touched = new Set();
   for (const p of list) {
     let d = p.day ? t.days.find((x) => x.date === p.day) : t.days[t.days.length - 1];
     if (!d) {
-      d = newDay(p.day); if (TEMPLATES[t.template].fixedPlace) d.place = { ...t.destination };
-      t.days.push(d); t.days.sort(byDate); made++;
-      if (p.gps && !TEMPLATES[t.template].fixedPlace) nameJobs.push([d, p.gps]);
+      d = newDay(p.day); if (fixed) d.place = { ...t.destination };
+      t.days.push(d); t.days.sort(byDate); made.push(d);
     }
-    d.photos.push(p);
+    d.photos.push(p); touched.add(d);
   }
+  touched.forEach((d) => d.photos.sort(photoSort));
+  const first = made.length ? made.slice().sort(byDate)[0] : null;
+  if (!t.start && first && first.date) t.start = first.date;
+  const noDate = list.filter((p) => p.dayFromFile).length;
+  changed(); S.tab = "days"; made.forEach((d) => S.open.add(d.id)); renderPanel();
+  toast(`${list.length} Fotos zugeordnet${made.length ? `, ${made.length} ${made.length === 1 ? "neuer Tag" : "neue Tage"} angelegt` : ""}${bad ? `, ${bad} nicht lesbar` : ""}${noDate ? `. Bei ${noDate} fehlte das Aufnahmedatum (Dateidatum verwendet)` : ""}.`, 8000);
+  /* Orte der neuen Tage aus dem GPS des jeweils letzten Fotos (Abendort), langsam im Hintergrund */
+  for (const d of made) {
+    const g = d.photos.filter((p) => p.gps).map((p) => p.gps).pop();
+    if (!g || (fixed ? t.destination.name : d.place.name)) continue;
+    try {
+      const name = await reversePlace(g.lat, g.lon);
+      if (!name) continue;
+      if (fixed) { if (!t.destination.name) { t.destination = { name, lat: g.lat, lon: g.lon }; t.days.forEach((x) => { if (!x.place.name) x.place = { ...t.destination }; }); } }
+      else if (!d.place.name) d.place = { name, lat: g.lat, lon: g.lon };
+      changed(); if (S.tab === "days") renderPanel();
+    } catch (e) { break; }
+  }
+}
+
+/* ---------- Foto-Karten im Tages-Editor ---------- */
+function photoCard(d, p) {
+  const nm = NUMS(p).length, info = [p.day ? fmtDate(p.day, { day: "numeric", month: "short" }) + (p.time ? " " + p.time.slice(0, 5) : "") : "", p.gps ? "GPS" : "", nm ? `${nm} Nummern` : "", p.marks.length - nm > 0 ? "Markierungen" : ""].filter(Boolean).join(" · ");
+  const k = `d:${d.id}.photos.${p.id}`;
+  return `<div class="pcard"><img class="pthumb" src="${p.vsrc || p.src}" alt=""><div class="pbody">
+    <input data-k="${k}.note" value="${esc(p.note)}" placeholder="Bildunterschrift / Anmerkung">
+    <small>${esc(p.name)}${info ? " · " + esc(info) : ""}</small>
+    <div class="btnrow" style="margin:4px 0 0"><button data-act="photoMark" data-day="${d.id}" data-id="${p.id}">Markieren …</button><button class="ico" data-act="photoRotL" data-day="${d.id}" data-id="${p.id}" title="Links drehen">⟲</button><button class="ico" data-act="photoRotR" data-day="${d.id}" data-id="${p.id}" title="Rechts drehen">⟳</button><button class="ico" data-act="photoUp" data-day="${d.id}" data-id="${p.id}" title="Früher">↑</button><button class="ico" data-act="photoDown" data-day="${d.id}" data-id="${p.id}" title="Später">↓</button><button class="ico" data-act="delPhoto" data-day="${d.id}" data-id="${p.id}" title="Entfernen">×</button></div></div></div>`;
+}
+
+/* ---------- Editor: Markieren, Drehen, Ausschnitt (wie im Foto-Protokoll) ---------- */
+let edP = null, edTool = "circle", edColor = "#E3242B", edDraft = null, edCrop = false, edRect = null, edStart = null, edFull = "";
+try { const s = JSON.parse(localStorage.getItem("reiseprotokoll.ed") || "null"); if (s) { edTool = s.t || edTool; edColor = s.c || edColor; } } catch (e) { /* ohne Speicher */ }
+function syncEdButtons() {
+  $$("#edTool button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === edTool)));
+  $$("#edColor button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === edColor)));
+  try { localStorage.setItem("reiseprotokoll.ed", JSON.stringify({ t: edTool, c: edColor })); } catch (e) { /* ohne Speicher */ }
+}
+async function openEditor(p) {
+  edP = p; edCrop = false; edRect = null; edStart = null;
+  $("#edName").textContent = p.name;
+  syncEdButtons();
+  await edLoadImage();
+  $("#editor").hidden = false;
+}
+/* Ansicht (gedreht, zugeschnitten); im Ausschnitt-Modus das ganze gedrehte Bild */
+async function edLoadImage() {
+  const p = edP; if (!p) return;
+  if (edCrop) {
+    const [rw, rh] = rotDims(p), c = document.createElement("canvas"); c.width = rw; c.height = rh;
+    const bmp = await bitmapOf(p); drawView(c.getContext("2d"), bmp, p, rw, rh, true); bmp.close();
+    edFull = c.toDataURL("image/jpeg", 0.85);
+  }
+  const v = viewBox(p, edCrop);
+  $("#edPic").src = edCrop ? edFull : p.vsrc || p.src;
+  $("#edImg").style.aspectRatio = `${v.w} / ${v.h}`;
+  $("#edSvg").setAttribute("viewBox", `0 0 ${v.w} ${v.h}`);
+  $("#editor").classList.toggle("cropping", edCrop);
+  $("#edCrop").setAttribute("aria-pressed", String(edCrop));
+  $("#edCropReset").disabled = !p.crop;
+  $("#edHint").hidden = edCrop; $("#edHintCrop").hidden = !edCrop;
+  drawEd(); renderEdNotes();
+}
+function closeEditor() {
+  $("#editor").hidden = true; edDraft = null; edRect = null; edCrop = false; edStart = null; edP = null;
   changed(); renderPanel();
-  toast(`${list.length} Fotos zugeordnet${made ? `, ${made} neue Tage angelegt` : ""}.`);
-  for (const [d, g] of nameJobs) {
-    try { const name = await reversePlace(g.lat, g.lon); if (name && !d.place.name) { d.place = { name, lat: g.lat, lon: g.lon }; changed(); if (S.tab === "days") renderPanel(); } } catch (e) { break; }
-  }
+}
+function cropOverlay() {
+  const [rw, rh] = rotDims(edP), c = edRect || edP.crop; if (!c) return "";
+  return `<path d="M0 0H${rw}V${rh}H0Z M${c.x} ${c.y}h${c.w}v${c.h}h${-c.w}Z" fill="rgba(0,0,0,.55)" fill-rule="evenodd"/>`
+    + `<rect x="${c.x}" y="${c.y}" width="${c.w}" height="${c.h}" fill="none" stroke="#fff" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
+}
+function drawEd() {
+  if (!edP) return;
+  $("#edSvg").innerHTML = marksSvgInner(edP, { full: edCrop, extra: edDraft }) + (edCrop ? cropOverlay() : "");
+  $("#edUndo").disabled = !edP.marks.length; $("#edClear").disabled = !edP.marks.length;
+  const v = viewBox(edP, edCrop), n = NUMS(edP).length;
+  $("#edImg").style.width = `min(100%, calc((100dvh - ${250 + (n ? 30 + 40 * Math.min(n, 4) : 0)}px) * ${(v.w / v.h).toFixed(4)}))`;
+}
+function renderEdNotes() {
+  const box = $("#edNotes"), nums = NUMS(edP);
+  box.hidden = !nums.length;
+  box.innerHTML = nums.length ? `<span class="lbl">Notizen zu den Nummern</span>` + nums.map((m, k) =>
+    `<div class="nrow"><span class="bdg2" style="background:${m.c};color:${numInk(m.c)}">${k + 1}</span><input type="text" data-k="${k}" value="${esc(m.note || "")}" placeholder="Was ist hier? z. B. schöner Aussichtspunkt" aria-label="Notiz zu Nummer ${k + 1}"><button type="button" data-k="${k}" aria-label="Nummer ${k + 1} entfernen">×</button></div>`).join("") : "";
+  drawEd();
+}
+function edPoint(e) {
+  const rc = $("#edSvg").getBoundingClientRect(), v = viewBox(edP, edCrop);
+  return { x: clamp((e.clientX - rc.left) / rc.width * v.w, 0, v.w), y: clamp((e.clientY - rc.top) / rc.height * v.h, 0, v.h) };
+}
+const rectOf = (a, b) => ({ x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(a.x - b.x), h: Math.abs(a.y - b.y) });
+function shapeFrom(a, b) {
+  const base = Math.min(edP.w, edP.h), d = Math.hypot(b.x - a.x, b.y - a.y), drag = d > base * 0.02;
+  if (edTool === "circle") return { t: "circle", x: a.x, y: a.y, r: drag ? d : base * 0.075, c: edColor };
+  if (edTool === "num") return { t: "num", x: a.x, y: a.y, r: drag ? Math.min(base * 0.09, Math.max(base * 0.02, d)) : base * 0.036, c: edColor, note: "" };
+  if (drag) return { t: "arrow", x: a.x, y: a.y, x2: b.x, y2: b.y, c: edColor };
+  let vx = edP.w / 2 - a.x, vy = edP.h / 2 - a.y; const l = Math.hypot(vx, vy);
+  if (l < base * 0.05) { vx = -1; vy = -1; }
+  const n = Math.hypot(vx, vy);
+  return { t: "arrow", x: a.x, y: a.y, x2: a.x + vx / n * base * 0.2, y2: a.y + vy / n * base * 0.2, c: edColor };
+}
+function bindEditor() {
+  const svg = $("#edSvg");
+  svg.addEventListener("pointerdown", (e) => {
+    if (!edP) return; e.preventDefault(); svg.setPointerCapture(e.pointerId); edStart = edPoint(e);
+    if (edCrop) { edRect = null; return; }
+    edDraft = shapeFrom(edStart, edStart); drawEd();
+  });
+  svg.addEventListener("pointermove", (e) => {
+    if (!edStart) return;
+    if (edCrop) { edRect = rectOf(edStart, edPoint(e)); drawEd(); return; }
+    edDraft = shapeFrom(edStart, edPoint(e)); drawEd();
+  });
+  svg.addEventListener("pointerup", async (e) => {
+    if (!edStart) return;
+    if (edCrop) {
+      const r = rectOf(edStart, edPoint(e)); edStart = null; edRect = null;
+      const [rw, rh] = rotDims(edP);
+      if (r.w > rw * 0.05 && r.h > rh * 0.05) { edCrop = false; await setCrop(edP, r); await edLoadImage(); } else drawEd();
+      return;
+    }
+    const m = shapeFrom(edStart, edPoint(e));
+    edP.marks.push(unviewMark(edP, m)); edStart = null; edDraft = null; drawEd(); if (m.t === "num") renderEdNotes();
+  });
+  svg.addEventListener("pointercancel", () => { edStart = null; edDraft = null; edRect = null; drawEd(); });
+  $("#edNotes").addEventListener("input", (e) => { const k = e.target.dataset.k; if (k != null && edP) NUMS(edP)[+k].note = e.target.value; });
+  $("#edNotes").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-k]"); if (!b || !edP) return;
+    const m = NUMS(edP)[+b.dataset.k]; edP.marks.splice(edP.marks.indexOf(m), 1); renderEdNotes();
+  });
+  $("#edRotL").addEventListener("click", async () => { await rotatePhoto(edP, -1); await edLoadImage(); });
+  $("#edRotR").addEventListener("click", async () => { await rotatePhoto(edP, 1); await edLoadImage(); });
+  $("#edCrop").addEventListener("click", async () => { edCrop = !edCrop; edRect = null; await edLoadImage(); });
+  $("#edCropReset").addEventListener("click", async () => { edCrop = false; await setCrop(edP, null); await edLoadImage(); });
+  $("#edTool").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { edTool = b.dataset.v; syncEdButtons(); } });
+  $("#edColor").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { edColor = b.dataset.v; syncEdButtons(); } });
+  $("#edUndo").addEventListener("click", () => { edP.marks.pop(); renderEdNotes(); });
+  $("#edClear").addEventListener("click", () => { edP.marks = []; renderEdNotes(); });
+  $("#edDone").addEventListener("click", closeEditor);
+  $("#editor").addEventListener("click", (e) => { if (e.target.id === "editor") closeEditor(); });
+  document.addEventListener("keydown", (e) => {
+    if ($("#editor").hidden) return;
+    if (e.key === "Escape") closeEditor();
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && e.target.tagName !== "INPUT") { e.preventDefault(); edP.marks.pop(); renderEdNotes(); }
+  });
 }
 
 /* ---------- Karte ---------- */
@@ -1619,36 +2258,40 @@ function applyLegs() {
   changed(); renderPanel(); toast(n ? `Kilometer und Fahrzeit für ${n} Tage eingetragen.` : "Keine passenden Tage gefunden.");
 }
 
-/* ---------- Projekt: speichern, öffnen, PDF ---------- */
+/* ---------- Projekt: öffnen und PDF erstellen ---------- */
 function loadTrip(t, fresh) {
   S.trip = normalizeTrip(t); S.open = new Set(); S.newPoint = blankPlace();
   if (!fresh && S.trip.days[0]) S.open.add(S.trip.days[0].id);
   refreshDerived(S.trip);
-  S.tab = fresh ? "trip" : "trip";
+  S.tab = "trip";
   renderPanel(); renderPreview(); scheduleSave();
 }
-function saveProject() {
-  download(new Blob([JSON.stringify(S.trip)], { type: "application/json" }), safeName(S.trip.title) + ".reise.json");
-  toast("Projektdatei gespeichert (mit Fotos und Karte).");
-}
+const hasContent = () => S.trip.days.length > 0 || S.trip.title.trim() !== "";
+
+/* Ein Projekt-PDF öffnen (Einstellungen, Tage, Fotos, Karte kommen aus den Anhängen) */
 async function openProject(file) {
   if (!file) return;
+  if (hasContent() && !confirm("Das aktuelle Projekt wird durch das PDF ersetzt. Fortfahren?")) return;
   try {
-    const t = JSON.parse(await file.text());
-    if (!t || !Array.isArray(t.days)) throw new Error("kein Reiseprojekt");
-    loadTrip(t); toast("Projekt geöffnet.");
-  } catch (e) { toast("Die Datei ist kein gültiges Reise-Projekt."); }
-  $("#openFile").value = "";
+    toast("PDF wird gelesen …", 120000);
+    const r = await readProjectPdf(file, (n, N) => toast(`Fotos werden geladen … ${n}/${N}`, 120000));
+    loadTrip(r.trip);
+    const warn = [r.missing ? `${r.missing} Fotos fehlen im PDF` : "", r.unreadable ? `${r.unreadable} Fotos nicht lesbar` : ""].filter(Boolean).join(", ");
+    toast(warn ? `Projekt geöffnet (${warn}).` : "Projekt geöffnet.", warn ? 9000 : 3500);
+  } catch (e) { console.warn(e); toast(e.message || "Das PDF konnte nicht geöffnet werden.", 10000); }
+  const f = $("#openFile"); if (f) f.value = "";
 }
+
 async function makePdf() {
   const btn = $("#pdfBtn"); if (S.busy) return;
   if (!window.PDFLib) { toast("Die PDF-Bibliothek konnte nicht geladen werden (Internet nötig)."); return; }
   S.busy = true; btn.disabled = true;
   try {
-    const { pages } = layoutTrip(S.trip);
-    const bytes = await buildPdf(pages, { title: S.trip.title, author: S.trip.travelers }, (n, N) => (btn.textContent = `Seite ${n}/${N} …`));
-    download(new Blob([bytes], { type: "application/pdf" }), safeName(S.trip.title) + ".pdf");
-    toast("PDF erstellt.");
+    const t = S.trip, { pages } = layoutTrip(t);
+    const atts = t.projData ? await collectAttachments(t, (n, N) => (btn.textContent = `Fotos ${n}/${N} …`)) : [];
+    const bytes = await buildPdf(pages, { title: t.title, author: t.travelers }, atts, (n, N) => (btn.textContent = `Seite ${n}/${N} …`));
+    download(new Blob([bytes], { type: "application/pdf" }), safeName(t.title) + ".pdf");
+    toast(`PDF erstellt (${fmtNum(bytes.length / 1048576, 1)} MB${t.projData ? ", mit Bearbeitungsdaten" : ""}).`);
   } catch (e) { console.error(e); toast("PDF-Fehler: " + e.message); }
   S.busy = false; btn.disabled = false; btn.textContent = "PDF erstellen";
 }
@@ -1671,6 +2314,7 @@ const idbGet = (k) => idb().then((db) => new Promise((res, rej) => { const r = d
   try { saved = await idbGet("trip"); } catch (e) { /* kein Speicher verfügbar */ }
   if (saved && saved.days) { S.trip = normalizeTrip(saved); refreshDerived(S.trip); }
   else S.trip = demoTrip("rundreise");
+  bindEditor();
   renderPanel(); renderPreview();
   await initFonts();
   renderPanel(); renderPreview();

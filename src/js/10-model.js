@@ -31,7 +31,7 @@ function newTrip(template = "rundreise") {
     startPlace: blankPlace(), destination: blankPlace(), roundTrip: false,
     days: [], summary: "", summaryAuto: true,
     route: { auto: true, road: true, points: [], km: null, legs: [], mapSig: "" },
-    mapImg: "", mapUser: false, coverPhoto: "", ruled: true, costPage: true,
+    mapImg: "", mapUser: false, coverPhoto: "", projData: true, embed: "original", ruled: true, costPage: true,
   };
 }
 
@@ -49,6 +49,14 @@ function normalizeTrip(t) {
     photos: Array.isArray(d.photos) ? d.photos : [],
   }));
   return out;
+}
+
+/* Ältere oder unvollständige Fotos ergänzen (Arbeitskopie `src` ist Pflicht). */
+function normPhoto(p) {
+  const bw = p.bw || p.w || 1, bh = p.bh || p.h || 1;
+  const o = { id: uid(), name: "Foto", type: "", mod: 0, size: 0, file: null, src: "", vsrc: "", gps: null, day: "", time: "", dayFromFile: false, note: "", rot: 0, crop: null, marks: [], ...p, bw, bh };
+  o.w = o.w || bw; o.h = o.h || bh;
+  return o;
 }
 
 /* ---------- Ableitungen ---------- */

@@ -21,7 +21,8 @@ Reise-Protokoll ist ein eigenständiges Tool (kein Teil von Foto-Protokoll, nur 
 | `40-layout` | Seitenmodell: `coverPage`, `dayPages`, `costPages`, `layoutTrip` |
 | `50-render` | `pageHtml` (Vorschau) und `buildPdf` (pdf-lib) aus dem Seitenmodell |
 | `60-map` | Karte: OSM-Kacheln + Route auf Canvas, OSRM, Schemakarte als Rückfall |
-| `70-photos` | Fotos verkleinern, EXIF (Tag, GPS), Nominatim (Suche, Ortsname) |
+| `70-photos` | Foto: Original + Arbeitskopie, EXIF, HEIC, Drehen/Ausschnitt (`viewMarks`, `drawView`), Markierungs-Geometrie, Nominatim |
+| `75-project` | Projektdaten im PDF: `cleanTrip()` (Prüfen), `collectAttachments()`, `readProjectPdf()` |
 | `80-ui` | Reiter, Ereignisse, Speichern/Öffnen, Autosave (IndexedDB) |
 | `90-main` | Start |
 
@@ -33,14 +34,15 @@ Reise-Protokoll ist ein eigenständiges Tool (kein Teil von Foto-Protokoll, nur 
 - **Neues Farbschema** = ein Eintrag in `THEMES`.
 - Die Deckseitenkarte ist nach dem Erzeugen ein festes Bild (`trip.mapImg`); Änderungen an der Route ändern sie nicht, der Reiter zeigt nur einen Hinweis (`mapStale`).
 - Externe Bibliotheken nur als einzelnes UMD-Skript von cdnjs/jsDelivr (pdf-lib, exifr). Alles andere inline.
-- Projektdatei (`*.reise.json`) = `trip` als JSON. Beim Laden immer durch `normalizeTrip()`; Felder nur ergänzen, nie umbenennen ohne `format` zu erhöhen.
+- **Projekt = PDF.** `buildPdf()` hängt `reise-protokoll-projekt.json` (alles außer Bilddaten), die Fotos (`0001 name.jpg`, Original oder Arbeitskopie), `karte.jpg` und `titelfoto.jpg` an. Gelesen wird mit `readProjectPdf()`. **Alles aus einem PDF ist unsicher** und läuft vor jeder Verwendung durch `cleanTrip()` (nur bekannte Felder, Typen, Bereiche, Aufzählungen, Längen; Bilder nie aus Textfeldern, nur aus Anhängen mit JPEG-Prüfung). Neue Felder in `newTrip()`/`newDay()` **und** in `cleanTrip()` aufnehmen, bei unverträglichen Änderungen `FORMAT` erhöhen und alte Formate weiter lesen. `test/projekt.mjs` enthält einen Test mit manipulierten Daten.
+- Fotos: `file` (Original, bleibt unverändert) und `src` (Arbeitskopie, höchstens 1600 px). Markierungen liegen in Pixeln der Arbeitskopie (`bw` × `bh`), Drehung/Ausschnitt nur als Ansicht `vsrc`; gezeichnet wird immer über `photoView()`/`viewMarks()`. Beim Wiederöffnen wird die Arbeitskopie aus dem eingebetteten Foto neu berechnet, Markierungen werden bei abweichender Größe skaliert.
 
 ## Erkenntnisse
 
 - Text-`y` im Seitenmodell ist die **Oberkante** der Zeile (CSS `line-height: 1`); das PDF setzt die Grundlinie bei `y + BASELINE × Größe`.
 - pdf-lib: `drawSvgPath` skaliert auch die Linienbreite mit `scale`; Bilder werden mit Klippfad zugeschnitten (`pushGraphicsState` … `clip`).
 - OSM-Kacheln erlauben Canvas-Auslesen (CORS `*`). Schlägt das fehl oder fehlen Kacheln, entsteht automatisch die Schemakarte. Öffentliche Dienste (Kacheln, Nominatim max. 1 Anfrage/s, OSRM-Demo-Server) nur für gelegentliche Nutzung; Quellenangabe steht auf der Karte.
-- Tests: Playwright ersetzt alle Netzzugriffe durch Testantworten (`test/e2e.mjs`). PDFs lassen sich mit `pip install pymupdf` zu Bildern rendern, um das Layout zu prüfen.
+- Tests: Playwright ersetzt alle Netzzugriffe durch Testantworten (`test/e2e.mjs`: Oberfläche, Karte, Vorlagen; `test/projekt.mjs`: Mehrfach-Import, PDF-Roundtrip, manipulierte PDFs). PDFs lassen sich mit `pip install pymupdf` zu Bildern rendern, um das Layout zu prüfen.
 
 ## Windows
 

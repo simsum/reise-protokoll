@@ -4,6 +4,7 @@
   try { saved = await idbGet("trip"); } catch (e) { /* kein Speicher verfügbar */ }
   if (saved && saved.days) { S.trip = normalizeTrip(saved); refreshDerived(S.trip); }
   else S.trip = demoTrip("rundreise");
+  bindEditor();
   renderPanel(); renderPreview();
   await initFonts();
   renderPanel(); renderPreview();

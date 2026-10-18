@@ -12,10 +12,11 @@
       <option value="kurztrip">Beispiel Kurztrip</option>
     </select>
     <button data-act="new">Neu</button>
-    <button data-act="open">Öffnen</button>
-    <button data-act="save">Speichern</button>
+    <button data-act="addPhotos" title="Mehrere Fotos auf einmal: Tage entstehen aus den Aufnahmedaten">Fotos hinzufügen</button>
+    <button data-act="open" title="Ein mit Reise-Protokoll erstelltes PDF zum Weiterbearbeiten öffnen">PDF öffnen</button>
     <button class="primary" data-act="pdf" id="pdfBtn">PDF erstellen</button>
-    <input type="file" id="openFile" accept=".json,application/json" hidden>
+    <input type="file" id="openFile" accept=".pdf,application/pdf" hidden>
+    <input type="file" id="photoGlobal" accept="image/*,.heic,.heif" multiple hidden>
   </header>
   <main>
     <aside id="side">
@@ -37,6 +38,33 @@
       <div id="pages"></div>
     </section>
   </main>
+</div>
+<div class="modal" id="editor" hidden role="dialog" aria-modal="true" aria-labelledby="edName">
+  <div class="ed">
+    <div class="ed-bar">
+      <b id="edName" class="edname"></b>
+      <span class="grow"></span>
+      <div class="seg" id="edTool" role="group" aria-label="Werkzeug">
+        <button type="button" data-v="circle">Kreis</button><button type="button" data-v="arrow">Pfeil</button><button type="button" data-v="num">Nummer</button>
+      </div>
+      <div class="sw" id="edColor" role="group" aria-label="Farbe">
+        <button type="button" data-v="#E3242B" style="background:#E3242B" aria-label="Rot"></button>
+        <button type="button" data-v="#FFC400" style="background:#FFC400" aria-label="Gelb"></button>
+        <button type="button" data-v="#1F6FEB" style="background:#1F6FEB" aria-label="Blau"></button>
+      </div>
+      <div class="seg" role="group" aria-label="Ansicht">
+        <button type="button" id="edRotL" title="Links drehen">⟲</button><button type="button" id="edRotR" title="Rechts drehen">⟳</button><button type="button" id="edCrop" aria-pressed="false" title="Ausschnitt wählen">Ausschnitt</button>
+      </div>
+      <button type="button" id="edCropReset" disabled>Ausschnitt aufheben</button>
+      <button type="button" id="edUndo">Rückgängig</button>
+      <button type="button" id="edClear">Alle entfernen</button>
+      <button type="button" class="primary" id="edDone">Fertig</button>
+    </div>
+    <p class="hint" id="edHintCrop" hidden>Ausschnitt wählen: Mit gedrückter Maustaste ein Rechteck aufziehen. Er gilt für Vorschau und PDF, die eingebettete Originaldatei bleibt unverändert. Markierungen außerhalb des Ausschnitts entfallen.</p>
+    <p class="hint" id="edHint">Auf die Stelle klicken, die markiert werden soll. Ziehen bestimmt die Größe von Kreis und Nummer bzw. Richtung und Länge des Pfeils. Zu jeder Nummer kannst du unten eine Notiz schreiben.</p>
+    <div class="ed-stage"><div class="ed-img" id="edImg"><img alt="" id="edPic"><svg id="edSvg"></svg></div></div>
+    <div class="ed-notes" id="edNotes" hidden></div>
+  </div>
 </div>
 <div id="toast" hidden></div>
 
