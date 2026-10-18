@@ -137,7 +137,7 @@ body.dragging::after { content: "Fotos hier ablegen (oder ein Projekt-PDF zum Ö
 
 <div id="app">
   <header class="top">
-    <div class="brand"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s6.5-5.7 6.5-11a6.5 6.5 0 1 0-13 0C5.5 15.3 12 21 12 21z"/><circle cx="12" cy="10" r="2.4"/></svg> Reise-Protokoll <span class="ver">v0.4.0</span></div>
+    <div class="brand"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s6.5-5.7 6.5-11a6.5 6.5 0 1 0-13 0C5.5 15.3 12 21 12 21z"/><circle cx="12" cy="10" r="2.4"/></svg> Reise-Protokoll <span class="ver">v0.5.0</span></div>
     <div class="grow"></div>
     <select id="demo" title="Beispielreise laden">
       <option value="">Beispiel laden …</option>
@@ -307,7 +307,7 @@ const blankPlace = () => ({ name: "", lat: null, lon: null });
 function newDay(date = "") {
   return {
     id: uid(), date, place: blankPlace(), from: "", km: "", drive: "", title: "", lodging: "",
-    weather: "", tmin: "", tmax: "", wxAuto: null, text: "", plan: "",
+    weather: "", tmin: "", tmax: "", wxAuto: null, wxExtra: "", text: "", plan: "",
     highlights: "", costs: [], photos: [],
   };
 }
@@ -874,6 +874,17 @@ function dayPages(t, i, T, warns) {
     pg.text(x + 35, y + 25, fitT(v || "–", "R", 9.5, bw - 46), { s: 9.5, c: v ? T.ink : T.muted });
   });
 
+  /* Wetterdetails (Wind, Niederschlag, Luftfeuchte …) als eigene Zeile unter den Infokästen */
+  let off = 0;
+  const wxd = dayWxDetail(d);
+  if (wxd) {
+    const wl = wrapMax(wxd, "R", 8.5, CW - 44, 3), bh = 12 + wl.lines.length * 11;
+    pg.rect(MX, 176, CW, bh, { fill: T.soft, r: 8 });
+    pg.icon(d.weather || "sun", MX + 11, 176 + (bh - 17) / 2, 17, T.accent, 1.5);
+    wl.lines.forEach((l, k) => pg.text(MX + 35, 176 + 6.5 + k * 11, l, { s: 8.5, c: T.ink }));
+    off = bh + 10;
+  }
+
   /* Fotos (die ersten drei als Streifen, mit Bildunterschrift) */
   const shown = d.photos.slice(0, 3), stripH = 132, stripY = BOTTOM - stripH;
   const bodyBottom = shown.length ? stripY - 16 : BOTTOM - 4;
@@ -884,9 +895,9 @@ function dayPages(t, i, T, warns) {
 
   /* Text links */
   const lw = 316;
-  let bodyTop = 188;
+  let bodyTop = 188 + off;
   const sp = tpl.strip ? tpl.strip(t, i) : null;
-  if (sp && (sp.from || sp.to)) { routeStrip(pg, sp, T, 182); bodyTop = 236; }
+  if (sp && (sp.from || sp.to)) { routeStrip(pg, sp, T, 182 + off); bodyTop = 236 + off; }
   const blocks = tpl.sections(d);
   let r = flow(pg, blocks, MX, bodyTop, lw, bodyBottom, { T, ruled: t.ruled });
   if (!r.rest.length && t.ruled) rulesTo(pg, MX, r.y, lw, bodyBottom);
@@ -1252,13 +1263,36 @@ const TILE_SOURCES = [
   { id: "osmde", name: "OpenStreetMap.de", url: (z, x, y) => `https://tile.openstreetmap.de/${z}/${x}/${y}.png`, credit: "© OpenStreetMap-Mitwirkende (openstreetmap.de)" },
   { id: "esri", name: "Esri", url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/${z}/${y}/${x}`, credit: "Karte: Esri, HERE, Garmin, © OpenStreetMap-Mitwirkende" },
 ];
+/* Reihenfolge: Aus einer lokalen Datei (file://) schickt der Browser keinen Referer, dann sperrt der OSM-Hauptserver
+   immer (mit einer Fehlerkachel). Dort zuerst OSM.de und Esri, den Hauptserver nur als letzte Möglichkeit. `tileForce` (nur Tests) erzwingt einen Anbieter. */
+let tileForce = "";
+function tileSources() {
+  if (tileForce) return TILE_SOURCES.filter((s) => s.id === tileForce);
+  return location.protocol === "file:" ? [TILE_SOURCES[1], TILE_SOURCES[2], TILE_SOURCES[0]] : TILE_SOURCES;
+}
+
+/* Sperrkachel von OSM („Access blocked“, gelb-schwarz gestreift) auch dann erkennen, wenn sie mit Status 200 kommt */
+function looksBlocked(bmp) {
+  const c = document.createElement("canvas"); c.width = c.height = 64;
+  const g = c.getContext("2d", { willReadFrequently: true }); g.drawImage(bmp, 0, 0, 64, 64);
+  const d = g.getImageData(0, 0, 64, 64).data; let yellow = 0, dark = 0;
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i] > 235 && d[i + 1] > 205 && d[i + 2] < 80) yellow++;
+    else if (d[i] < 50 && d[i + 1] < 50 && d[i + 2] < 50) dark++;
+  }
+  return yellow > 64 * 64 * 0.015 && dark > 64 * 64 * 0.015;
+}
+
 /* Per fetch statt <img>, damit eine Sperre (403) als Fehler erkannt wird und nicht als Kachel zählt. */
 async function loadTile(src, z, x, y) {
   try {
     const r = await fetch(src.url(z, x, y), { signal: AbortSignal.timeout(9000) });
     if (!r.ok) return null;
     const b = await r.blob();
-    return /^image\//.test(b.type) ? await createImageBitmap(b) : null;
+    if (!/^image\//.test(b.type)) return null;
+    const bmp = await createImageBitmap(b);
+    if (looksBlocked(bmp)) { bmp.close(); return null; }
+    return bmp;
   } catch (e) { return null; }
 }
 
@@ -1298,7 +1332,7 @@ async function renderMap(t, { road = true, onStatus = () => {}, noTiles = false,
   const tx0 = Math.floor(ox / TILE), tx1 = Math.floor((ox + MAP_W) / TILE), ty0 = Math.floor(oy / TILE), ty1 = Math.floor((oy + MAP_H) / TILE);
   for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) if (ty >= 0 && ty < nT) coords.push({ tx, ty, wx: ((tx % nT) + nT) % nT });
   let source = null, blocked = false;
-  for (const src of noTiles ? [] : TILE_SOURCES) {
+  for (const src of noTiles ? [] : tileSources()) {
     onStatus(`Kartenkacheln werden geladen (${src.name}) …`);
     const tiles = await Promise.all(coords.map((c) => loadTile(src, z, c.wx, c.ty).then((im) => ({ im, ...c }))));
     const ok = tiles.filter((x) => x.im);
@@ -1307,7 +1341,7 @@ async function renderMap(t, { road = true, onStatus = () => {}, noTiles = false,
       source = src; break;
     }
     ok.forEach((x) => x.im.close && x.im.close());
-    if (src.id === "osm") blocked = true;
+    blocked = true; // dieser Anbieter hat nicht geliefert (gesperrt oder nicht erreichbar)
   }
   const mode = source ? "osm" : "schema";
   if (!source) drawSchemaGrid(g, T);
@@ -1361,7 +1395,7 @@ async function renderMap(t, { road = true, onStatus = () => {}, noTiles = false,
   let src;
   try { src = cv.toDataURL("image/jpeg", 0.88); }
   catch (e) { /* Canvas durch fremde Kacheln gesperrt: Schemakarte */ return renderMap(t, { noTiles: true, pre: { ...info, geom } }); }
-  return { src, w: MAP_W, h: MAP_H, mode, source: source ? source.id : "", blocked, km: info.km, legs: info.legs };
+  return { src, w: MAP_W, h: MAP_H, mode, source: source ? source.id : "", sourceName: source ? source.name : "", blocked, km: info.km, legs: info.legs };
 }
 
 function drawSchemaGrid(g, T) {
@@ -1638,7 +1672,7 @@ function cleanTrip(j) {
       d = d && typeof d === "object" ? d : {};
       return {
         id: cleanId(d.id, seen), date: cleanIso(d.date), place: cleanPlace(d.place), from: clipStr(d.from, 200), km: clipStr(d.km, 20), drive: clipStr(d.drive, 20),
-        title: clipStr(d.title, 200), lodging: clipStr(d.lodging, 200), weather: oneOf(d.weather, ["", ...WEATHER.map((w) => w.id)], ""), tmin: clipStr(d.tmin, 12), tmax: clipStr(d.tmax, 12), wxAuto: typeof d.wxAuto === "boolean" ? d.wxAuto : null,
+        title: clipStr(d.title, 200), lodging: clipStr(d.lodging, 200), weather: oneOf(d.weather, ["", ...WEATHER.map((w) => w.id)], ""), tmin: clipStr(d.tmin, 12), tmax: clipStr(d.tmax, 12), wxAuto: typeof d.wxAuto === "boolean" ? d.wxAuto : null, wxExtra: clipStr(d.wxExtra, 300),
         text: clipStr(d.text, 20000), plan: clipStr(d.plan, 8000), highlights: clipStr(d.highlights, 4000),
         costs: (Array.isArray(d.costs) ? d.costs : []).slice(0, 200).map((c) => ({ id: cleanId(c && c.id, seen), l: clipStr(c && c.l, 200), cat: oneOf(c && c.cat, CATS.map((k) => k.id), "sonstiges"), a: clipStr(c && c.a, 20) })),
         photos: (Array.isArray(d.photos) ? d.photos : []).slice(0, 500).map((g) => cleanPhotoMeta(g, photoIds)),
@@ -1833,6 +1867,34 @@ async function fetchWx(g, h) { // Bright Sky zuerst, bei fehlender Station oder 
   try { return await openMeteo(g, h); } catch (e) { throw netErr || e; }
 }
 
+/* Detailzeile des Tages (Tagesseite): eigener Text, sonst Mittelwerte aus den Wetterdaten der Fotos */
+function dayWxDetail(d) {
+  const extra = (d.wxExtra || "").trim();
+  if (extra) return extra;
+  const ws = d.photos.map((p) => p.wx).filter(Boolean);
+  if (!ws.length) return "";
+  const vals = (k) => ws.map((x) => x[k]).filter((v) => v != null);
+  const avg = (k) => { const v = vals(k); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+  const mx = (k) => { const v = vals(k); return v.length ? Math.max(...v) : null; };
+  const n0 = (v) => String(Math.round(v)), n1 = (v) => fmtNum(v, 1), parts = [];
+  const fe = vals("feels");
+  if (fe.length && Math.abs(avg("feels") - avg("t")) >= 1) parts.push(`gefühlt ${n0(Math.min(...fe))}–${n0(Math.max(...fe))} °C`);
+  const wind = avg("wind");
+  if (wind != null) {
+    const dirs = vals("dir"), gust = mx("gust");
+    const dir = dirs.length ? (Math.atan2(dirs.reduce((s, a) => s + Math.sin(a * Math.PI / 180), 0), dirs.reduce((s, a) => s + Math.cos(a * Math.PI / 180), 0)) * 180) / Math.PI : null;
+    parts.push(`Wind Ø ${n0(wind)} km/h${dir != null ? " aus " + compass(dir) : ""}${gust != null && gust > wind + 1 ? `, Böen bis ${n0(gust)} km/h` : ""}`);
+  }
+  const rain = mx("rain");
+  if (rain != null) parts.push(rain > 0 ? `Niederschlag bis ${n1(rain)} mm/h` : "kein Niederschlag");
+  if (avg("cloud") != null) parts.push(`Bewölkung Ø ${n0(avg("cloud"))} %`);
+  if (avg("hum") != null) parts.push(`Luftfeuchte Ø ${n0(avg("hum"))} %`);
+  if (avg("press") != null) parts.push(`Luftdruck ${n0(avg("press"))} hPa`);
+  if (!parts.length) return "";
+  const src = [...new Set(ws.map((x) => (x.src === "brightsky" ? "DWD" + (x.station ? ` (${x.station})` : "") : "Open-Meteo")))].join(", ");
+  return parts.join(" · ") + " · Quelle: " + src;
+}
+
 /* ---------- Anwendung auf Fotos und Tage ---------- */
 const ownerDay = (p) => S.trip.days.find((d) => d.photos.includes(p));
 const wxWanted = (p) => S.trip.capWeather && p.gps && p.day && p.time && !p.dayFromFile && p.weatherSrc !== "manual" && !p.wx && !p.wxTried && !!ownerDay(p);
@@ -1950,7 +2012,7 @@ const DAY_FIELDS = {
   km: (d) => fld("Kilometer", `d:${d.id}.km`, d.km, { inputmode: "decimal" }),
   drive: (d) => fld("Fahrzeit (Std:Min)", `d:${d.id}.drive`, d.drive, { ph: "2:30" }),
   title: (d) => fld("Titel des Tages", `d:${d.id}.title`, d.title, { ph: "z. B. Salzkammergut" }),
-  weather: (d) => `<div class="wx">${selFld("Wetter", `d:${d.id}.weather`, d.weather, [["", "–"], ...WEATHER.map((w) => [w.id, w.name])])}${fld("Min °C", `d:${d.id}.tmin`, d.tmin, { inputmode: "decimal" })}${fld("Max °C", `d:${d.id}.tmax`, d.tmax, { inputmode: "decimal" })}</div>${wxHint(d)}`,
+  weather: (d) => `<div class="wx">${selFld("Wetter", `d:${d.id}.weather`, d.weather, [["", "–"], ...WEATHER.map((w) => [w.id, w.name])])}${fld("Min °C", `d:${d.id}.tmin`, d.tmin, { inputmode: "decimal" })}${fld("Max °C", `d:${d.id}.tmax`, d.tmax, { inputmode: "decimal" })}</div>${fld("Wetter-Details (optional, ersetzt die Zeile aus den Fotodaten)", `d:${d.id}.wxExtra`, d.wxExtra, { ph: "z. B. Wind Ø 12 km/h aus SW, am Nachmittag Schauer" })}${wxHint(d)}`,
   lodging: (d) => fld("Unterkunft", `d:${d.id}.lodging`, d.lodging),
   text: (d) => fld(S.trip.template === "kurztrip" ? "Notizen" : "Tagebuch", `d:${d.id}.text`, d.text, { rows: 7, ph: "Was haben wir erlebt?" }),
   plan: (d) => fld("Tagesplan (eine Zeile pro Punkt, Uhrzeit vorn)", `d:${d.id}.plan`, d.plan, { rows: 7, ph: "09:30 Frühstück im Café, 11:00 Stadtrundgang, …" }),
@@ -2394,7 +2456,7 @@ async function makeMap() {
     changed(); renderPanel();
     t.mapSource = r.source;
     toast(r.mode !== "osm" ? "Karte erzeugt, aber ohne Kartenhintergrund (Kartenserver nicht erreichbar)."
-      : r.blocked ? "Karte erzeugt. OpenStreetMap hat die Kacheln gesperrt (beim Öffnen der Datei von der Festplatte fehlt der Referer), deshalb stammen sie von einem anderen Kartenserver." : "Karte erzeugt.", r.blocked || r.mode !== "osm" ? 10000 : 3500);
+      : r.blocked ? `Karte erzeugt. Ein Kartenserver hat die Kacheln gesperrt (OpenStreetMap verlangt einen Referer, den lokale Dateien nicht senden), deshalb stammen sie von ${r.sourceName}.` : "Karte erzeugt.", r.blocked || r.mode !== "osm" ? 10000 : 3500);
   } catch (e) { if (st) st.textContent = e.message; toast(e.message); if (btn) btn.disabled = false; }
 }
 async function useOwnMap(file) {

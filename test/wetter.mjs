@@ -82,6 +82,13 @@ ok(w[1].w === "rain" && w[1].a === "15" && w[1].b === "15" && w[1].src === "open
 ok(calls.filter((c) => c.startsWith("bs")).length === 3 && calls.filter((c) => c.startsWith("om")).length === 1, `Abfragen: ${calls.join(", ")}`);
 await page.waitForTimeout(500);
 ok((await page.locator("#pages").innerText()).includes("9–14 °C"), "Wetterkasten der Tagesseite: 9–14 °C");
+const det = await page.evaluate(() => dayWxDetail(S.trip.days[0]));
+ok(/Wind Ø 12 km\/h aus SW, Böen bis 20 km\/h/.test(det) && /Luftfeuchte Ø 60 %/.test(det) && /Luftdruck 1015 hPa/.test(det) && /Quelle: DWD \(Muenchen-Stadt\)/.test(det), "Detailzeile: " + det);
+ok((await page.locator("#pages").innerText()).includes("Luftfeuchte Ø 60 %"), "Detailzeile auf der Tagesseite");
+await page.evaluate(() => { S.trip.days[0].wxExtra = "Eigener Text zum Wetter"; changed(); });
+await page.waitForTimeout(400);
+ok((await page.locator("#pages").innerText()).includes("Eigener Text zum Wetter") && !(await page.locator("#pages").innerText()).includes("Luftfeuchte Ø 60"), "eigener Text ersetzt die automatische Zeile");
+await page.evaluate(() => { S.trip.days[0].wxExtra = ""; changed(); });
 
 console.log("Manuelle Änderung und Fotozeile");
 await page.evaluate(() => { S.tab = "days"; renderPanel(); });

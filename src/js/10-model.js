@@ -20,7 +20,7 @@ const blankPlace = () => ({ name: "", lat: null, lon: null });
 function newDay(date = "") {
   return {
     id: uid(), date, place: blankPlace(), from: "", km: "", drive: "", title: "", lodging: "",
-    weather: "", tmin: "", tmax: "", wxAuto: null, text: "", plan: "",
+    weather: "", tmin: "", tmax: "", wxAuto: null, wxExtra: "", text: "", plan: "",
     highlights: "", costs: [], photos: [],
   };
 }

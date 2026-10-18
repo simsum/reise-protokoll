@@ -81,6 +81,34 @@ async function fetchWx(g, h) { // Bright Sky zuerst, bei fehlender Station oder 
   try { return await openMeteo(g, h); } catch (e) { throw netErr || e; }
 }
 
+/* Detailzeile des Tages (Tagesseite): eigener Text, sonst Mittelwerte aus den Wetterdaten der Fotos */
+function dayWxDetail(d) {
+  const extra = (d.wxExtra || "").trim();
+  if (extra) return extra;
+  const ws = d.photos.map((p) => p.wx).filter(Boolean);
+  if (!ws.length) return "";
+  const vals = (k) => ws.map((x) => x[k]).filter((v) => v != null);
+  const avg = (k) => { const v = vals(k); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+  const mx = (k) => { const v = vals(k); return v.length ? Math.max(...v) : null; };
+  const n0 = (v) => String(Math.round(v)), n1 = (v) => fmtNum(v, 1), parts = [];
+  const fe = vals("feels");
+  if (fe.length && Math.abs(avg("feels") - avg("t")) >= 1) parts.push(`gefühlt ${n0(Math.min(...fe))}–${n0(Math.max(...fe))} °C`);
+  const wind = avg("wind");
+  if (wind != null) {
+    const dirs = vals("dir"), gust = mx("gust");
+    const dir = dirs.length ? (Math.atan2(dirs.reduce((s, a) => s + Math.sin(a * Math.PI / 180), 0), dirs.reduce((s, a) => s + Math.cos(a * Math.PI / 180), 0)) * 180) / Math.PI : null;
+    parts.push(`Wind Ø ${n0(wind)} km/h${dir != null ? " aus " + compass(dir) : ""}${gust != null && gust > wind + 1 ? `, Böen bis ${n0(gust)} km/h` : ""}`);
+  }
+  const rain = mx("rain");
+  if (rain != null) parts.push(rain > 0 ? `Niederschlag bis ${n1(rain)} mm/h` : "kein Niederschlag");
+  if (avg("cloud") != null) parts.push(`Bewölkung Ø ${n0(avg("cloud"))} %`);
+  if (avg("hum") != null) parts.push(`Luftfeuchte Ø ${n0(avg("hum"))} %`);
+  if (avg("press") != null) parts.push(`Luftdruck ${n0(avg("press"))} hPa`);
+  if (!parts.length) return "";
+  const src = [...new Set(ws.map((x) => (x.src === "brightsky" ? "DWD" + (x.station ? ` (${x.station})` : "") : "Open-Meteo")))].join(", ");
+  return parts.join(" · ") + " · Quelle: " + src;
+}
+
 /* ---------- Anwendung auf Fotos und Tage ---------- */
 const ownerDay = (p) => S.trip.days.find((d) => d.photos.includes(p));
 const wxWanted = (p) => S.trip.capWeather && p.gps && p.day && p.time && !p.dayFromFile && p.weatherSrc !== "manual" && !p.wx && !p.wxTried && !!ownerDay(p);

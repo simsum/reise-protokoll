@@ -54,20 +54,23 @@ const info = await page.evaluate(() => ({ img: S.trip.mapImg.length, km: S.trip.
 console.log("  ", JSON.stringify(info));
 ok(info.img > 20000, `Karte erzeugt (${(info.img / 1024).toFixed(0)} KB)`);
 ok(info.km > 600 && info.km < 1000, `Straßenroute: ${info.km && info.km.toFixed(0)} km`);
-ok(/Karte erzeugt\.$/.test(info.toast || ""), `Kartenhintergrund von OSM (Hinweis: „${info.toast}“)`);
+ok(/Karte erzeugt/.test(info.toast || ""), `Karte mit Hintergrund: ${await page.evaluate(() => S.trip.mapSource)} (Hinweis: „${info.toast}“)`);
 await page.evaluate(() => { document.querySelector("#toast").hidden = true; });
 await page.locator(".mapimg").screenshot({ path: join(out, "netz-karte.png") });
 
 console.log("Ersatzanbieter (OSM von Hand ausgeblendet)");
 console.log("  Quelle der ersten Karte:", await page.evaluate(() => S.trip.mapSource));
-for (const id of ["osmde", "esri"]) {
-  await page.evaluate((id) => { while (TILE_SOURCES[0].id !== id) TILE_SOURCES.shift(); S.trip.mapImg = ""; S.trip.mapSource = ""; renderPanel(); }, id);
+for (const id of ["osmde", "esri", "osm"]) {
+  await page.evaluate((id) => { tileForce = id; S.trip.mapImg = ""; S.trip.mapSource = ""; renderPanel(); }, id);
   await page.click("#mapBtn");
   await page.waitForFunction(() => S.trip.mapImg, null, { timeout: 90000 }).catch(() => {});
-  ok((await page.evaluate(() => S.trip.mapSource)) === id, `Karte von ${id} erzeugt`);
+  const src = await page.evaluate(() => S.trip.mapSource);
+  if (id === "osm") console.log(`  Hauptserver aus der lokalen Datei: ${src === "osm" ? "liefert Kacheln" : "gesperrt (erwartet)"}`);
+  else ok(src === id, `Karte von ${id} erzeugt`);
   await page.evaluate(() => { document.querySelector("#toast").hidden = true; });
   await page.locator(".mapimg").screenshot({ path: join(out, `netz-karte-${id}.png`) });
 }
+await page.evaluate(() => { tileForce = ""; });
 
 console.log("Angefragte Dienste:\n  " + [...new Set(reqs.map((r) => r.replace(/\/\d+\/\d+\.png/, "/z/x/y.png")))].join("\n  "));
 ok(errors.length === 0, "keine Fehler in der Konsole" + (errors.length ? ": " + errors.slice(0, 3).join(" | ") : ""));

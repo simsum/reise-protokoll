@@ -15,7 +15,7 @@ let failed = 0;
 const ok = (c, msg) => { console.log((c ? "  ok   " : "  FEHLT ") + msg); if (!c) failed++; };
 
 /* kleines PNG (Kachel mit Raster) ohne Zusatzpakete */
-function png(w, h) {
+function png(w, h, stripes) {
   const crcT = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
   const crc = (b) => { let c = 0xffffffff; for (const x of b) c = crcT[(c ^ x) & 255] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
   const chunk = (t, d) => { const l = Buffer.alloc(4); l.writeUInt32BE(d.length); const td = Buffer.concat([Buffer.from(t), d]); const c = Buffer.alloc(4); c.writeUInt32BE(crc(td)); return Buffer.concat([l, td, c]); };
@@ -23,6 +23,7 @@ function png(w, h) {
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     const o = y * (w * 3 + 1) + 1 + x * 3, edge = x % 128 === 0 || y % 128 === 0;
     raw[o] = edge ? 200 : 232; raw[o + 1] = edge ? 205 : 236; raw[o + 2] = edge ? 190 : 224;
+    if (stripes && x < 40) { const yel = ((x + y) >> 3) % 2 === 0; raw[o] = yel ? 255 : 20; raw[o + 1] = yel ? 230 : 20; raw[o + 2] = yel ? 0 : 20; }
   }
   const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 2;
   return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", ihdr), chunk("IDAT", deflateSync(raw)), chunk("IEND", Buffer.alloc(0))]);
@@ -34,7 +35,7 @@ const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
 page.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/.test(m.text())) errors.push(m.text()); }); // gesperrte Kacheln im Test sind gewollt
 
-let blockOsm = false, blockDe = false, blockEsri = false;
+let blockOsm = false, blockDe = false, blockEsri = false, stripeDe = false;
 const nm = (p) => join(root, "node_modules", p);
 await page.route("**/*", async (r) => {
   const u = r.request().url();
@@ -43,6 +44,7 @@ await page.route("**/*", async (r) => {
   if (u.includes("exifr")) return r.fulfill({ contentType: "text/javascript", body: readFileSync(nm("exifr/dist/full.umd.js")) });
   if (u.includes("tile.openstreetmap.org") && blockOsm) return r.fulfill({ status: 403, contentType: "image/png", headers: { "access-control-allow-origin": "*" }, body: png(256, 256) });
   if (u.includes("tile.openstreetmap.de") && blockDe) return r.abort();
+  if (u.includes("tile.openstreetmap.de") && stripeDe) return r.fulfill({ contentType: "image/png", headers: { "access-control-allow-origin": "*" }, body: png(256, 256, true) });
   if (u.includes("arcgisonline.com") && blockEsri) return r.abort();
   if (/tile\.openstreetmap\.(org|de)|arcgisonline\.com/.test(u)) return r.fulfill({ contentType: "image/png", headers: { "access-control-allow-origin": "*" }, body: png(256, 256) });
   if (u.includes("router.project-osrm.org")) {
@@ -74,28 +76,24 @@ ok((await page.evaluate(() => S.trip.route.legs.length)) === 4, "Teilstrecken de
 await page.click('[data-act="applyLegs"]');
 ok((await page.evaluate(() => S.trip.days[0].km)) === "150", "km aus Route in Tag übernommen");
 
-console.log("Kartenserver gesperrt (403 wie beim Öffnen von der Festplatte)");
-blockOsm = true;
-await page.evaluate(() => { S.trip.mapImg = ""; S.trip.mapSource = ""; renderPanel(); });
-await page.click("#mapBtn");
-await page.waitForFunction(() => S.trip.mapImg, null, { timeout: 30000 });
-ok((await page.evaluate(() => S.trip.mapSource)) === "osmde", "OSM gesperrt: Ersatz OpenStreetMap.de");
-ok((await page.evaluate(() => document.querySelector("#toast").textContent)).includes("gesperrt"), "Hinweis auf die Sperre");
+console.log("Kartenanbieter (aus der lokalen Datei: erst OSM.de, dann Esri, OSM zuletzt)");
+const regen = async () => {
+  await page.evaluate(() => { S.trip.mapImg = ""; S.trip.mapSource = ""; renderPanel(); });
+  await page.click("#mapBtn");
+  await page.waitForFunction(() => S.trip.mapImg, null, { timeout: 30000 });
+  return page.evaluate(() => S.trip.mapSource);
+};
+ok((await regen()) === "osmde", "Datei von der Festplatte: zuerst OpenStreetMap.de");
 blockDe = true;
-await page.evaluate(() => { S.trip.mapImg = ""; S.trip.mapSource = ""; renderPanel(); });
-await page.click("#mapBtn");
-await page.waitForFunction(() => S.trip.mapImg, null, { timeout: 30000 });
-ok((await page.evaluate(() => S.trip.mapSource)) === "esri", "auch OSM.de gesperrt: Esri");
+ok((await regen()) === "esri", "OSM.de gesperrt: Esri");
+ok((await page.evaluate(() => document.querySelector("#toast").textContent)).includes("gesperrt"), "Hinweis auf die Sperre");
 blockEsri = true;
-await page.evaluate(() => { S.trip.mapImg = ""; S.trip.mapSource = ""; renderPanel(); });
-await page.click("#mapBtn");
-await page.waitForFunction(() => S.trip.mapImg, null, { timeout: 30000 });
-ok((await page.evaluate(() => S.trip.mapSource)) === "", "alle gesperrt: Schemakarte statt Fehlkacheln");
-blockOsm = false; blockDe = false; blockEsri = false;
-await page.evaluate(() => { S.trip.mapImg = ""; renderPanel(); });
-await page.click("#mapBtn");
-await page.waitForFunction(() => S.trip.mapImg, null, { timeout: 30000 });
-ok((await page.evaluate(() => S.trip.mapSource)) === "osm", "wieder frei: OpenStreetMap");
+ok((await regen()) === "osm", "OSM.de und Esri gesperrt: OSM-Hauptserver als letzte Möglichkeit");
+blockOsm = true;
+ok((await regen()) === "", "alle gesperrt (403): Schemakarte statt Fehlkacheln");
+blockOsm = false; blockEsri = false; blockDe = false; stripeDe = true;
+ok((await regen()) === "esri", "Sperrkachel mit Status 200 (gelb-schwarz) wird am Bild erkannt");
+stripeDe = false;
 
 console.log("Vorlagen");
 await page.click('[data-tab="trip"]');

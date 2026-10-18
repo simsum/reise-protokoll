@@ -1,6 +1,6 @@
 {
   "name": "reise-protokoll",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "Reisetagebuch als PDF: Vorlagen nach Reiseart, Deckseite mit Übersicht und Routenkarte – läuft komplett im Browser.",
   "license": "MIT",
   "private": true,

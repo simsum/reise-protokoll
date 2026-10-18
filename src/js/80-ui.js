@@ -64,7 +64,7 @@ const DAY_FIELDS = {
   km: (d) => fld("Kilometer", `d:${d.id}.km`, d.km, { inputmode: "decimal" }),
   drive: (d) => fld("Fahrzeit (Std:Min)", `d:${d.id}.drive`, d.drive, { ph: "2:30" }),
   title: (d) => fld("Titel des Tages", `d:${d.id}.title`, d.title, { ph: "z. B. Salzkammergut" }),
-  weather: (d) => `<div class="wx">${selFld("Wetter", `d:${d.id}.weather`, d.weather, [["", "–"], ...WEATHER.map((w) => [w.id, w.name])])}${fld("Min °C", `d:${d.id}.tmin`, d.tmin, { inputmode: "decimal" })}${fld("Max °C", `d:${d.id}.tmax`, d.tmax, { inputmode: "decimal" })}</div>${wxHint(d)}`,
+  weather: (d) => `<div class="wx">${selFld("Wetter", `d:${d.id}.weather`, d.weather, [["", "–"], ...WEATHER.map((w) => [w.id, w.name])])}${fld("Min °C", `d:${d.id}.tmin`, d.tmin, { inputmode: "decimal" })}${fld("Max °C", `d:${d.id}.tmax`, d.tmax, { inputmode: "decimal" })}</div>${fld("Wetter-Details (optional, ersetzt die Zeile aus den Fotodaten)", `d:${d.id}.wxExtra`, d.wxExtra, { ph: "z. B. Wind Ø 12 km/h aus SW, am Nachmittag Schauer" })}${wxHint(d)}`,
   lodging: (d) => fld("Unterkunft", `d:${d.id}.lodging`, d.lodging),
   text: (d) => fld(S.trip.template === "kurztrip" ? "Notizen" : "Tagebuch", `d:${d.id}.text`, d.text, { rows: 7, ph: "Was haben wir erlebt?" }),
   plan: (d) => fld("Tagesplan (eine Zeile pro Punkt, Uhrzeit vorn)", `d:${d.id}.plan`, d.plan, { rows: 7, ph: "09:30 Frühstück im Café, 11:00 Stadtrundgang, …" }),
@@ -508,7 +508,7 @@ async function makeMap() {
     changed(); renderPanel();
     t.mapSource = r.source;
     toast(r.mode !== "osm" ? "Karte erzeugt, aber ohne Kartenhintergrund (Kartenserver nicht erreichbar)."
-      : r.blocked ? "Karte erzeugt. OpenStreetMap hat die Kacheln gesperrt (beim Öffnen der Datei von der Festplatte fehlt der Referer), deshalb stammen sie von einem anderen Kartenserver." : "Karte erzeugt.", r.blocked || r.mode !== "osm" ? 10000 : 3500);
+      : r.blocked ? `Karte erzeugt. Ein Kartenserver hat die Kacheln gesperrt (OpenStreetMap verlangt einen Referer, den lokale Dateien nicht senden), deshalb stammen sie von ${r.sourceName}.` : "Karte erzeugt.", r.blocked || r.mode !== "osm" ? 10000 : 3500);
   } catch (e) { if (st) st.textContent = e.message; toast(e.message); if (btn) btn.disabled = false; }
 }
 async function useOwnMap(file) {

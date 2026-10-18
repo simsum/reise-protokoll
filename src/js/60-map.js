@@ -35,13 +35,36 @@ const TILE_SOURCES = [
   { id: "osmde", name: "OpenStreetMap.de", url: (z, x, y) => `https://tile.openstreetmap.de/${z}/${x}/${y}.png`, credit: "© OpenStreetMap-Mitwirkende (openstreetmap.de)" },
   { id: "esri", name: "Esri", url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/${z}/${y}/${x}`, credit: "Karte: Esri, HERE, Garmin, © OpenStreetMap-Mitwirkende" },
 ];
+/* Reihenfolge: Aus einer lokalen Datei (file://) schickt der Browser keinen Referer, dann sperrt der OSM-Hauptserver
+   immer (mit einer Fehlerkachel). Dort zuerst OSM.de und Esri, den Hauptserver nur als letzte Möglichkeit. `tileForce` (nur Tests) erzwingt einen Anbieter. */
+let tileForce = "";
+function tileSources() {
+  if (tileForce) return TILE_SOURCES.filter((s) => s.id === tileForce);
+  return location.protocol === "file:" ? [TILE_SOURCES[1], TILE_SOURCES[2], TILE_SOURCES[0]] : TILE_SOURCES;
+}
+
+/* Sperrkachel von OSM („Access blocked“, gelb-schwarz gestreift) auch dann erkennen, wenn sie mit Status 200 kommt */
+function looksBlocked(bmp) {
+  const c = document.createElement("canvas"); c.width = c.height = 64;
+  const g = c.getContext("2d", { willReadFrequently: true }); g.drawImage(bmp, 0, 0, 64, 64);
+  const d = g.getImageData(0, 0, 64, 64).data; let yellow = 0, dark = 0;
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i] > 235 && d[i + 1] > 205 && d[i + 2] < 80) yellow++;
+    else if (d[i] < 50 && d[i + 1] < 50 && d[i + 2] < 50) dark++;
+  }
+  return yellow > 64 * 64 * 0.015 && dark > 64 * 64 * 0.015;
+}
+
 /* Per fetch statt <img>, damit eine Sperre (403) als Fehler erkannt wird und nicht als Kachel zählt. */
 async function loadTile(src, z, x, y) {
   try {
     const r = await fetch(src.url(z, x, y), { signal: AbortSignal.timeout(9000) });
     if (!r.ok) return null;
     const b = await r.blob();
-    return /^image\//.test(b.type) ? await createImageBitmap(b) : null;
+    if (!/^image\//.test(b.type)) return null;
+    const bmp = await createImageBitmap(b);
+    if (looksBlocked(bmp)) { bmp.close(); return null; }
+    return bmp;
   } catch (e) { return null; }
 }
 
@@ -81,7 +104,7 @@ async function renderMap(t, { road = true, onStatus = () => {}, noTiles = false,
   const tx0 = Math.floor(ox / TILE), tx1 = Math.floor((ox + MAP_W) / TILE), ty0 = Math.floor(oy / TILE), ty1 = Math.floor((oy + MAP_H) / TILE);
   for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) if (ty >= 0 && ty < nT) coords.push({ tx, ty, wx: ((tx % nT) + nT) % nT });
   let source = null, blocked = false;
-  for (const src of noTiles ? [] : TILE_SOURCES) {
+  for (const src of noTiles ? [] : tileSources()) {
     onStatus(`Kartenkacheln werden geladen (${src.name}) …`);
     const tiles = await Promise.all(coords.map((c) => loadTile(src, z, c.wx, c.ty).then((im) => ({ im, ...c }))));
     const ok = tiles.filter((x) => x.im);
@@ -90,7 +113,7 @@ async function renderMap(t, { road = true, onStatus = () => {}, noTiles = false,
       source = src; break;
     }
     ok.forEach((x) => x.im.close && x.im.close());
-    if (src.id === "osm") blocked = true;
+    blocked = true; // dieser Anbieter hat nicht geliefert (gesperrt oder nicht erreichbar)
   }
   const mode = source ? "osm" : "schema";
   if (!source) drawSchemaGrid(g, T);
@@ -144,7 +167,7 @@ async function renderMap(t, { road = true, onStatus = () => {}, noTiles = false,
   let src;
   try { src = cv.toDataURL("image/jpeg", 0.88); }
   catch (e) { /* Canvas durch fremde Kacheln gesperrt: Schemakarte */ return renderMap(t, { noTiles: true, pre: { ...info, geom } }); }
-  return { src, w: MAP_W, h: MAP_H, mode, source: source ? source.id : "", blocked, km: info.km, legs: info.legs };
+  return { src, w: MAP_W, h: MAP_H, mode, source: source ? source.id : "", sourceName: source ? source.name : "", blocked, km: info.km, legs: info.legs };
 }
 
 function drawSchemaGrid(g, T) {

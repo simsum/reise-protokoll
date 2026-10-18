@@ -190,6 +190,17 @@ function dayPages(t, i, T, warns) {
     pg.text(x + 35, y + 25, fitT(v || "–", "R", 9.5, bw - 46), { s: 9.5, c: v ? T.ink : T.muted });
   });
 
+  /* Wetterdetails (Wind, Niederschlag, Luftfeuchte …) als eigene Zeile unter den Infokästen */
+  let off = 0;
+  const wxd = dayWxDetail(d);
+  if (wxd) {
+    const wl = wrapMax(wxd, "R", 8.5, CW - 44, 3), bh = 12 + wl.lines.length * 11;
+    pg.rect(MX, 176, CW, bh, { fill: T.soft, r: 8 });
+    pg.icon(d.weather || "sun", MX + 11, 176 + (bh - 17) / 2, 17, T.accent, 1.5);
+    wl.lines.forEach((l, k) => pg.text(MX + 35, 176 + 6.5 + k * 11, l, { s: 8.5, c: T.ink }));
+    off = bh + 10;
+  }
+
   /* Fotos (die ersten drei als Streifen, mit Bildunterschrift) */
   const shown = d.photos.slice(0, 3), stripH = 132, stripY = BOTTOM - stripH;
   const bodyBottom = shown.length ? stripY - 16 : BOTTOM - 4;
@@ -200,9 +211,9 @@ function dayPages(t, i, T, warns) {
 
   /* Text links */
   const lw = 316;
-  let bodyTop = 188;
+  let bodyTop = 188 + off;
   const sp = tpl.strip ? tpl.strip(t, i) : null;
-  if (sp && (sp.from || sp.to)) { routeStrip(pg, sp, T, 182); bodyTop = 236; }
+  if (sp && (sp.from || sp.to)) { routeStrip(pg, sp, T, 182 + off); bodyTop = 236 + off; }
   const blocks = tpl.sections(d);
   let r = flow(pg, blocks, MX, bodyTop, lw, bodyBottom, { T, ruled: t.ruled });
   if (!r.rest.length && t.ruled) rulesTo(pg, MX, r.y, lw, bodyBottom);
