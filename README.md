@@ -66,5 +66,7 @@ Aufbau und Regeln stehen in [CLAUDE.md](CLAUDE.md).
 - **Tipps fürs nächste Mal**: Abschnitt für Erkenntnisse (je Tag und/oder als eigene Seite am Ende)
 - **Camper**: statt „Unterkunft“ ein Stellplatz mit Wasser, Entsorgung und Strom
 - Weitere Vorlagen (Städtereise, Wanderung, Strandurlaub)
-- Eigene Schriften im PDF, Seitenformate (A5, Querformat)
+- **Seitenformate** (A4, A5, A3, US Letter, Hoch- und Querformat)
+- **Export als HTML-Datei und als Markdown-Datei** (Text, Fotos, Karte), zusätzlich zum PDF
+- Eigene Schriften im PDF
 - Kartenausschnitt pro Tag
