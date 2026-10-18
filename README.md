@@ -35,7 +35,7 @@ Im Reiter „Reise“:
 | Gruppe | Optionen |
 |---|---|
 | **Beschriftung unter den Bildern** | Fotonummer, Datum und Uhrzeit, Ort, GPS-Koordinaten (im PDF als Link zur Karte), Wetter zur Aufnahmezeit, Bildunterschrift, Notizen zu nummerierten Markierungen, Dateiname |
-| **Fotos auf den Seiten** | 0 bis 3 Fotos auf der Tagesseite (weitere kommen auf Fotoseiten), Bildauflösung 110 / 150 / 220 / 300 dpi (gerechnet aus dem Original) |
+| **Fotos auf den Seiten** | **Automatisch**: Der Freiraum unter dem Text der Tagesseite gehört den Fotos (bis zu 6, in passender Größe, mit viel Text kommen sie auf Fotoseiten); oder fest 0 bis 3 Fotos als Streifen. Aussehen: Schatten mit abgerundeten Ecken, weißer Rand mit Schatten oder schlicht. Bildauflösung 110 / 150 / 220 / 300 dpi (gerechnet aus dem Original) |
 | **Originale & Qualität** | Originaldateien bitgenau einbetten (mit EXIF) oder auf 3200 / 2400 / 1600 px verkleinern (Aufnahmedatum und GPS bleiben in der Datei), Bearbeitungsdaten im PDF speichern, Prüfsummen-Seite (SHA-256) |
 | **Ort und Wetter aus den Fotodaten** | Ort aus GPS: OpenStreetMap (Straße, Hausnummer) mit Rückfall auf eine eingebaute Ortsliste, nur offline oder aus; Wetter ermitteln ja/nein |
 

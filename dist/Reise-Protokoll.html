@@ -138,7 +138,7 @@ body.dragging::after { content: "Fotos hier ablegen (oder ein Projekt-PDF zum Ö
 
 <div id="app">
   <header class="top">
-    <div class="brand"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s6.5-5.7 6.5-11a6.5 6.5 0 1 0-13 0C5.5 15.3 12 21 12 21z"/><circle cx="12" cy="10" r="2.4"/></svg> Reise-Protokoll <span class="ver">v0.6.0</span></div>
+    <div class="brand"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s6.5-5.7 6.5-11a6.5 6.5 0 1 0-13 0C5.5 15.3 12 21 12 21z"/><circle cx="12" cy="10" r="2.4"/></svg> Reise-Protokoll <span class="ver">v0.7.0</span></div>
     <div class="grow"></div>
     <select id="demo" title="Beispielreise laden">
       <option value="">Beispiel laden …</option>
@@ -320,7 +320,7 @@ function newTrip(template = "rundreise") {
     startPlace: blankPlace(), destination: blankPlace(), roundTrip: false,
     days: [], summary: "", summaryAuto: true,
     route: { auto: true, road: true, points: [], km: null, legs: [], mapSig: "" },
-    mapImg: "", mapSource: "", mapUser: false, coverPhoto: "", projData: true, embed: "original", capWeather: true, wxLine: false, capNum: false, capDate: false, capPlace: false, capGps: false, capNote: true, capMarks: true, capFile: false, hashes: false, dpi: "150", placeMode: "auto", stripN: 3, ruled: true, costPage: true,
+    mapImg: "", mapSource: "", mapUser: false, coverPhoto: "", projData: true, embed: "original", capWeather: true, wxLine: false, capNum: false, capDate: false, capPlace: false, capGps: false, capNote: true, capMarks: true, capFile: false, hashes: false, dpi: "150", placeMode: "auto", stripN: "auto", photoStyle: "shadow", ruled: true, costPage: true,
   };
 }
 
@@ -692,12 +692,12 @@ function wrapMax(text, f, size, maxW, maxLines) {
    zeichnen beide nur aus diesem Modell – es gibt keine zweite Layout-Logik.
 
    Operationen (k):
-     rect  {x,y,w,h,fill,stroke,sw,r}          Rechteck, optional abgerundet
+     rect  {x,y,w,h,fill,fo,stroke,sw,r}       Rechteck, optional abgerundet (fo = Deckkraft der Füllung)
      line  {x1,y1,x2,y2,c,sw}                  Linie
      t     {x,y,text,s,f,c,a,ls}               Text; y = Oberkante, a = l|c|r, ls = Buchstabenabstand
      path  {x,y,w,h,vw,vh,d,fill,stroke,sw}    SVG-Pfad im Raster vw×vh (Symbole)
      link  {x,y,w,h,url}                       klickbarer Bereich (nur feste, im Code stehende Adressen)
-     img   {x,y,w,h,src,iw,ih,pid}             Bild, füllt den Rahmen (zugeschnitten); pid = Foto-ID (Büroklammer im PDF)         */
+     img   {x,y,w,h,src,iw,ih,pid,r}           Bild, füllt den Rahmen (zugeschnitten, Ecken r); pid = Foto-ID (Büroklammer im PDF)         */
 const PW = 595.28, PH = 841.89, MX = 40, CW = PW - 2 * MX, BOTTOM = 790;
 const PROJECT_URL = "https://github.com/simsum/reise-protokoll", PROJECT_LABEL = "Reise-Protokoll · github.com/simsum/reise-protokoll";
 
@@ -706,14 +706,16 @@ class Pg {
     this.W = PW; this.H = PH; this.ops = []; this.T = T;
     if (T.paper.toUpperCase() !== "#FFFFFF") this.rect(0, 0, PW, PH, { fill: T.paper });
   }
-  rect(x, y, w, h, o = {}) { this.ops.push({ k: "rect", x, y, w, h, fill: o.fill || null, stroke: o.stroke || null, sw: o.sw || 0.6, r: Math.min(o.r || 0, w / 2, h / 2) }); }
+  rect(x, y, w, h, o = {}) { this.ops.push({ k: "rect", x, y, w, h, fill: o.fill || null, stroke: o.stroke || null, sw: o.sw || 0.6, r: Math.min(o.r || 0, w / 2, h / 2), fo: o.fo }); }
+  /* weicher Schatten: mehrere schwach deckende Rechtecke, nach unten versetzt */
+  shadow(x, y, w, h, r = 0) { for (let i = 1; i <= 7; i++) { const e = i * 0.85; this.rect(x - e, y - e + 1.8, w + 2 * e, h + 2 * e, { fill: "#000000", fo: 0.032, r: r + e }); } }
   line(x1, y1, x2, y2, c, sw = 0.6) { this.ops.push({ k: "line", x1, y1, x2, y2, c, sw }); }
   text(x, y, text, o = {}) {
     this.ops.push({ k: "t", x, y, text: clean(text), s: o.s || 10, f: o.f || "R", c: o.c || this.T.ink, a: o.a || "l", ls: o.ls || 0 });
   }
   link(x, y, w, h, url) { this.ops.push({ k: "link", x, y, w, h, url }); }
   icon(name, x, y, s, c, sw = 1.6) { this.ops.push({ k: "path", x, y, w: s, h: s, vw: 24, vh: 24, d: ICONS[name] || ICONS.sun, fill: null, stroke: c, sw }); }
-  img(x, y, w, h, src, iw, ih, pid) { this.ops.push({ k: "img", x, y, w, h, src, iw: iw || w, ih: ih || h, pid }); }
+  img(x, y, w, h, src, iw, ih, pid, r = 0) { this.ops.push({ k: "img", x, y, w, h, src, iw: iw || w, ih: ih || h, pid, r }); }
   label(x, y, text, c, a) { this.text(x, y, String(text).toUpperCase(), { f: "B", s: 7.5, c: c || this.T.accent, ls: 1.4, a }); }
 }
 
@@ -822,8 +824,9 @@ function coverPage(t, st, T, warns) {
   /* Karte */
   const my = sy + 64 + 18, mh = 220;
   if (t.mapImg) {
-    pg.img(MX, my, CW, mh, t.mapImg, t.mapW, t.mapH);
-    pg.rect(MX, my, CW, mh, { stroke: T.rule, sw: 0.8 });
+    if (t.photoStyle === "shadow") pg.shadow(MX, my, CW, mh, 6);
+    pg.img(MX, my, CW, mh, t.mapImg, t.mapW, t.mapH, undefined, t.photoStyle === "shadow" ? 6 : 0);
+    if (t.photoStyle !== "shadow") pg.rect(MX, my, CW, mh, { stroke: T.rule, sw: 0.8 });
   } else {
     pg.rect(MX, my, CW, mh, { fill: T.soft, r: 8 });
     pg.icon("pin", PW / 2 - 14, my + mh / 2 - 26, 28, T.muted, 1.4);
@@ -896,24 +899,41 @@ function dayPages(t, i, T, warns) {
     off = bh + 10;
   }
 
-  /* Fotos (die ersten stripN als Streifen, mit Beschriftung; die Höhe richtet sich nach der Zahl der Beschriftungszeilen) */
-  const shown = d.photos.slice(0, t.stripN), g = 10, sw = shown.length ? (CW - g * (shown.length - 1)) / shown.length : 0;
-  const lines = shown.map((p) => photoLines(t, p, sw, 8, warns, `Tag ${i + 1}`));
-  const stripH = shown.length ? 100 + Math.max(...lines.map(captionH)) : 0, stripY = BOTTOM - stripH;
-  const bodyBottom = shown.length ? stripY - 16 : BOTTOM - 4;
-  shown.forEach((p, k) => photoBlock(pg, p, MX + k * (sw + g), stripY, sw, stripH, lines[k], T, 100));
-
-  /* Text links */
-  const lw = 316;
+  /* Kopf der Textspalten */
+  const lw = 316, rx = MX + lw + 24, rw = PW - MX - rx;
   let bodyTop = 188 + off;
   const sp = tpl.strip ? tpl.strip(t, i) : null;
   if (sp && (sp.from || sp.to)) { routeStrip(pg, sp, T, 182 + off); bodyTop = 236 + off; }
   const blocks = tpl.sections(d);
+
+  /* Fotos auf der Tagesseite.
+     „automatisch“: Der Text wird zuerst gemessen, der Freiraum darunter gehört den Fotos (so viele wie mit gutem Format hineinpassen).
+     Feste Zahl (0–3): ein Streifen am Seitenende, dessen Höhe von der Zahl der Beschriftungszeilen abhängt. */
+  const style = t.photoStyle;
+  let shown = [], bodyBottom = BOTTOM - 4, place = () => {};
+  if (t.stripN === "auto") {
+    const dm = new Pg(T), r1 = flow(dm, blocks, MX, bodyTop, lw, BOTTOM - 4, { T, ruled: false });
+    const textEnd = Math.max(r1.rest.length ? BOTTOM : r1.y, rightColumn(dm, t, d, T, rx, bodyTop, rw, BOTTOM - 4, [], i));
+    const y0 = textEnd + 22, fit = d.photos.length && BOTTOM - y0 >= 130 ? fitPhotos(t, d.photos, MX, y0, CW, BOTTOM - y0) : null;
+    if (fit) {
+      shown = d.photos.slice(0, fit.n); bodyBottom = y0 - 16;
+      const top = Math.min(...fit.cells.map((c) => c.y)), bot = Math.max(...fit.cells.map((c) => c.y + c.h)), shift = Math.max(0, (BOTTOM - y0 - (bot - top)) / 2 - 4);
+      place = () => shown.forEach((p, k) => photoBlock(pg, p, fit.cells[k].x, fit.cells[k].y + shift, fit.cells[k].w, fit.cells[k].h, fit.Ls[k], T, 0, style));
+    }
+  } else {
+    shown = d.photos.slice(0, +t.stripN);
+    const g = 10, sw = shown.length ? (CW - g * (shown.length - 1)) / shown.length : 0;
+    const lines = shown.map((p) => photoLines(t, p, sw, 8, warns, `Tag ${i + 1}`));
+    const stripH = shown.length ? 100 + Math.max(...lines.map(captionH)) : 0, stripY = BOTTOM - stripH;
+    if (shown.length) bodyBottom = stripY - 16;
+    place = () => shown.forEach((p, k) => photoBlock(pg, p, MX + k * (sw + g), stripY, sw, stripH, lines[k], T, 100, style));
+  }
+  place();
+
+  /* Text links, Highlights und Ausgaben rechts */
   let r = flow(pg, blocks, MX, bodyTop, lw, bodyBottom, { T, ruled: t.ruled });
   if (!r.rest.length && t.ruled) rulesTo(pg, MX, r.y, lw, bodyBottom);
-
-  /* Highlights und Ausgaben rechts */
-  rightColumn(pg, t, d, T, MX + lw + 24, bodyTop, PW - MX - (MX + lw + 24), bodyBottom, warns, i);
+  rightColumn(pg, t, d, T, rx, bodyTop, rw, bodyBottom, warns, i);
 
   /* Fortsetzungsseiten */
   for (let n = 0; r.rest.length && n < 8; n++) {
@@ -924,11 +944,11 @@ function dayPages(t, i, T, warns) {
   if (r.rest.length) warns.push(`Tag ${i + 1}: Der Text ist zu lang und wird abgeschnitten.`);
 
   /* weitere Fotos: Aufteilung nach Anzahl, gleichmäßig auf Seiten verteilt */
-  const more = d.photos.slice(t.stripN), per = more.length ? Math.ceil(more.length / Math.ceil(more.length / 6)) : 6;
+  const more = d.photos.slice(shown.length), per = more.length ? Math.ceil(more.length / Math.ceil(more.length / 6)) : 6;
   for (let k = 0; k < more.length; k += per) {
     const p3 = new Pg(T); out.push(p3);
     const y0 = miniHeader(p3, `Tag ${i + 1} · Fotos`, title), chunk = more.slice(k, k + per);
-    galleryCells(chunk.length, MX, y0, CW, BOTTOM - y0).forEach((c, n) => photoBlock(p3, chunk[n], c.x, c.y, c.w, c.h, photoLines(t, chunk[n], c.w, 10, warns, `Tag ${i + 1}`), T));
+    galleryCells(chunk.length, MX, y0, CW, BOTTOM - y0).forEach((c, n) => photoBlock(p3, chunk[n], c.x, c.y, c.w, c.h, photoLines(t, chunk[n], c.w, 10, warns, `Tag ${i + 1}`), T, 0, style));
   }
   return out;
 }
@@ -961,17 +981,20 @@ function photoLines(t, p, w, maxLines, warns, where) {
 }
 const captionH = (L) => (L.length ? L.length * LH + 5 : 0);
 
-function photoBlock(pg, p, x, y, w, h, L, T, fixedIh) {
-  const v = photoView(p), th = captionH(L), ih = fixedIh || Math.max(20, h - th);
-  const marked = viewMarks(p).length > 0;
-  let r = { x, y, w, h: ih };
-  if (marked) { const k = Math.min(w / v.w, ih / v.h); r = { w: v.w * k, h: v.h * k }; r.x = x + (w - r.w) / 2; r.y = y; }
-  pg.img(r.x, r.y, r.w, r.h, v.src, v.w, v.h, p.id);
-  pg.rect(r.x, r.y, r.w, r.h, { stroke: T.rule, sw: 0.5 });
+function photoBlock(pg, p, x, y, w, h, L, T, fixedIh, style) {
+  const v = photoView(p), th = captionH(L), cellH = fixedIh || Math.max(20, h - th);
+  const pad = style === "frame" ? 5 : 0, rad = style === "shadow" ? 5 : 0;
+  const marked = viewMarks(p).length > 0, aw = w - 2 * pad, ah = cellH - 2 * pad;
+  let r = { x: x + pad, y: y + pad, w: aw, h: ah };
+  if (marked) { const k = Math.min(aw / v.w, ah / v.h); r = { w: v.w * k, h: v.h * k }; r.x = x + pad + (aw - r.w) / 2; r.y = y + pad; }
+  if (style === "shadow") pg.shadow(r.x, r.y, r.w, r.h, rad);
+  if (style === "frame") { pg.shadow(r.x - pad, r.y - pad, r.w + 2 * pad, r.h + 2 * pad, 1.5); pg.rect(r.x - pad, r.y - pad, r.w + 2 * pad, r.h + 2 * pad, { fill: "#FFFFFF", stroke: T.rule, sw: 0.4, r: 1.5 }); }
+  pg.img(r.x, r.y, r.w, r.h, v.src, v.w, v.h, p.id, rad);
+  if (!style || style === "plain") pg.rect(r.x, r.y, r.w, r.h, { stroke: T.rule, sw: 0.5 });
   if (marked) drawMarks(pg, p, r, v);
   const col = { ink: T.ink, muted: T.muted, acc: T.accent };
   L.forEach((l, k) => {
-    const ty = y + ih + 5 + k * LH;
+    const ty = y + cellH + 5 + k * LH;
     if (l.n) {
       pg.rect(x, ty + 0.5, 8, 8, { fill: l.col, r: 4 });
       pg.text(x + 4, ty + 1.9, String(l.n), { f: "B", s: 5.8, c: numInk(l.col), a: "c" });
@@ -1004,19 +1027,41 @@ function drawMarks(pg, p, r, v) {
   }
 }
 
-function galleryCells(n, x, y, w, h) {
-  const g = 12, half = (w - g) / 2, cap = (v) => Math.min(v, 300), out = [];
-  const rows = (cols, nr) => { const ch = cap((h - g * (nr - 1)) / nr); return ch; };
-  if (n === 1) out.push({ x, y, w, h: Math.min(h, 460) });
-  else if (n === 2) { const ch = cap((h - g) / 2); out.push({ x, y, w, h: ch }, { x, y: y + ch + g, w, h: ch }); }
+function galleryCells(n, x, y, w, h, opt = {}) {
+  const g = 12, half = (w - g) / 2, cap = opt.cap || 300, out = [];
+  if (opt.side) { // Tagesseite: breite, flache Fläche
+    if (n === 3 && h >= 330) {
+      const top = Math.min(cap, (h - g) * 0.55), bot = Math.min(cap * 0.75, h - top - g);
+      return [{ x, y, w, h: top }, { x, y: y + top + g, w: half, h: bot }, { x: x + half + g, y: y + top + g, w: half, h: bot }];
+    }
+    const cols = n <= 3 ? n : n === 4 ? 2 : 3, rows = Math.ceil(n / cols), cw = (w - (cols - 1) * g) / cols, ch = Math.min(cap, (h - (rows - 1) * g) / rows);
+    for (let k = 0; k < n; k++) out.push({ x: x + (k % cols) * (cw + g), y: y + Math.floor(k / cols) * (ch + g), w: cw, h: ch });
+    return out;
+  }
+  if (n === 1) out.push({ x, y, w, h: Math.min(h, cap * 1.5) });
+  else if (n === 2) { const ch = Math.min(cap, (h - g) / 2); out.push({ x, y, w, h: ch }, { x, y: y + ch + g, w, h: ch }); }
   else if (n === 3) {
-    const top = Math.min(300, (h - g) * 0.55), bot = Math.min(220, h - top - g);
+    const top = Math.min(cap, (h - g) * 0.55), bot = Math.min(cap * 0.75, h - top - g);
     out.push({ x, y, w, h: top }, { x, y: y + top + g, w: half, h: bot }, { x: x + half + g, y: y + top + g, w: half, h: bot });
   } else {
-    const nr = Math.ceil(n / 2), ch = rows(2, nr);
+    const nr = Math.ceil(n / 2), ch = Math.min(cap, (h - g * (nr - 1)) / nr);
     for (let k = 0; k < n; k++) out.push({ x: x + (k % 2) * (half + g), y: y + Math.floor(k / 2) * (ch + g), w: half, h: ch });
   }
   return out;
+}
+
+/* So viele Fotos wie mit gutem Format in die freie Fläche passen (mindestens 95 pt Bildhöhe je Foto) */
+function fitPhotos(t, photos, x, y, w, h) {
+  for (let n = Math.min(photos.length, 6); n >= 1; n--) {
+    const cells = galleryCells(n, x, y, w, h, { cap: 360, side: true });
+    if (n === 1) { // ein einzelnes Foto behält sein Seitenverhältnis (nicht zugeschnitten), mittig
+      const v = photoView(photos[0]), c = cells[0], cw = Math.min(w, (c.h - 22) * (v.w / v.h));
+      cells[0] = { x: x + (w - cw) / 2, y: c.y, w: cw, h: c.h };
+    }
+    const Ls = cells.map((c, k) => photoLines(t, photos[k], c.w, 5, [], ""));
+    if (cells.every((c, k) => c.h - captionH(Ls[k]) >= 95 && c.y + c.h <= y + h + 0.5)) return { n, cells, Ls };
+  }
+  return null;
 }
 
 /* Streckenleiste (Rundreise): Start – Ziel mit Kilometern in der Mitte */
@@ -1068,7 +1113,9 @@ function rightColumn(pg, t, d, T, x, y, w, yMax, warns, i) {
     pg.line(x, y + 2, x + w, y + 2, T.rule, 0.8);
     pg.text(x, y + 8, "Summe", { f: "B", s: 9.5 });
     pg.text(x + w, y + 8, money(dayCosts(d), t.currency), { f: "B", s: 9.5, a: "r", c: T.accent });
+    y += 22;
   }
+  return y;
 }
 
 /* ---------- Kostenübersicht ---------- */
@@ -1172,6 +1219,8 @@ const FONT_CSS = {
   SI: "font-family:'Times New Roman',Times,'Liberation Serif',serif;font-style:italic", C: "font-family:'Courier New',Courier,'Liberation Mono',monospace",
 };
 
+const rgba = (hex, a) => `rgba(${hexRgb(hex).join(",")},${a})`;
+
 function pageHtml(pg) {
   const X = (v) => (v / pg.W * 100).toFixed(4) + "%", Y = (v) => (v / pg.H * 100).toFixed(4) + "%";
   const U = (v) => (v / pg.W * 100).toFixed(4) + "cqw";
@@ -1180,7 +1229,7 @@ function pageHtml(pg) {
   for (const o of pg.ops) {
     if (o.k === "rect") {
       const st = o.stroke ? `border:${U(o.sw)} solid ${o.stroke};box-sizing:border-box;` : "";
-      h += `<div class="ab" style="${box(o)};${o.fill ? "background:" + o.fill + ";" : ""}${st}${o.r ? "border-radius:" + U(o.r) : ""}"></div>`;
+      h += `<div class="ab" style="${box(o)};${o.fill ? "background:" + (o.fo != null ? rgba(o.fill, o.fo) : o.fill) + ";" : ""}${st}${o.r ? "border-radius:" + U(o.r) : ""}"></div>`;
     } else if (o.k === "line") {
       const horiz = o.y1 === o.y2;
       h += horiz
@@ -1194,7 +1243,7 @@ function pageHtml(pg) {
     } else if (o.k === "link") {
       h += `<a class="ab" href="${esc(o.url)}" target="_blank" rel="noopener" style="${box(o)}" aria-label="Projektseite"></a>`;
     } else if (o.k === "img") {
-      h += `<img class="ab im" style="${box(o)}" src="${o.src}" alt="">`;
+      h += `<img class="ab im" style="${box(o)}${o.r ? ";border-radius:" + U(o.r) : ""}" src="${o.src}" alt="">`;
     }
   }
   return h;
@@ -1208,6 +1257,15 @@ function bytesOfDataUrl(u) {
 }
 
 /* attachments: [{name, bytes, mime, desc, rel, pid}] werden als Dateianhänge eingebettet (pid: Foto, dessen Seite eine Büroklammer bekommt). */
+/* Klippfad (Rechteck, optional mit runden Ecken); x, y = linke untere Ecke in PDF-Koordinaten */
+function clipOps(L, x, y, w, h, r) {
+  if (!r) return [L.moveTo(x, y), L.lineTo(x + w, y), L.lineTo(x + w, y + h), L.lineTo(x, y + h), L.closePath(), L.clip(), L.endPath()];
+  const k = 0.5523 * r;
+  return [L.moveTo(x + r, y), L.lineTo(x + w - r, y), L.appendBezierCurve(x + w - r + k, y, x + w, y + r - k, x + w, y + r), L.lineTo(x + w, y + h - r),
+    L.appendBezierCurve(x + w, y + h - r + k, x + w - r + k, y + h, x + w - r, y + h), L.lineTo(x + r, y + h), L.appendBezierCurve(x + r - k, y + h, x, y + h - r + k, x, y + h - r),
+    L.lineTo(x, y + r), L.appendBezierCurve(x, y + r - k, x + r - k, y, x + r, y), L.closePath(), L.clip(), L.endPath()];
+}
+
 async function buildPdf(pages, meta, attachments, onProgress, hooks) {
   const L = PDFLib, doc = await L.PDFDocument.create();
   doc.setTitle(meta.title || "Reiseprotokoll"); doc.setCreator("Reise-Protokoll"); doc.setProducer("Reise-Protokoll (pdf-lib)");
@@ -1237,7 +1295,7 @@ async function buildPdf(pages, meta, attachments, onProgress, hooks) {
     for (const o of pg.ops) {
       if (o.k === "rect") {
         const opt = {};
-        if (o.fill) opt.color = rgbOf(o.fill);
+        if (o.fill) { opt.color = rgbOf(o.fill); if (o.fo != null) opt.opacity = o.fo; }
         if (o.stroke) { opt.borderColor = rgbOf(o.stroke); opt.borderWidth = o.sw; }
         if (o.r > 0) page.drawSvgPath(rrPath(o.w, o.h, o.r), { x: o.x, y: Y(o.y), ...opt });
         else page.drawRectangle({ x: o.x, y: Y(o.y + o.h), width: o.w, height: o.h, ...opt });
@@ -1265,8 +1323,7 @@ async function buildPdf(pages, meta, attachments, onProgress, hooks) {
         if (!im) im = await embed(o.src);
         const s = Math.max(o.w / im.width, o.h / im.height);
         const dw = im.width * s, dh = im.height * s;
-        page.pushOperators(L.pushGraphicsState(), L.moveTo(o.x, Y(o.y + o.h)), L.lineTo(o.x + o.w, Y(o.y + o.h)),
-          L.lineTo(o.x + o.w, Y(o.y)), L.lineTo(o.x, Y(o.y)), L.closePath(), L.clip(), L.endPath());
+        page.pushOperators(L.pushGraphicsState(), ...clipOps(L, o.x, Y(o.y + o.h), o.w, o.h, o.r || 0));
         page.drawImage(im, { x: o.x + (o.w - dw) / 2, y: Y(o.y + o.h) + (o.h - dh) / 2, width: dw, height: dh });
         page.pushOperators(L.popGraphicsState());
         const sp = o.pid && specs.get(o.pid);
@@ -1833,7 +1890,7 @@ function cleanTrip(j) {
     summary: clipStr(t.summary, 4000), summaryAuto: t.summaryAuto !== false, mapUser: !!t.mapUser, ruled: t.ruled !== false, costPage: t.costPage !== false,
     projData: t.projData !== false, capWeather: t.capWeather !== false, wxLine: !!t.wxLine,
     capNum: !!t.capNum, capDate: !!t.capDate, capPlace: !!t.capPlace, capGps: !!t.capGps, capNote: t.capNote !== false, capMarks: t.capMarks !== false, capFile: !!t.capFile, hashes: !!t.hashes,
-    dpi: oneOf(t.dpi, ["110", "150", "220", "300"], "150"), placeMode: oneOf(t.placeMode, ["auto", "offline", "off"], "auto"), stripN: oneOf(+t.stripN, [0, 1, 2, 3], 3), embed: oneOf(t.embed === "work" ? "1600" : t.embed, ["original", "3200", "2400", "1600"], "original"),
+    dpi: oneOf(t.dpi, ["110", "150", "220", "300"], "150"), placeMode: oneOf(t.placeMode, ["auto", "offline", "off"], "auto"), stripN: t.stripN === "auto" ? "auto" : oneOf(+t.stripN, [0, 1, 2, 3], "auto"), photoStyle: oneOf(t.photoStyle, ["shadow", "frame", "plain"], "shadow"), embed: oneOf(t.embed === "work" ? "1600" : t.embed, ["original", "3200", "2400", "1600"], "original"),
     mapSource: oneOf(t.mapSource, ["", "osm", "osmde", "esri"], ""), mapW: num(t.mapW, 1, 20000, 0), mapH: num(t.mapH, 1, 20000, 0), coverW: num(t.coverW, 1, 20000, 0), coverH: num(t.coverH, 1, 20000, 0),
     hasMap: !!t.hasMap, hasCover: !!t.hasCover,
     route: {
@@ -2275,7 +2332,8 @@ function panelTrip() {
   ${chk("Notizen zu nummerierten Markierungen", "capMarks", t.capMarks)}
   ${chk("Dateiname", "capFile", t.capFile)}
   <h3>Fotos auf den Seiten</h3>
-  ${selFld("Fotos auf der Tagesseite (weitere kommen auf Fotoseiten)", "stripN", String(t.stripN), [["0", "Keine, nur Fotoseiten"], ["1", "1 Foto"], ["2", "2 Fotos"], ["3", "3 Fotos"]])}
+  ${selFld("Fotos auf der Tagesseite (weitere kommen auf Fotoseiten)", "stripN", String(t.stripN), [["auto", "Automatisch: Freiraum unter dem Text nutzen"], ["0", "Keine, nur Fotoseiten"], ["1", "1 Foto"], ["2", "2 Fotos"], ["3", "3 Fotos"]])}
+  ${selFld("Aussehen der Fotos", "photoStyle", t.photoStyle, [["shadow", "Schatten und abgerundete Ecken"], ["frame", "Weißer Rand mit Schatten"], ["plain", "Schlicht mit dünnem Rand"]])}
   ${selFld("Bildauflösung auf der Seite", "dpi", t.dpi, [["110", "110 dpi – klein, für den Bildschirm"], ["150", "150 dpi – Standard"], ["220", "220 dpi – guter Druck"], ["300", "300 dpi – sehr scharf, großes PDF"]])}
   <h3>Originale & Qualität</h3>
   ${selFld("Fotos im PDF einbetten", "embed", t.embed, [["original", "Originaldateien (volle Qualität, mit EXIF)"], ["3200", "Verkleinert auf 3200 px (leicht, ca. 1,2 MB je Foto)"], ["2400", "Verkleinert auf 2400 px (mittel, ca. 0,7 MB)"], ["1600", "Verkleinert auf 1600 px (stark, ca. 0,3 MB)"]])}
@@ -2427,7 +2485,7 @@ document.addEventListener("input", (e) => {
   r.obj[r.prop] = el.type === "checkbox" ? el.checked : el.value;
   if (/^d:[^.]+\.(weather|tmin|tmax)$/.test(key)) { const wd = dayOf(key.split(".")[0].slice(2)); if (wd) wd.wxAuto = false; }
   if (key === "capWeather" && el.checked) { wxState = "unknown"; queueAllWeather(); }
-  if (key === "stripN") r.obj[r.prop] = +el.value;
+  if (key === "stripN") r.obj[r.prop] = el.value === "auto" ? "auto" : +el.value;
   if (key === "placeMode") reresolvePlaces();
   if (/^d:[^.]+\.photos\.[^.]+\.place$/.test(key)) { r.obj.placeSrc = el.value ? "manual" : ""; if (!el.value) queuePlace(r.obj); }
   if (/^d:[^.]+\.photos\.[^.]+\.weather$/.test(key)) { r.obj.weatherSrc = el.value ? "manual" : ""; if (!el.value) { r.obj.wx = null; r.obj.wxTried = false; queueWeather(r.obj); } }

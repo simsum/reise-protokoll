@@ -7,6 +7,8 @@ const FONT_CSS = {
   SI: "font-family:'Times New Roman',Times,'Liberation Serif',serif;font-style:italic", C: "font-family:'Courier New',Courier,'Liberation Mono',monospace",
 };
 
+const rgba = (hex, a) => `rgba(${hexRgb(hex).join(",")},${a})`;
+
 function pageHtml(pg) {
   const X = (v) => (v / pg.W * 100).toFixed(4) + "%", Y = (v) => (v / pg.H * 100).toFixed(4) + "%";
   const U = (v) => (v / pg.W * 100).toFixed(4) + "cqw";
@@ -15,7 +17,7 @@ function pageHtml(pg) {
   for (const o of pg.ops) {
     if (o.k === "rect") {
       const st = o.stroke ? `border:${U(o.sw)} solid ${o.stroke};box-sizing:border-box;` : "";
-      h += `<div class="ab" style="${box(o)};${o.fill ? "background:" + o.fill + ";" : ""}${st}${o.r ? "border-radius:" + U(o.r) : ""}"></div>`;
+      h += `<div class="ab" style="${box(o)};${o.fill ? "background:" + (o.fo != null ? rgba(o.fill, o.fo) : o.fill) + ";" : ""}${st}${o.r ? "border-radius:" + U(o.r) : ""}"></div>`;
     } else if (o.k === "line") {
       const horiz = o.y1 === o.y2;
       h += horiz
@@ -29,7 +31,7 @@ function pageHtml(pg) {
     } else if (o.k === "link") {
       h += `<a class="ab" href="${esc(o.url)}" target="_blank" rel="noopener" style="${box(o)}" aria-label="Projektseite"></a>`;
     } else if (o.k === "img") {
-      h += `<img class="ab im" style="${box(o)}" src="${o.src}" alt="">`;
+      h += `<img class="ab im" style="${box(o)}${o.r ? ";border-radius:" + U(o.r) : ""}" src="${o.src}" alt="">`;
     }
   }
   return h;
@@ -43,6 +45,15 @@ function bytesOfDataUrl(u) {
 }
 
 /* attachments: [{name, bytes, mime, desc, rel, pid}] werden als Dateianhänge eingebettet (pid: Foto, dessen Seite eine Büroklammer bekommt). */
+/* Klippfad (Rechteck, optional mit runden Ecken); x, y = linke untere Ecke in PDF-Koordinaten */
+function clipOps(L, x, y, w, h, r) {
+  if (!r) return [L.moveTo(x, y), L.lineTo(x + w, y), L.lineTo(x + w, y + h), L.lineTo(x, y + h), L.closePath(), L.clip(), L.endPath()];
+  const k = 0.5523 * r;
+  return [L.moveTo(x + r, y), L.lineTo(x + w - r, y), L.appendBezierCurve(x + w - r + k, y, x + w, y + r - k, x + w, y + r), L.lineTo(x + w, y + h - r),
+    L.appendBezierCurve(x + w, y + h - r + k, x + w - r + k, y + h, x + w - r, y + h), L.lineTo(x + r, y + h), L.appendBezierCurve(x + r - k, y + h, x, y + h - r + k, x, y + h - r),
+    L.lineTo(x, y + r), L.appendBezierCurve(x, y + r - k, x + r - k, y, x + r, y), L.closePath(), L.clip(), L.endPath()];
+}
+
 async function buildPdf(pages, meta, attachments, onProgress, hooks) {
   const L = PDFLib, doc = await L.PDFDocument.create();
   doc.setTitle(meta.title || "Reiseprotokoll"); doc.setCreator("Reise-Protokoll"); doc.setProducer("Reise-Protokoll (pdf-lib)");
@@ -72,7 +83,7 @@ async function buildPdf(pages, meta, attachments, onProgress, hooks) {
     for (const o of pg.ops) {
       if (o.k === "rect") {
         const opt = {};
-        if (o.fill) opt.color = rgbOf(o.fill);
+        if (o.fill) { opt.color = rgbOf(o.fill); if (o.fo != null) opt.opacity = o.fo; }
         if (o.stroke) { opt.borderColor = rgbOf(o.stroke); opt.borderWidth = o.sw; }
         if (o.r > 0) page.drawSvgPath(rrPath(o.w, o.h, o.r), { x: o.x, y: Y(o.y), ...opt });
         else page.drawRectangle({ x: o.x, y: Y(o.y + o.h), width: o.w, height: o.h, ...opt });
@@ -100,8 +111,7 @@ async function buildPdf(pages, meta, attachments, onProgress, hooks) {
         if (!im) im = await embed(o.src);
         const s = Math.max(o.w / im.width, o.h / im.height);
         const dw = im.width * s, dh = im.height * s;
-        page.pushOperators(L.pushGraphicsState(), L.moveTo(o.x, Y(o.y + o.h)), L.lineTo(o.x + o.w, Y(o.y + o.h)),
-          L.lineTo(o.x + o.w, Y(o.y)), L.lineTo(o.x, Y(o.y)), L.closePath(), L.clip(), L.endPath());
+        page.pushOperators(L.pushGraphicsState(), ...clipOps(L, o.x, Y(o.y + o.h), o.w, o.h, o.r || 0));
         page.drawImage(im, { x: o.x + (o.w - dw) / 2, y: Y(o.y + o.h) + (o.h - dh) / 2, width: dw, height: dh });
         page.pushOperators(L.popGraphicsState());
         const sp = o.pid && specs.get(o.pid);

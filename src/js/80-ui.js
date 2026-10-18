@@ -50,7 +50,8 @@ function panelTrip() {
   ${chk("Notizen zu nummerierten Markierungen", "capMarks", t.capMarks)}
   ${chk("Dateiname", "capFile", t.capFile)}
   <h3>Fotos auf den Seiten</h3>
-  ${selFld("Fotos auf der Tagesseite (weitere kommen auf Fotoseiten)", "stripN", String(t.stripN), [["0", "Keine, nur Fotoseiten"], ["1", "1 Foto"], ["2", "2 Fotos"], ["3", "3 Fotos"]])}
+  ${selFld("Fotos auf der Tagesseite (weitere kommen auf Fotoseiten)", "stripN", String(t.stripN), [["auto", "Automatisch: Freiraum unter dem Text nutzen"], ["0", "Keine, nur Fotoseiten"], ["1", "1 Foto"], ["2", "2 Fotos"], ["3", "3 Fotos"]])}
+  ${selFld("Aussehen der Fotos", "photoStyle", t.photoStyle, [["shadow", "Schatten und abgerundete Ecken"], ["frame", "Weißer Rand mit Schatten"], ["plain", "Schlicht mit dünnem Rand"]])}
   ${selFld("Bildauflösung auf der Seite", "dpi", t.dpi, [["110", "110 dpi – klein, für den Bildschirm"], ["150", "150 dpi – Standard"], ["220", "220 dpi – guter Druck"], ["300", "300 dpi – sehr scharf, großes PDF"]])}
   <h3>Originale & Qualität</h3>
   ${selFld("Fotos im PDF einbetten", "embed", t.embed, [["original", "Originaldateien (volle Qualität, mit EXIF)"], ["3200", "Verkleinert auf 3200 px (leicht, ca. 1,2 MB je Foto)"], ["2400", "Verkleinert auf 2400 px (mittel, ca. 0,7 MB)"], ["1600", "Verkleinert auf 1600 px (stark, ca. 0,3 MB)"]])}
@@ -202,7 +203,7 @@ document.addEventListener("input", (e) => {
   r.obj[r.prop] = el.type === "checkbox" ? el.checked : el.value;
   if (/^d:[^.]+\.(weather|tmin|tmax)$/.test(key)) { const wd = dayOf(key.split(".")[0].slice(2)); if (wd) wd.wxAuto = false; }
   if (key === "capWeather" && el.checked) { wxState = "unknown"; queueAllWeather(); }
-  if (key === "stripN") r.obj[r.prop] = +el.value;
+  if (key === "stripN") r.obj[r.prop] = el.value === "auto" ? "auto" : +el.value;
   if (key === "placeMode") reresolvePlaces();
   if (/^d:[^.]+\.photos\.[^.]+\.place$/.test(key)) { r.obj.placeSrc = el.value ? "manual" : ""; if (!el.value) queuePlace(r.obj); }
   if (/^d:[^.]+\.photos\.[^.]+\.weather$/.test(key)) { r.obj.weatherSrc = el.value ? "manual" : ""; if (!el.value) { r.obj.wx = null; r.obj.wxTried = false; queueWeather(r.obj); } }

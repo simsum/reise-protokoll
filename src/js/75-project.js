@@ -53,7 +53,7 @@ function cleanTrip(j) {
     summary: clipStr(t.summary, 4000), summaryAuto: t.summaryAuto !== false, mapUser: !!t.mapUser, ruled: t.ruled !== false, costPage: t.costPage !== false,
     projData: t.projData !== false, capWeather: t.capWeather !== false, wxLine: !!t.wxLine,
     capNum: !!t.capNum, capDate: !!t.capDate, capPlace: !!t.capPlace, capGps: !!t.capGps, capNote: t.capNote !== false, capMarks: t.capMarks !== false, capFile: !!t.capFile, hashes: !!t.hashes,
-    dpi: oneOf(t.dpi, ["110", "150", "220", "300"], "150"), placeMode: oneOf(t.placeMode, ["auto", "offline", "off"], "auto"), stripN: oneOf(+t.stripN, [0, 1, 2, 3], 3), embed: oneOf(t.embed === "work" ? "1600" : t.embed, ["original", "3200", "2400", "1600"], "original"),
+    dpi: oneOf(t.dpi, ["110", "150", "220", "300"], "150"), placeMode: oneOf(t.placeMode, ["auto", "offline", "off"], "auto"), stripN: t.stripN === "auto" ? "auto" : oneOf(+t.stripN, [0, 1, 2, 3], "auto"), photoStyle: oneOf(t.photoStyle, ["shadow", "frame", "plain"], "shadow"), embed: oneOf(t.embed === "work" ? "1600" : t.embed, ["original", "3200", "2400", "1600"], "original"),
     mapSource: oneOf(t.mapSource, ["", "osm", "osmde", "esri"], ""), mapW: num(t.mapW, 1, 20000, 0), mapH: num(t.mapH, 1, 20000, 0), coverW: num(t.coverW, 1, 20000, 0), coverH: num(t.coverH, 1, 20000, 0),
     hasMap: !!t.hasMap, hasCover: !!t.hasCover,
     route: {

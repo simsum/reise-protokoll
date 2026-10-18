@@ -4,12 +4,12 @@
    zeichnen beide nur aus diesem Modell – es gibt keine zweite Layout-Logik.
 
    Operationen (k):
-     rect  {x,y,w,h,fill,stroke,sw,r}          Rechteck, optional abgerundet
+     rect  {x,y,w,h,fill,fo,stroke,sw,r}       Rechteck, optional abgerundet (fo = Deckkraft der Füllung)
      line  {x1,y1,x2,y2,c,sw}                  Linie
      t     {x,y,text,s,f,c,a,ls}               Text; y = Oberkante, a = l|c|r, ls = Buchstabenabstand
      path  {x,y,w,h,vw,vh,d,fill,stroke,sw}    SVG-Pfad im Raster vw×vh (Symbole)
      link  {x,y,w,h,url}                       klickbarer Bereich (nur feste, im Code stehende Adressen)
-     img   {x,y,w,h,src,iw,ih,pid}             Bild, füllt den Rahmen (zugeschnitten); pid = Foto-ID (Büroklammer im PDF)         */
+     img   {x,y,w,h,src,iw,ih,pid,r}           Bild, füllt den Rahmen (zugeschnitten, Ecken r); pid = Foto-ID (Büroklammer im PDF)         */
 const PW = 595.28, PH = 841.89, MX = 40, CW = PW - 2 * MX, BOTTOM = 790;
 const PROJECT_URL = "https://github.com/simsum/reise-protokoll", PROJECT_LABEL = "Reise-Protokoll · github.com/simsum/reise-protokoll";
 
@@ -18,14 +18,16 @@ class Pg {
     this.W = PW; this.H = PH; this.ops = []; this.T = T;
     if (T.paper.toUpperCase() !== "#FFFFFF") this.rect(0, 0, PW, PH, { fill: T.paper });
   }
-  rect(x, y, w, h, o = {}) { this.ops.push({ k: "rect", x, y, w, h, fill: o.fill || null, stroke: o.stroke || null, sw: o.sw || 0.6, r: Math.min(o.r || 0, w / 2, h / 2) }); }
+  rect(x, y, w, h, o = {}) { this.ops.push({ k: "rect", x, y, w, h, fill: o.fill || null, stroke: o.stroke || null, sw: o.sw || 0.6, r: Math.min(o.r || 0, w / 2, h / 2), fo: o.fo }); }
+  /* weicher Schatten: mehrere schwach deckende Rechtecke, nach unten versetzt */
+  shadow(x, y, w, h, r = 0) { for (let i = 1; i <= 7; i++) { const e = i * 0.85; this.rect(x - e, y - e + 1.8, w + 2 * e, h + 2 * e, { fill: "#000000", fo: 0.032, r: r + e }); } }
   line(x1, y1, x2, y2, c, sw = 0.6) { this.ops.push({ k: "line", x1, y1, x2, y2, c, sw }); }
   text(x, y, text, o = {}) {
     this.ops.push({ k: "t", x, y, text: clean(text), s: o.s || 10, f: o.f || "R", c: o.c || this.T.ink, a: o.a || "l", ls: o.ls || 0 });
   }
   link(x, y, w, h, url) { this.ops.push({ k: "link", x, y, w, h, url }); }
   icon(name, x, y, s, c, sw = 1.6) { this.ops.push({ k: "path", x, y, w: s, h: s, vw: 24, vh: 24, d: ICONS[name] || ICONS.sun, fill: null, stroke: c, sw }); }
-  img(x, y, w, h, src, iw, ih, pid) { this.ops.push({ k: "img", x, y, w, h, src, iw: iw || w, ih: ih || h, pid }); }
+  img(x, y, w, h, src, iw, ih, pid, r = 0) { this.ops.push({ k: "img", x, y, w, h, src, iw: iw || w, ih: ih || h, pid, r }); }
   label(x, y, text, c, a) { this.text(x, y, String(text).toUpperCase(), { f: "B", s: 7.5, c: c || this.T.accent, ls: 1.4, a }); }
 }
 
@@ -134,8 +136,9 @@ function coverPage(t, st, T, warns) {
   /* Karte */
   const my = sy + 64 + 18, mh = 220;
   if (t.mapImg) {
-    pg.img(MX, my, CW, mh, t.mapImg, t.mapW, t.mapH);
-    pg.rect(MX, my, CW, mh, { stroke: T.rule, sw: 0.8 });
+    if (t.photoStyle === "shadow") pg.shadow(MX, my, CW, mh, 6);
+    pg.img(MX, my, CW, mh, t.mapImg, t.mapW, t.mapH, undefined, t.photoStyle === "shadow" ? 6 : 0);
+    if (t.photoStyle !== "shadow") pg.rect(MX, my, CW, mh, { stroke: T.rule, sw: 0.8 });
   } else {
     pg.rect(MX, my, CW, mh, { fill: T.soft, r: 8 });
     pg.icon("pin", PW / 2 - 14, my + mh / 2 - 26, 28, T.muted, 1.4);
@@ -208,24 +211,41 @@ function dayPages(t, i, T, warns) {
     off = bh + 10;
   }
 
-  /* Fotos (die ersten stripN als Streifen, mit Beschriftung; die Höhe richtet sich nach der Zahl der Beschriftungszeilen) */
-  const shown = d.photos.slice(0, t.stripN), g = 10, sw = shown.length ? (CW - g * (shown.length - 1)) / shown.length : 0;
-  const lines = shown.map((p) => photoLines(t, p, sw, 8, warns, `Tag ${i + 1}`));
-  const stripH = shown.length ? 100 + Math.max(...lines.map(captionH)) : 0, stripY = BOTTOM - stripH;
-  const bodyBottom = shown.length ? stripY - 16 : BOTTOM - 4;
-  shown.forEach((p, k) => photoBlock(pg, p, MX + k * (sw + g), stripY, sw, stripH, lines[k], T, 100));
-
-  /* Text links */
-  const lw = 316;
+  /* Kopf der Textspalten */
+  const lw = 316, rx = MX + lw + 24, rw = PW - MX - rx;
   let bodyTop = 188 + off;
   const sp = tpl.strip ? tpl.strip(t, i) : null;
   if (sp && (sp.from || sp.to)) { routeStrip(pg, sp, T, 182 + off); bodyTop = 236 + off; }
   const blocks = tpl.sections(d);
+
+  /* Fotos auf der Tagesseite.
+     „automatisch“: Der Text wird zuerst gemessen, der Freiraum darunter gehört den Fotos (so viele wie mit gutem Format hineinpassen).
+     Feste Zahl (0–3): ein Streifen am Seitenende, dessen Höhe von der Zahl der Beschriftungszeilen abhängt. */
+  const style = t.photoStyle;
+  let shown = [], bodyBottom = BOTTOM - 4, place = () => {};
+  if (t.stripN === "auto") {
+    const dm = new Pg(T), r1 = flow(dm, blocks, MX, bodyTop, lw, BOTTOM - 4, { T, ruled: false });
+    const textEnd = Math.max(r1.rest.length ? BOTTOM : r1.y, rightColumn(dm, t, d, T, rx, bodyTop, rw, BOTTOM - 4, [], i));
+    const y0 = textEnd + 22, fit = d.photos.length && BOTTOM - y0 >= 130 ? fitPhotos(t, d.photos, MX, y0, CW, BOTTOM - y0) : null;
+    if (fit) {
+      shown = d.photos.slice(0, fit.n); bodyBottom = y0 - 16;
+      const top = Math.min(...fit.cells.map((c) => c.y)), bot = Math.max(...fit.cells.map((c) => c.y + c.h)), shift = Math.max(0, (BOTTOM - y0 - (bot - top)) / 2 - 4);
+      place = () => shown.forEach((p, k) => photoBlock(pg, p, fit.cells[k].x, fit.cells[k].y + shift, fit.cells[k].w, fit.cells[k].h, fit.Ls[k], T, 0, style));
+    }
+  } else {
+    shown = d.photos.slice(0, +t.stripN);
+    const g = 10, sw = shown.length ? (CW - g * (shown.length - 1)) / shown.length : 0;
+    const lines = shown.map((p) => photoLines(t, p, sw, 8, warns, `Tag ${i + 1}`));
+    const stripH = shown.length ? 100 + Math.max(...lines.map(captionH)) : 0, stripY = BOTTOM - stripH;
+    if (shown.length) bodyBottom = stripY - 16;
+    place = () => shown.forEach((p, k) => photoBlock(pg, p, MX + k * (sw + g), stripY, sw, stripH, lines[k], T, 100, style));
+  }
+  place();
+
+  /* Text links, Highlights und Ausgaben rechts */
   let r = flow(pg, blocks, MX, bodyTop, lw, bodyBottom, { T, ruled: t.ruled });
   if (!r.rest.length && t.ruled) rulesTo(pg, MX, r.y, lw, bodyBottom);
-
-  /* Highlights und Ausgaben rechts */
-  rightColumn(pg, t, d, T, MX + lw + 24, bodyTop, PW - MX - (MX + lw + 24), bodyBottom, warns, i);
+  rightColumn(pg, t, d, T, rx, bodyTop, rw, bodyBottom, warns, i);
 
   /* Fortsetzungsseiten */
   for (let n = 0; r.rest.length && n < 8; n++) {
@@ -236,11 +256,11 @@ function dayPages(t, i, T, warns) {
   if (r.rest.length) warns.push(`Tag ${i + 1}: Der Text ist zu lang und wird abgeschnitten.`);
 
   /* weitere Fotos: Aufteilung nach Anzahl, gleichmäßig auf Seiten verteilt */
-  const more = d.photos.slice(t.stripN), per = more.length ? Math.ceil(more.length / Math.ceil(more.length / 6)) : 6;
+  const more = d.photos.slice(shown.length), per = more.length ? Math.ceil(more.length / Math.ceil(more.length / 6)) : 6;
   for (let k = 0; k < more.length; k += per) {
     const p3 = new Pg(T); out.push(p3);
     const y0 = miniHeader(p3, `Tag ${i + 1} · Fotos`, title), chunk = more.slice(k, k + per);
-    galleryCells(chunk.length, MX, y0, CW, BOTTOM - y0).forEach((c, n) => photoBlock(p3, chunk[n], c.x, c.y, c.w, c.h, photoLines(t, chunk[n], c.w, 10, warns, `Tag ${i + 1}`), T));
+    galleryCells(chunk.length, MX, y0, CW, BOTTOM - y0).forEach((c, n) => photoBlock(p3, chunk[n], c.x, c.y, c.w, c.h, photoLines(t, chunk[n], c.w, 10, warns, `Tag ${i + 1}`), T, 0, style));
   }
   return out;
 }
@@ -273,17 +293,20 @@ function photoLines(t, p, w, maxLines, warns, where) {
 }
 const captionH = (L) => (L.length ? L.length * LH + 5 : 0);
 
-function photoBlock(pg, p, x, y, w, h, L, T, fixedIh) {
-  const v = photoView(p), th = captionH(L), ih = fixedIh || Math.max(20, h - th);
-  const marked = viewMarks(p).length > 0;
-  let r = { x, y, w, h: ih };
-  if (marked) { const k = Math.min(w / v.w, ih / v.h); r = { w: v.w * k, h: v.h * k }; r.x = x + (w - r.w) / 2; r.y = y; }
-  pg.img(r.x, r.y, r.w, r.h, v.src, v.w, v.h, p.id);
-  pg.rect(r.x, r.y, r.w, r.h, { stroke: T.rule, sw: 0.5 });
+function photoBlock(pg, p, x, y, w, h, L, T, fixedIh, style) {
+  const v = photoView(p), th = captionH(L), cellH = fixedIh || Math.max(20, h - th);
+  const pad = style === "frame" ? 5 : 0, rad = style === "shadow" ? 5 : 0;
+  const marked = viewMarks(p).length > 0, aw = w - 2 * pad, ah = cellH - 2 * pad;
+  let r = { x: x + pad, y: y + pad, w: aw, h: ah };
+  if (marked) { const k = Math.min(aw / v.w, ah / v.h); r = { w: v.w * k, h: v.h * k }; r.x = x + pad + (aw - r.w) / 2; r.y = y + pad; }
+  if (style === "shadow") pg.shadow(r.x, r.y, r.w, r.h, rad);
+  if (style === "frame") { pg.shadow(r.x - pad, r.y - pad, r.w + 2 * pad, r.h + 2 * pad, 1.5); pg.rect(r.x - pad, r.y - pad, r.w + 2 * pad, r.h + 2 * pad, { fill: "#FFFFFF", stroke: T.rule, sw: 0.4, r: 1.5 }); }
+  pg.img(r.x, r.y, r.w, r.h, v.src, v.w, v.h, p.id, rad);
+  if (!style || style === "plain") pg.rect(r.x, r.y, r.w, r.h, { stroke: T.rule, sw: 0.5 });
   if (marked) drawMarks(pg, p, r, v);
   const col = { ink: T.ink, muted: T.muted, acc: T.accent };
   L.forEach((l, k) => {
-    const ty = y + ih + 5 + k * LH;
+    const ty = y + cellH + 5 + k * LH;
     if (l.n) {
       pg.rect(x, ty + 0.5, 8, 8, { fill: l.col, r: 4 });
       pg.text(x + 4, ty + 1.9, String(l.n), { f: "B", s: 5.8, c: numInk(l.col), a: "c" });
@@ -316,19 +339,41 @@ function drawMarks(pg, p, r, v) {
   }
 }
 
-function galleryCells(n, x, y, w, h) {
-  const g = 12, half = (w - g) / 2, cap = (v) => Math.min(v, 300), out = [];
-  const rows = (cols, nr) => { const ch = cap((h - g * (nr - 1)) / nr); return ch; };
-  if (n === 1) out.push({ x, y, w, h: Math.min(h, 460) });
-  else if (n === 2) { const ch = cap((h - g) / 2); out.push({ x, y, w, h: ch }, { x, y: y + ch + g, w, h: ch }); }
+function galleryCells(n, x, y, w, h, opt = {}) {
+  const g = 12, half = (w - g) / 2, cap = opt.cap || 300, out = [];
+  if (opt.side) { // Tagesseite: breite, flache Fläche
+    if (n === 3 && h >= 330) {
+      const top = Math.min(cap, (h - g) * 0.55), bot = Math.min(cap * 0.75, h - top - g);
+      return [{ x, y, w, h: top }, { x, y: y + top + g, w: half, h: bot }, { x: x + half + g, y: y + top + g, w: half, h: bot }];
+    }
+    const cols = n <= 3 ? n : n === 4 ? 2 : 3, rows = Math.ceil(n / cols), cw = (w - (cols - 1) * g) / cols, ch = Math.min(cap, (h - (rows - 1) * g) / rows);
+    for (let k = 0; k < n; k++) out.push({ x: x + (k % cols) * (cw + g), y: y + Math.floor(k / cols) * (ch + g), w: cw, h: ch });
+    return out;
+  }
+  if (n === 1) out.push({ x, y, w, h: Math.min(h, cap * 1.5) });
+  else if (n === 2) { const ch = Math.min(cap, (h - g) / 2); out.push({ x, y, w, h: ch }, { x, y: y + ch + g, w, h: ch }); }
   else if (n === 3) {
-    const top = Math.min(300, (h - g) * 0.55), bot = Math.min(220, h - top - g);
+    const top = Math.min(cap, (h - g) * 0.55), bot = Math.min(cap * 0.75, h - top - g);
     out.push({ x, y, w, h: top }, { x, y: y + top + g, w: half, h: bot }, { x: x + half + g, y: y + top + g, w: half, h: bot });
   } else {
-    const nr = Math.ceil(n / 2), ch = rows(2, nr);
+    const nr = Math.ceil(n / 2), ch = Math.min(cap, (h - g * (nr - 1)) / nr);
     for (let k = 0; k < n; k++) out.push({ x: x + (k % 2) * (half + g), y: y + Math.floor(k / 2) * (ch + g), w: half, h: ch });
   }
   return out;
+}
+
+/* So viele Fotos wie mit gutem Format in die freie Fläche passen (mindestens 95 pt Bildhöhe je Foto) */
+function fitPhotos(t, photos, x, y, w, h) {
+  for (let n = Math.min(photos.length, 6); n >= 1; n--) {
+    const cells = galleryCells(n, x, y, w, h, { cap: 360, side: true });
+    if (n === 1) { // ein einzelnes Foto behält sein Seitenverhältnis (nicht zugeschnitten), mittig
+      const v = photoView(photos[0]), c = cells[0], cw = Math.min(w, (c.h - 22) * (v.w / v.h));
+      cells[0] = { x: x + (w - cw) / 2, y: c.y, w: cw, h: c.h };
+    }
+    const Ls = cells.map((c, k) => photoLines(t, photos[k], c.w, 5, [], ""));
+    if (cells.every((c, k) => c.h - captionH(Ls[k]) >= 95 && c.y + c.h <= y + h + 0.5)) return { n, cells, Ls };
+  }
+  return null;
 }
 
 /* Streckenleiste (Rundreise): Start – Ziel mit Kilometern in der Mitte */
@@ -380,7 +425,9 @@ function rightColumn(pg, t, d, T, x, y, w, yMax, warns, i) {
     pg.line(x, y + 2, x + w, y + 2, T.rule, 0.8);
     pg.text(x, y + 8, "Summe", { f: "B", s: 9.5 });
     pg.text(x + w, y + 8, money(dayCosts(d), t.currency), { f: "B", s: 9.5, a: "r", c: T.accent });
+    y += 22;
   }
+  return y;
 }
 
 /* ---------- Kostenübersicht ---------- */

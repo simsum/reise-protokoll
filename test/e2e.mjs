@@ -129,7 +129,7 @@ ok(n >= 6, `langer Text erzeugt Folgeseite: ${n} Seiten`);
 
 console.log("Fotos");
 await page.evaluate(async () => {
-  loadTrip(demoTrip("rundreise"));
+  loadTrip(demoTrip("rundreise")); S.trip.stripN = 3;
   const mk = async (i) => {
     const cv = document.createElement("canvas"); cv.width = 1200; cv.height = i % 2 ? 900 : 800;
     const g = cv.getContext("2d"); g.fillStyle = `hsl(${i * 47},45%,60%)`; g.fillRect(0, 0, cv.width, cv.height);
