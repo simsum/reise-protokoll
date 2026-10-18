@@ -2,6 +2,8 @@
 
 Reisetagebuch als PDF. Man wählt eine Vorlage nach Reiseart, trägt Tage, Notizen, Wetter, Kosten und Fotos ein und bekommt ein gestaltetes PDF. Die **Deckseite** zeigt immer eine Übersicht: Dauer, Kennzahlen, **Karte der Fahrstrecke** und Zusammenfassung.
 
+**Direkt ausprobieren: https://simsum.github.io/reise-protokoll/** (GitHub Pages)
+
 Das Tool ist eine einzige HTML-Datei ([`dist/Reise-Protokoll.html`](dist/Reise-Protokoll.html)) und läuft komplett im Browser. Es gibt keinen Server, Fotos werden nicht hochgeladen.
 
 ## Vorlagen
