@@ -90,6 +90,7 @@ details.day .body { padding: 4px 12px 10px; border-top: 1px solid var(--line); p
 #pages { flex: 1; overflow: auto; padding: 22px 16px; display: flex; flex-direction: column; align-items: center; gap: 22px; }
 .sheet { position: relative; width: calc(min(720px, 100%) * var(--z, 1)); flex: none; background: #fff; box-shadow: 0 2px 14px rgba(0,0,0,.18); container-type: inline-size; overflow: hidden; }
 .ab { position: absolute; }
+a.ab { cursor: pointer; }
 .t { line-height: 1; white-space: pre; }
 .im { object-fit: cover; display: block; }
 svg.ab { overflow: visible; }

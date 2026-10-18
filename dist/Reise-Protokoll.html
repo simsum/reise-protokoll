@@ -91,6 +91,7 @@ details.day .body { padding: 4px 12px 10px; border-top: 1px solid var(--line); p
 #pages { flex: 1; overflow: auto; padding: 22px 16px; display: flex; flex-direction: column; align-items: center; gap: 22px; }
 .sheet { position: relative; width: calc(min(720px, 100%) * var(--z, 1)); flex: none; background: #fff; box-shadow: 0 2px 14px rgba(0,0,0,.18); container-type: inline-size; overflow: hidden; }
 .ab { position: absolute; }
+a.ab { cursor: pointer; }
 .t { line-height: 1; white-space: pre; }
 .im { object-fit: cover; display: block; }
 svg.ab { overflow: visible; }
@@ -137,7 +138,7 @@ body.dragging::after { content: "Fotos hier ablegen (oder ein Projekt-PDF zum Ö
 
 <div id="app">
   <header class="top">
-    <div class="brand"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s6.5-5.7 6.5-11a6.5 6.5 0 1 0-13 0C5.5 15.3 12 21 12 21z"/><circle cx="12" cy="10" r="2.4"/></svg> Reise-Protokoll <span class="ver">v0.5.0</span></div>
+    <div class="brand"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s6.5-5.7 6.5-11a6.5 6.5 0 1 0-13 0C5.5 15.3 12 21 12 21z"/><circle cx="12" cy="10" r="2.4"/></svg> Reise-Protokoll <span class="ver">v0.5.1</span></div>
     <div class="grow"></div>
     <select id="demo" title="Beispielreise laden">
       <option value="">Beispiel laden …</option>
@@ -692,8 +693,10 @@ function wrapMax(text, f, size, maxW, maxLines) {
      line  {x1,y1,x2,y2,c,sw}                  Linie
      t     {x,y,text,s,f,c,a,ls}               Text; y = Oberkante, a = l|c|r, ls = Buchstabenabstand
      path  {x,y,w,h,vw,vh,d,fill,stroke,sw}    SVG-Pfad im Raster vw×vh (Symbole)
+     link  {x,y,w,h,url}                       klickbarer Bereich (nur feste, im Code stehende Adressen)
      img   {x,y,w,h,src,iw,ih,pid}             Bild, füllt den Rahmen (zugeschnitten); pid = Foto-ID (Büroklammer im PDF)         */
 const PW = 595.28, PH = 841.89, MX = 40, CW = PW - 2 * MX, BOTTOM = 790;
+const PROJECT_URL = "https://github.com/simsum/reise-protokoll", PROJECT_LABEL = "Reise-Protokoll · github.com/simsum/reise-protokoll";
 
 class Pg {
   constructor(T) {
@@ -705,6 +708,7 @@ class Pg {
   text(x, y, text, o = {}) {
     this.ops.push({ k: "t", x, y, text: clean(text), s: o.s || 10, f: o.f || "R", c: o.c || this.T.ink, a: o.a || "l", ls: o.ls || 0 });
   }
+  link(x, y, w, h, url) { this.ops.push({ k: "link", x, y, w, h, url }); }
   icon(name, x, y, s, c, sw = 1.6) { this.ops.push({ k: "path", x, y, w: s, h: s, vw: 24, vh: 24, d: ICONS[name] || ICONS.sun, fill: null, stroke: c, sw }); }
   img(x, y, w, h, src, iw, ih, pid) { this.ops.push({ k: "img", x, y, w, h, src, iw: iw || w, ih: ih || h, pid }); }
   label(x, y, text, c, a) { this.text(x, y, String(text).toUpperCase(), { f: "B", s: 7.5, c: c || this.T.accent, ls: 1.4, a }); }
@@ -813,7 +817,7 @@ function coverPage(t, st, T, warns) {
   });
 
   /* Karte */
-  const my = sy + 64 + 18, mh = 236;
+  const my = sy + 64 + 18, mh = 220;
   if (t.mapImg) {
     pg.img(MX, my, CW, mh, t.mapImg, t.mapW, t.mapH);
     pg.rect(MX, my, CW, mh, { stroke: T.rule, sw: 0.8 });
@@ -833,7 +837,11 @@ function coverPage(t, st, T, warns) {
   const sum = wrapMax(t.summary.trim() || "–", "S", 11, CW, 6);
   sum.lines.forEach((l, k) => pg.text(MX, zy + 20 + k * 16, l, { f: "S", s: 11 }));
   if (sum.cut) warns.push("Die Zusammenfassung ist für die Deckseite zu lang und wird abgeschnitten (höchstens 6 Zeilen).");
-  if (t.travelers.trim()) pg.text(MX, 806, fitT("Reisende: " + t.travelers.trim(), "R", 8.5, CW), { s: 8.5, c: T.muted });
+  /* Reisende */
+  if (t.travelers.trim()) {
+    pg.label(MX, zy + 20 + 6 * 16 + 6, "Reisende");
+    pg.text(MX, zy + 20 + 6 * 16 + 19, fitT(t.travelers.trim(), "S", 11, CW), { f: "S", s: 11 });
+  }
   return pg;
 }
 
@@ -1089,11 +1097,13 @@ function layoutTrip(t) {
   t.days.forEach((_, i) => pages.push(...dayPages(t, i, T, warns)));
   if (t.costPage) pages.push(...costPages(t, st, T));
   const N = pages.length;
+  const created = new Date().toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
   pages.forEach((pg, n) => {
-    if (!n) return;
-    pg.line(MX, 800, PW - MX, 800, T.rule, 0.6);
-    pg.text(MX, 810, fitT(t.title.trim() || "Meine Reise", "R", 7.5, CW - 80), { s: 7.5, c: T.muted });
-    pg.text(PW - MX, 810, `Seite ${n + 1} von ${N}`, { s: 7.5, c: T.muted, a: "r" });
+    if (n) pg.line(MX, 800, PW - MX, 800, T.rule, 0.6);
+    pg.text(MX, 806, fitT((t.title.trim() || "Meine Reise") + " · erstellt am " + created, "R", 7.5, CW - 110), { s: 7.5, c: T.muted });
+    pg.text(MX, 816.5, PROJECT_LABEL, { s: 7.5, c: T.accent });
+    pg.link(MX, 815.5, tw(PROJECT_LABEL, "R", 7.5), 10, PROJECT_URL);
+    if (n) pg.text(PW - MX, 806, `Seite ${n + 1} von ${N}`, { s: 7.5, c: T.muted, a: "r" });
   });
   if (!t.days.length) warns.push("Noch keine Tage angelegt (Reiter „Tage“).");
   return { pages, warns, stats: st };
@@ -1128,6 +1138,8 @@ function pageHtml(pg) {
       h += `<div class="ab t" style="left:${X(x)};top:${Y(o.y)};font-size:${U(o.s)};color:${o.c};${FONT_CSS[o.f]};${o.ls ? "letter-spacing:" + U(o.ls) + ";" : ""}">${esc(o.text)}</div>`;
     } else if (o.k === "path") {
       h += `<svg class="ab" style="${box(o)}" viewBox="0 0 ${o.vw} ${o.vh}"><path d="${o.d}" fill="${o.fill || "none"}" stroke="${o.stroke || "none"}" stroke-width="${o.sw}"${o.fo != null ? ` fill-opacity="${o.fo}"` : ""}${o.so != null ? ` stroke-opacity="${o.so}"` : ""} stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    } else if (o.k === "link") {
+      h += `<a class="ab" href="${esc(o.url)}" target="_blank" rel="noopener" style="${box(o)}" aria-label="Projektseite"></a>`;
     } else if (o.k === "img") {
       h += `<img class="ab im" style="${box(o)}" src="${o.src}" alt="">`;
     }
@@ -1187,6 +1199,8 @@ async function buildPdf(pages, meta, attachments, onProgress) {
           page.drawText(ch, { x, y: Y(base), size: o.s, font, color: rgbOf(o.c) });
           x += font.widthOfTextAtSize(ch, o.s) + o.ls;
         }
+      } else if (o.k === "link") {
+        annots.push(ctx.register(ctx.obj({ Type: "Annot", Subtype: "Link", Rect: [o.x, Y(o.y + o.h), o.x + o.w, Y(o.y)], Border: [0, 0, 0], A: { Type: "Action", S: "URI", URI: L.PDFString.of(o.url) } })));
       } else if (o.k === "path") {
         const opt = { x: o.x, y: Y(o.y), scale: o.w / o.vw, borderLineCap: L.LineCapStyle.Round };
         if (o.fill) { opt.color = rgbOf(o.fill); if (o.fo != null) opt.opacity = o.fo; }
@@ -1230,7 +1244,7 @@ async function buildPdf(pages, meta, attachments, onProgress) {
    Die Karte wird einmal aus OpenStreetMap-Kacheln zusammengesetzt, mit der Route
    übermalt und als JPEG in der Reise gespeichert. Danach ist sie statisch.
    Gehen die Kacheln nicht (offline, gesperrt), entsteht eine Schemakarte. */
-const MAP_W = 1236, MAP_H = 566, TILE = 256;
+const MAP_W = 1236, MAP_H = 528, TILE = 256;
 const mapProj = (lat, lon, z) => {
   const n = TILE * 2 ** z, s = Math.sin(lat * Math.PI / 180);
   return { x: (lon + 180) / 360 * n, y: (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * n };

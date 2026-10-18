@@ -154,6 +154,14 @@ const [dl] = await Promise.all([page.waitForEvent("download"), page.click("#pdfB
 await dl.saveAs(join(out, "rundreise.pdf"));
 const pdf = await PDFDocument.load(readFileSync(join(out, "rundreise.pdf")));
 ok(pdf.getPageCount() === 8, `PDF hat 8 Seiten: ${pdf.getPageCount()}`);
+{
+  const { PDFName, PDFDict, PDFArray } = await import("pdf-lib");
+  const uris = [];
+  pdf.getPages().forEach((pg) => { const an = pg.node.lookupMaybe(PDFName.of("Annots"), PDFArray); if (an) for (let i = 0; i < an.size(); i++) { const d = an.lookupMaybe(i, PDFDict), act = d && d.lookupMaybe(PDFName.of("A"), PDFDict), u = act && act.get(PDFName.of("URI")); if (u && u.decodeText) uris.push(u.decodeText()); } });
+  ok(uris.length === 8 && uris.every((u) => u === "https://github.com/simsum/reise-protokoll"), `Fußzeile mit Link zur GitHub-Seite auf allen ${uris.length} Seiten`);
+  ok((await page.locator("#pages").innerText()).includes("github.com/simsum/reise-protokoll") && (await page.locator('#pages a[href="https://github.com/simsum/reise-protokoll"]').count()) === 8, "Link auch in der Vorschau");
+  ok((await page.locator("#pages .sheet").first().innerText()).includes("Familie Mustermann"), "Reisende auf der Deckseite");
+}
 await page.evaluate(() => { $("#toast").hidden = true; });
 await page.click('[data-tab="days"]');
 await page.click("details.day summary");

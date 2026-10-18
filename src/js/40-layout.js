@@ -8,8 +8,10 @@
      line  {x1,y1,x2,y2,c,sw}                  Linie
      t     {x,y,text,s,f,c,a,ls}               Text; y = Oberkante, a = l|c|r, ls = Buchstabenabstand
      path  {x,y,w,h,vw,vh,d,fill,stroke,sw}    SVG-Pfad im Raster vw×vh (Symbole)
+     link  {x,y,w,h,url}                       klickbarer Bereich (nur feste, im Code stehende Adressen)
      img   {x,y,w,h,src,iw,ih,pid}             Bild, füllt den Rahmen (zugeschnitten); pid = Foto-ID (Büroklammer im PDF)         */
 const PW = 595.28, PH = 841.89, MX = 40, CW = PW - 2 * MX, BOTTOM = 790;
+const PROJECT_URL = "https://github.com/simsum/reise-protokoll", PROJECT_LABEL = "Reise-Protokoll · github.com/simsum/reise-protokoll";
 
 class Pg {
   constructor(T) {
@@ -21,6 +23,7 @@ class Pg {
   text(x, y, text, o = {}) {
     this.ops.push({ k: "t", x, y, text: clean(text), s: o.s || 10, f: o.f || "R", c: o.c || this.T.ink, a: o.a || "l", ls: o.ls || 0 });
   }
+  link(x, y, w, h, url) { this.ops.push({ k: "link", x, y, w, h, url }); }
   icon(name, x, y, s, c, sw = 1.6) { this.ops.push({ k: "path", x, y, w: s, h: s, vw: 24, vh: 24, d: ICONS[name] || ICONS.sun, fill: null, stroke: c, sw }); }
   img(x, y, w, h, src, iw, ih, pid) { this.ops.push({ k: "img", x, y, w, h, src, iw: iw || w, ih: ih || h, pid }); }
   label(x, y, text, c, a) { this.text(x, y, String(text).toUpperCase(), { f: "B", s: 7.5, c: c || this.T.accent, ls: 1.4, a }); }
@@ -129,7 +132,7 @@ function coverPage(t, st, T, warns) {
   });
 
   /* Karte */
-  const my = sy + 64 + 18, mh = 236;
+  const my = sy + 64 + 18, mh = 220;
   if (t.mapImg) {
     pg.img(MX, my, CW, mh, t.mapImg, t.mapW, t.mapH);
     pg.rect(MX, my, CW, mh, { stroke: T.rule, sw: 0.8 });
@@ -149,7 +152,11 @@ function coverPage(t, st, T, warns) {
   const sum = wrapMax(t.summary.trim() || "–", "S", 11, CW, 6);
   sum.lines.forEach((l, k) => pg.text(MX, zy + 20 + k * 16, l, { f: "S", s: 11 }));
   if (sum.cut) warns.push("Die Zusammenfassung ist für die Deckseite zu lang und wird abgeschnitten (höchstens 6 Zeilen).");
-  if (t.travelers.trim()) pg.text(MX, 806, fitT("Reisende: " + t.travelers.trim(), "R", 8.5, CW), { s: 8.5, c: T.muted });
+  /* Reisende */
+  if (t.travelers.trim()) {
+    pg.label(MX, zy + 20 + 6 * 16 + 6, "Reisende");
+    pg.text(MX, zy + 20 + 6 * 16 + 19, fitT(t.travelers.trim(), "S", 11, CW), { f: "S", s: 11 });
+  }
   return pg;
 }
 
@@ -405,11 +412,13 @@ function layoutTrip(t) {
   t.days.forEach((_, i) => pages.push(...dayPages(t, i, T, warns)));
   if (t.costPage) pages.push(...costPages(t, st, T));
   const N = pages.length;
+  const created = new Date().toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
   pages.forEach((pg, n) => {
-    if (!n) return;
-    pg.line(MX, 800, PW - MX, 800, T.rule, 0.6);
-    pg.text(MX, 810, fitT(t.title.trim() || "Meine Reise", "R", 7.5, CW - 80), { s: 7.5, c: T.muted });
-    pg.text(PW - MX, 810, `Seite ${n + 1} von ${N}`, { s: 7.5, c: T.muted, a: "r" });
+    if (n) pg.line(MX, 800, PW - MX, 800, T.rule, 0.6);
+    pg.text(MX, 806, fitT((t.title.trim() || "Meine Reise") + " · erstellt am " + created, "R", 7.5, CW - 110), { s: 7.5, c: T.muted });
+    pg.text(MX, 816.5, PROJECT_LABEL, { s: 7.5, c: T.accent });
+    pg.link(MX, 815.5, tw(PROJECT_LABEL, "R", 7.5), 10, PROJECT_URL);
+    if (n) pg.text(PW - MX, 806, `Seite ${n + 1} von ${N}`, { s: 7.5, c: T.muted, a: "r" });
   });
   if (!t.days.length) warns.push("Noch keine Tage angelegt (Reiter „Tage“).");
   return { pages, warns, stats: st };

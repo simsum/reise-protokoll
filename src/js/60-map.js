@@ -2,7 +2,7 @@
    Die Karte wird einmal aus OpenStreetMap-Kacheln zusammengesetzt, mit der Route
    übermalt und als JPEG in der Reise gespeichert. Danach ist sie statisch.
    Gehen die Kacheln nicht (offline, gesperrt), entsteht eine Schemakarte. */
-const MAP_W = 1236, MAP_H = 566, TILE = 256;
+const MAP_W = 1236, MAP_H = 528, TILE = 256;
 const mapProj = (lat, lon, z) => {
   const n = TILE * 2 ** z, s = Math.sin(lat * Math.PI / 180);
   return { x: (lon + 180) / 360 * n, y: (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * n };

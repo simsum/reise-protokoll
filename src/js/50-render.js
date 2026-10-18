@@ -26,6 +26,8 @@ function pageHtml(pg) {
       h += `<div class="ab t" style="left:${X(x)};top:${Y(o.y)};font-size:${U(o.s)};color:${o.c};${FONT_CSS[o.f]};${o.ls ? "letter-spacing:" + U(o.ls) + ";" : ""}">${esc(o.text)}</div>`;
     } else if (o.k === "path") {
       h += `<svg class="ab" style="${box(o)}" viewBox="0 0 ${o.vw} ${o.vh}"><path d="${o.d}" fill="${o.fill || "none"}" stroke="${o.stroke || "none"}" stroke-width="${o.sw}"${o.fo != null ? ` fill-opacity="${o.fo}"` : ""}${o.so != null ? ` stroke-opacity="${o.so}"` : ""} stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    } else if (o.k === "link") {
+      h += `<a class="ab" href="${esc(o.url)}" target="_blank" rel="noopener" style="${box(o)}" aria-label="Projektseite"></a>`;
     } else if (o.k === "img") {
       h += `<img class="ab im" style="${box(o)}" src="${o.src}" alt="">`;
     }
@@ -85,6 +87,8 @@ async function buildPdf(pages, meta, attachments, onProgress) {
           page.drawText(ch, { x, y: Y(base), size: o.s, font, color: rgbOf(o.c) });
           x += font.widthOfTextAtSize(ch, o.s) + o.ls;
         }
+      } else if (o.k === "link") {
+        annots.push(ctx.register(ctx.obj({ Type: "Annot", Subtype: "Link", Rect: [o.x, Y(o.y + o.h), o.x + o.w, Y(o.y)], Border: [0, 0, 0], A: { Type: "Action", S: "URI", URI: L.PDFString.of(o.url) } })));
       } else if (o.k === "path") {
         const opt = { x: o.x, y: Y(o.y), scale: o.w / o.vw, borderLineCap: L.LineCapStyle.Round };
         if (o.fill) { opt.color = rgbOf(o.fill); if (o.fo != null) opt.opacity = o.fo; }
