@@ -63,7 +63,8 @@ Aufbau und Regeln stehen in [CLAUDE.md](CLAUDE.md).
 
 ## Ideen für später
 
-- Weitere Vorlagen (Städtereise mit Tagesplan, Wanderung, Strandurlaub)
-- Wetter automatisch zum Tag und Ort abrufen (Open-Meteo)
+- **Tipps fürs nächste Mal**: Abschnitt für Erkenntnisse (je Tag und/oder als eigene Seite am Ende)
+- **Camper**: statt „Unterkunft“ ein Stellplatz mit Wasser, Entsorgung und Strom
+- Weitere Vorlagen (Städtereise, Wanderung, Strandurlaub)
 - Eigene Schriften im PDF, Seitenformate (A5, Querformat)
-- Fotos mit Bildunterschrift, Kartenausschnitt pro Tag
+- Kartenausschnitt pro Tag
