@@ -1,0 +1,1679 @@
+<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Reise-Protokoll</title></head><body><style>
+:root { color-scheme: light; --ui: #1f6f8b; --ui-d: #175a72; --bg: #f3f5f7; --card: #fff; --line: #dde3e8; --txt: #1d2a33; --mut: #6b7a86; --warn: #b45309; }
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--txt); background: var(--bg); }
+[hidden] { display: none !important; }
+#app { height: 100vh; display: flex; flex-direction: column; }
+.grow { flex: 1; }
+
+/* Kopfleiste */
+.top { display: flex; align-items: center; gap: 8px; padding: 8px 14px; background: var(--card); border-bottom: 1px solid var(--line); }
+.brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; color: var(--ui); }
+.ver { font-weight: 400; font-size: 12px; color: var(--mut); }
+button, select, input, textarea { font: inherit; color: inherit; }
+button { border: 1px solid var(--line); background: var(--card); padding: 6px 12px; border-radius: 8px; cursor: pointer; }
+button:hover { border-color: var(--ui); }
+button.primary { background: var(--ui); border-color: var(--ui); color: #fff; font-weight: 600; }
+button.primary:hover { background: var(--ui-d); }
+button:disabled { opacity: .55; cursor: wait; }
+button.ghost { border-color: transparent; background: transparent; color: var(--ui); padding: 4px 8px; }
+button.ico { padding: 2px 8px; line-height: 1.2; }
+select { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; background: var(--card); }
+
+main { flex: 1; display: flex; min-height: 0; }
+
+/* Seitenleiste */
+#side { width: 440px; flex: none; display: flex; flex-direction: column; background: var(--card); border-right: 1px solid var(--line); }
+.tabs { display: flex; border-bottom: 1px solid var(--line); }
+.tabs button { flex: 1; border: 0; border-radius: 0; padding: 10px 6px; background: none; color: var(--mut); border-bottom: 2px solid transparent; }
+.tabs button.on { color: var(--ui); border-bottom-color: var(--ui); font-weight: 600; }
+#panel { flex: 1; overflow: auto; padding: 14px; }
+#panel h3 { margin: 18px 0 8px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--mut); }
+#panel h3:first-child { margin-top: 0; }
+
+.f { display: block; margin: 0 0 10px; }
+.f > span { display: block; font-size: 12px; color: var(--mut); margin-bottom: 3px; }
+.f input, .f textarea, .f select { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; background: #fff; }
+.f textarea { resize: vertical; }
+.f input:focus, .f textarea:focus, .f select:focus { outline: 2px solid color-mix(in srgb, var(--ui) 35%, transparent); border-color: var(--ui); }
+.row { display: flex; gap: 6px; align-items: center; }
+.row > * { min-width: 0; }
+.row.two > .f { flex: 1; }
+.wx { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 6px; }
+.chk { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
+small { color: var(--mut); font-size: 12px; }
+.geo.ok { color: #2f6b4f; }
+.res { display: grid; gap: 2px; margin-top: 4px; }
+.res button { text-align: left; font-size: 12px; padding: 5px 8px; }
+
+.tpls { display: grid; gap: 8px; }
+.tpl { text-align: left; padding: 10px 12px; border-radius: 10px; }
+.tpl b { display: block; }
+.tpl small { display: block; }
+.tpl.on { border-color: var(--ui); box-shadow: 0 0 0 2px color-mix(in srgb, var(--ui) 25%, transparent); }
+.themes { display: flex; gap: 8px; flex-wrap: wrap; }
+.theme { display: flex; align-items: center; gap: 6px; padding: 4px 10px 4px 5px; border-radius: 999px; }
+.theme i { width: 18px; height: 18px; border-radius: 50%; display: inline-block; }
+.theme.on { border-color: var(--ui); box-shadow: 0 0 0 2px color-mix(in srgb, var(--ui) 25%, transparent); }
+
+/* Tage */
+details.day { border: 1px solid var(--line); border-radius: 10px; margin: 0 0 8px; background: #fff; }
+details.day > summary { cursor: pointer; padding: 9px 12px; font-weight: 600; list-style: none; display: flex; gap: 8px; align-items: center; }
+details.day > summary::before { content: "▸"; color: var(--mut); }
+details.day[open] > summary::before { content: "▾"; }
+details.day .body { padding: 4px 12px 10px; border-top: 1px solid var(--line); padding-top: 12px; }
+.dsum { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dsum small { font-weight: 400; margin-left: 4px; }
+.cost { display: grid; grid-template-columns: 1fr 108px 70px 28px; gap: 4px; margin-bottom: 4px; }
+.cost input, .cost select { width: 100%; border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; min-width: 0; }
+.thumbs { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
+.thumb { position: relative; width: 62px; height: 62px; border-radius: 6px; overflow: hidden; border: 1px solid var(--line); }
+.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.thumb button { position: absolute; top: 1px; right: 1px; padding: 0 5px; line-height: 1.2; border-radius: 4px; background: rgba(255,255,255,.9); }
+.drop { display: block; border: 2px dashed var(--line); border-radius: 10px; padding: 12px; text-align: center; color: var(--mut); cursor: pointer; margin-bottom: 10px; }
+.drop.over, .drop:hover { border-color: var(--ui); color: var(--ui); }
+.btnrow { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 10px; }
+
+/* Karte */
+.pt { display: grid; grid-template-columns: 22px 1fr auto; gap: 6px; align-items: start; margin-bottom: 6px; }
+.pt .n { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--ui); color: #fff; font-size: 12px; margin-top: 4px; }
+.pt .f { margin: 0; }
+.mapimg { width: 100%; border-radius: 8px; border: 1px solid var(--line); display: block; margin-top: 8px; }
+.note { background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412; border-radius: 8px; padding: 6px 10px; margin: 8px 0; font-size: 12px; }
+.stat { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--line); }
+
+/* Vorschau */
+#view { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.viewbar { display: flex; align-items: center; gap: 14px; padding: 8px 16px; font-size: 13px; color: var(--mut); border-bottom: 1px solid var(--line); background: var(--card); }
+#warn { color: var(--warn); }
+#pages { flex: 1; overflow: auto; padding: 22px 16px; display: flex; flex-direction: column; align-items: center; gap: 22px; }
+.sheet { position: relative; width: calc(min(720px, 100%) * var(--z, 1)); flex: none; background: #fff; box-shadow: 0 2px 14px rgba(0,0,0,.18); container-type: inline-size; overflow: hidden; }
+.ab { position: absolute; }
+.t { line-height: 1; white-space: pre; }
+.im { object-fit: cover; display: block; }
+svg.ab { overflow: visible; }
+
+#toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: #1d2a33; color: #fff; padding: 10px 16px; border-radius: 10px; box-shadow: 0 6px 20px rgba(0,0,0,.25); z-index: 10; max-width: 80vw; }
+
+@media (max-width: 900px) {
+  main { flex-direction: column; }
+  #side { width: auto; max-height: 55vh; border-right: 0; border-bottom: 1px solid var(--line); }
+}
+</style>
+
+<div id="app">
+  <header class="top">
+    <div class="brand"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s6.5-5.7 6.5-11a6.5 6.5 0 1 0-13 0C5.5 15.3 12 21 12 21z"/><circle cx="12" cy="10" r="2.4"/></svg> Reise-Protokoll <span class="ver">v0.2.0</span></div>
+    <div class="grow"></div>
+    <select id="demo" title="Beispielreise laden">
+      <option value="">Beispiel laden …</option>
+      <option value="rundreise">Beispiel Rundreise</option>
+      <option value="kurztrip">Beispiel Kurztrip</option>
+    </select>
+    <button data-act="new">Neu</button>
+    <button data-act="open">Öffnen</button>
+    <button data-act="save">Speichern</button>
+    <button class="primary" data-act="pdf" id="pdfBtn">PDF erstellen</button>
+    <input type="file" id="openFile" accept=".json,application/json" hidden>
+  </header>
+  <main>
+    <aside id="side">
+      <nav class="tabs" id="tabs">
+        <button data-tab="trip">Reise</button>
+        <button data-tab="days">Tage</button>
+        <button data-tab="map">Karte</button>
+        <button data-tab="sum">Zusammenfassung</button>
+      </nav>
+      <div id="panel"></div>
+    </aside>
+    <section id="view">
+      <div class="viewbar">
+        <span id="pageCount"></span>
+        <span id="warn"></span>
+        <div class="grow"></div>
+        <label>Zoom <select id="zoom"><option value="55">55 %</option><option value="75">75 %</option><option value="100" selected>100 %</option><option value="130">130 %</option></select></label>
+      </div>
+      <div id="pages"></div>
+    </section>
+  </main>
+</div>
+<div id="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/full.umd.js"></script>
+<script>
+/* ===== 00-util.js ===== */
+"use strict";
+
+/* ---------- Kleine Helfer ---------- */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const uid = () => Math.random().toString(36).slice(2, 9);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+
+/* ---------- Datum (immer als ISO-Text JJJJ-MM-TT, Rechnen in UTC) ---------- */
+const parseIso = (s) => (/^\d{4}-\d{2}-\d{2}$/.test(s || "") ? new Date(s + "T12:00:00Z") : null);
+const isoOf = (d) => d.toISOString().slice(0, 10);
+const addDays = (iso, n) => isoOf(new Date(parseIso(iso).getTime() + n * 864e5));
+const diffDays = (a, b) => Math.round((parseIso(b) - parseIso(a)) / 864e5);
+function fmtDate(iso, opt) {
+  const d = parseIso(iso);
+  return d ? d.toLocaleDateString("de-DE", { timeZone: "UTC", ...opt }) : "";
+}
+const fmtLong = (iso) => fmtDate(iso, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+function fmtRange(a, b) {
+  if (!parseIso(a)) return "";
+  if (!parseIso(b) || a === b) return fmtDate(a, { day: "numeric", month: "long", year: "numeric" });
+  const x = parseIso(a), y = parseIso(b);
+  if (x.getUTCFullYear() !== y.getUTCFullYear()) return fmtDate(a, { day: "numeric", month: "long", year: "numeric" }) + " – " + fmtDate(b, { day: "numeric", month: "long", year: "numeric" });
+  if (x.getUTCMonth() !== y.getUTCMonth()) return fmtDate(a, { day: "numeric", month: "long" }) + " – " + fmtDate(b, { day: "numeric", month: "long", year: "numeric" });
+  return x.getUTCDate() + ". – " + fmtDate(b, { day: "numeric", month: "long", year: "numeric" });
+}
+
+/* ---------- Zahlen ---------- */
+function parseNum(v) {
+  let s = String(v ?? "").trim().replace(/\s/g, "");
+  if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
+  const n = parseFloat(s);
+  return Number.isFinite(n) ? n : 0;
+}
+const hasNum = (v) => String(v ?? "").trim() !== "" && Number.isFinite(parseFloat(String(v).replace(",", ".")));
+const fmtNum = (n, d = 0) => n.toLocaleString("de-DE", { minimumFractionDigits: d, maximumFractionDigits: d });
+const money = (n, cur) => fmtNum(n, Math.abs(n - Math.round(n)) > 0.004 ? 2 : 0) + " " + (cur || "EUR").replace("EUR", "€");
+const listDe = (a) => (a.length < 2 ? a.join("") : a.slice(0, -1).join(", ") + " und " + a[a.length - 1]);
+
+/* ---------- Geo ---------- */
+function haversine(a, b) {
+  const R = 6371, r = Math.PI / 180;
+  const dLat = (b.lat - a.lat) * r, dLon = (b.lon - a.lon) * r;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+const hasGeo = (p) => p && Number.isFinite(p.lat) && Number.isFinite(p.lon);
+
+/* ---------- Farben ---------- */
+const hexRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+function mix(a, b, t) {
+  const x = hexRgb(a), y = hexRgb(b);
+  return "#" + x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, "0")).join("");
+}
+
+/* ---------- Benachrichtigung ---------- */
+let toastTimer;
+function toast(msg, ms = 3500) {
+  const el = $("#toast");
+  if (!el) return;
+  el.textContent = msg; el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (el.hidden = true), ms);
+}
+
+/* ---------- Dateien ---------- */
+function download(blob, name) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+const safeName = (s) => (String(s || "Reise").replace(/[\\/:*?"<>|]+/g, " ").trim() || "Reise").slice(0, 80);
+
+/* ===== 10-model.js ===== */
+/* ---------- Datenmodell ----------
+   Eine Reise (`trip`) besteht aus Einstellungen, Tagen, Route und Karte.
+   Alles ist einfaches JSON und wird als Projektdatei gespeichert. */
+
+const CATS = [
+  { id: "unterkunft", name: "Unterkunft" },
+  { id: "essen", name: "Essen & Trinken" },
+  { id: "transport", name: "Transport" },
+  { id: "aktivitaeten", name: "Aktivitäten" },
+  { id: "sonstiges", name: "Sonstiges" },
+];
+const WEATHER = [
+  { id: "sun", name: "Sonnig" }, { id: "partly", name: "Heiter" }, { id: "cloud", name: "Bewölkt" },
+  { id: "rain", name: "Regen" }, { id: "storm", name: "Gewitter" }, { id: "snow", name: "Schnee" }, { id: "fog", name: "Nebel" },
+];
+const weatherName = (id) => (WEATHER.find((w) => w.id === id) || {}).name || "";
+
+const blankPlace = () => ({ name: "", lat: null, lon: null });
+
+function newDay(date = "") {
+  return {
+    id: uid(), date, place: blankPlace(), from: "", km: "", drive: "", title: "", lodging: "",
+    weather: "", tmin: "", tmax: "", text: "", plan: "",
+    highlights: "", costs: [], photos: [],
+  };
+}
+
+function newTrip(template = "rundreise") {
+  return {
+    format: 1, template, theme: "meer", title: "", subtitle: "", travelers: "", currency: "EUR", start: "",
+    startPlace: blankPlace(), destination: blankPlace(), roundTrip: false,
+    days: [], summary: "", summaryAuto: true,
+    route: { auto: true, road: true, points: [], km: null, legs: [], mapSig: "" },
+    mapImg: "", mapUser: false, coverPhoto: "", ruled: true, costPage: true,
+  };
+}
+
+/* Fehlende Felder ergänzen (beim Laden älterer oder fremder Dateien). */
+function normalizeTrip(t) {
+  const base = newTrip(TEMPLATES[t && t.template] ? t.template : "rundreise");
+  const out = { ...base, ...t };
+  out.startPlace = { ...blankPlace(), ...(t.startPlace || {}) };
+  out.destination = { ...blankPlace(), ...(t.destination || {}) };
+  out.route = { ...base.route, ...(t.route || {}) };
+  if (!THEMES[out.theme]) out.theme = "meer";
+  out.days = (Array.isArray(t.days) ? t.days : []).map((d) => ({
+    ...newDay(), ...d, place: { ...blankPlace(), ...(d.place || {}) },
+    costs: Array.isArray(d.costs) ? d.costs.map((c) => ({ id: uid(), l: "", cat: "sonstiges", a: "", ...c })) : [],
+    photos: Array.isArray(d.photos) ? d.photos : [],
+  }));
+  return out;
+}
+
+/* ---------- Ableitungen ---------- */
+const dayCosts = (d) => d.costs.reduce((s, c) => s + parseNum(c.a), 0);
+const dayHighlights = (d) => String(d.highlights || "").split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+
+function dayFrom(t, i) {
+  const d = t.days[i];
+  if (d.from.trim()) return d.from.trim();
+  if (i > 0) return t.days[i - 1].place.name || "";
+  return t.startPlace.name || "";
+}
+const dayPlaceName = (t, d) => (TEMPLATES[t.template].fixedPlace ? t.destination.name || d.place.name : d.place.name);
+
+function tripStats(t) {
+  const days = t.days, n = days.length;
+  const dated = days.map((d) => d.date).filter((x) => parseIso(x)).sort();
+  const start = dated[0] || t.start || "", end = dated[dated.length - 1] || "";
+  const places = [], seen = new Set();
+  const addP = (name) => {
+    name = (name || "").trim();
+    if (name && !seen.has(name.toLowerCase())) { seen.add(name.toLowerCase()); places.push(name); }
+  };
+  if (TEMPLATES[t.template].fixedPlace) addP(t.destination.name);
+  else days.forEach((d) => addP(d.place.name));
+  let km = days.reduce((s, d) => s + parseNum(d.km), 0), kmEst = false;
+  if (!km && t.route.km) km = t.route.km;
+  if (!km) {
+    const pts = t.route.points.filter(hasGeo);
+    for (let i = 1; i < pts.length; i++) km += haversine(pts[i - 1], pts[i]) * 1.25;
+    kmEst = km > 0;
+  }
+  const byCat = {}; let cost = 0;
+  days.forEach((d) => d.costs.forEach((c) => { const a = parseNum(c.a); cost += a; byCat[c.cat] = (byCat[c.cat] || 0) + a; }));
+  const temps = days.filter((d) => hasNum(d.tmin) || hasNum(d.tmax)).map((d) => (hasNum(d.tmin) && hasNum(d.tmax) ? (parseNum(d.tmin) + parseNum(d.tmax)) / 2 : parseNum(hasNum(d.tmin) ? d.tmin : d.tmax)));
+  return {
+    nDays: n, nights: Math.max(0, n - 1), start, end, range: fmtRange(start, end), places, km: Math.round(km), kmEst,
+    cost, byCat, perDay: n ? cost / n : 0, photos: days.reduce((s, d) => s + d.photos.length, 0),
+    avgT: temps.length ? temps.reduce((a, b) => a + b, 0) / temps.length : null,
+    sunDays: days.filter((d) => d.weather === "sun" || d.weather === "partly").length,
+  };
+}
+
+/* ---------- Route aus Tagen und Fotos ---------- */
+function routeFromDays(t) {
+  const pts = [];
+  const push = (p, force, day = -1) => {
+    if (!p || !p.name) return;
+    const last = pts[pts.length - 1];
+    if (!force && last && (last.name === p.name || (hasGeo(last) && hasGeo(p) && haversine(last, p) < 1))) return;
+    pts.push({ id: uid(), name: p.name, lat: hasGeo(p) ? p.lat : null, lon: hasGeo(p) ? p.lon : null, day });
+  };
+  push(t.startPlace);
+  if (TEMPLATES[t.template].fixedPlace) push(t.destination);
+  else {
+    for (const [di, d] of t.days.entries()) {
+      let p = d.place;
+      if (p.name && !hasGeo(p)) {
+        const g = d.photos.find((x) => x.gps);
+        if (g) p = { name: p.name, lat: g.gps.lat, lon: g.gps.lon };
+      }
+      push(p, false, di);
+    }
+  }
+  if (t.roundTrip && t.startPlace.name) push(t.startPlace, pts.length > 1 && pts[pts.length - 1].name !== t.startPlace.name);
+  return pts;
+}
+
+function rebuildRoute(t) {
+  if (t.route.auto) t.route.points = routeFromDays(t);
+}
+
+/* ---------- Zusammenfassung vorschlagen ---------- */
+function suggestSummary(t) {
+  const st = tripStats(t), out = [];
+  const days = `${st.nDays} ${st.nDays === 1 ? "Tag" : "Tage"}`;
+  if (!st.nDays) return "";
+  if (TEMPLATES[t.template].fixedPlace) {
+    const dest = t.destination.name || st.places[0] || "unser Ziel";
+    out.push(`${st.nDays > 1 ? "Kurztrip" : "Ausflug"} nach ${dest}: ${days}${st.range ? " (" + st.range + ")" : ""}.`);
+  } else {
+    const start = t.startPlace.name || "", seq = [...new Set([start, ...st.places].filter(Boolean))];
+    let route = "";
+    const back = t.roundTrip && start ? " und zurück nach " + start : "";
+    if (seq.length >= 3) route = ` von ${seq[0]} über ${listDe(seq.slice(1, back ? undefined : -1))}${back ? "" : " nach " + seq[seq.length - 1]}${back}`;
+    else if (seq.length === 2) route = ` von ${seq[0]} nach ${seq[1]}${back}`;
+    else if (seq.length === 1) route = ` in ${seq[0]}`;
+    out.push(`Rundreise${route}: ${days}${st.range ? " (" + st.range + ")" : ""}.`);
+    const bits = [];
+    if (st.places.length) bits.push(`${st.places.length} ${st.places.length === 1 ? "Station" : "Stationen"}`);
+    if (st.km) bits.push(`${st.kmEst ? "etwa " : ""}${fmtNum(st.km)} km`);
+    if (bits.length) out.push("Unterwegs: " + bits.join(", ") + ".");
+  }
+  const hl = t.days.flatMap(dayHighlights).slice(0, 4);
+  if (hl.length) out.push("Highlights: " + listDe(hl) + ".");
+  if (st.cost > 0) out.push(`Gesamtkosten ${money(st.cost, t.currency)}, durchschnittlich ${money(st.perDay, t.currency)} pro Tag.`);
+  if (st.avgT != null) out.push(`Wetter: durchschnittlich ${fmtNum(st.avgT)} °C${st.sunDays ? ", an " + st.sunDays + " von " + st.nDays + " Tagen sonnig bis heiter" : ""}.`);
+  if (st.photos) out.push(`${st.photos} Fotos.`);
+  return out.join(" ");
+}
+
+function refreshDerived(t) {
+  rebuildRoute(t);
+  if (t.summaryAuto) t.summary = suggestSummary(t);
+}
+
+/* ---------- Beispielreisen ---------- */
+function demoTrip(kind) {
+  const P = (name, lat, lon) => ({ name, lat, lon });
+  const C = (l, cat, a) => ({ id: uid(), l, cat, a: String(a) });
+  if (kind === "kurztrip") {
+    const t = newTrip("kurztrip");
+    Object.assign(t, {
+      title: "Wochenende in Lissabon", subtitle: "Drei Tage Altstadt, Tram und Pastel de Nata", theme: "herbst", travelers: "Anna & Ben",
+      start: "2026-06-12", startPlace: P("Berlin", 52.52, 13.405), destination: P("Lissabon", 38.7223, -9.1393), roundTrip: true,
+    });
+    const mk = (i, o) => Object.assign(newDay(addDays("2026-06-12", i)), { place: P("Lissabon", 38.7223, -9.1393) }, o);
+    t.days = [
+      mk(0, { title: "Ankunft und Alfama", weather: "sun", tmin: "19", tmax: "27", lodging: "Hotel Bairro Alto", plan: "07:10 Flug ab Berlin\n10:15 Landung, mit der Metro in die Stadt\n13:00 Check-in im Hotel, Mittagessen\n15:00 Zu Fuß durch die Alfama\n17:30 Aussicht vom Miradouro das Portas do Sol\n20:30 Fado-Abend mit Sardinen vom Grill", text: "Der Fado ging unter die Haut. Nächstes Mal früher reservieren.", highlights: "Miradouro das Portas do Sol\nFado in der Alfama", costs: [C("Flug", "transport", 228), C("Metro", "transport", 9), C("Abendessen", "essen", 64)] }),
+      mk(1, { title: "Belém und Tram 28", weather: "partly", tmin: "20", tmax: "25", lodging: "Hotel Bairro Alto", plan: "09:00 Tram 15 nach Belém\n10:00 Torre de Belém und Hieronymus-Kloster\n12:00 Pastéis de Belém, natürlich\n14:30 Tram 28 durch enge Gassen\n19:30 Sonnenuntergang am Tejo\n21:00 Tapas im Bairro Alto", text: "Vor den Pastéis steht man 20 Minuten an, es lohnt sich.", highlights: "Pastéis de Belém\nTram 28\nSonnenuntergang am Tejo", costs: [C("Eintritte", "aktivitaeten", 36), C("Mittagessen", "essen", 28), C("Abendessen", "essen", 52)] }),
+      mk(2, { title: "Sintra und Heimflug", weather: "rain", tmin: "17", tmax: "21", lodging: "", plan: "08:30 Zug nach Sintra\n10:30 Palácio da Pena, im Nebel trotzdem schön\n14:00 Zurück nach Lissabon, Koffer holen\n17:00 Flughafen\n23:00 Landung in Berlin", text: "", highlights: "Palácio da Pena", costs: [C("Zug Sintra", "transport", 11), C("Eintritt Pena", "aktivitaeten", 28), C("Snacks", "essen", 18)] }),
+    ];
+    refreshDerived(t);
+    return t;
+  }
+  const t = newTrip("rundreise");
+  Object.assign(t, {
+    title: "Alpenrundreise 2026", subtitle: "Von München über Salzburg und das Salzkammergut nach Wien und zurück", theme: "meer", travelers: "Familie Mustermann",
+    currency: "EUR", start: "2026-05-14", startPlace: P("München", 48.1351, 11.582), roundTrip: true,
+  });
+  const mk = (i, o) => Object.assign(newDay(addDays("2026-05-14", i)), o);
+  t.days = [
+    mk(0, { place: P("Salzburg", 47.8095, 13.055), title: "Auf nach Österreich", km: "145", drive: "1:45", weather: "sun", tmin: "11", tmax: "21", lodging: "Altstadthotel Salzburg", text: "Abfahrt um 8 Uhr, kaum Verkehr auf der A8. Nach dem Check-in zu Fuß durch die Altstadt, Festung Hohensalzburg mit der Standseilbahn.\nAbends Mozartkugeln und Nockerl im Sternbräu.", highlights: "Festung Hohensalzburg\nSalzburger Nockerl", costs: [C("Maut Vignette", "transport", 12.8), C("Hotel", "unterkunft", 138), C("Abendessen", "essen", 71.5)] }),
+    mk(1, { place: P("Hallstatt", 47.5622, 13.6493), title: "Salzkammergut", from: "Salzburg", km: "75", drive: "1:15", weather: "partly", tmin: "9", tmax: "18", lodging: "Pension am See", text: "Über den Wolfgangsee nach Hallstatt. Am Vormittag war es noch ruhig im Ort, ab Mittag kamen die Reisebusse. Rundgang, dann mit der Seilbahn zum Skywalk.", highlights: "Skywalk Hallstatt\nFrühstück am Wolfgangsee", costs: [C("Parkplatz", "transport", 15), C("Seilbahn", "aktivitaeten", 62), C("Pension", "unterkunft", 124), C("Essen", "essen", 58)] }),
+    mk(2, { place: P("Wien", 48.2082, 16.3738), title: "Donau und Wachau", km: "290", drive: "3:30", weather: "cloud", tmin: "10", tmax: "16", lodging: "Apartment Neubau", text: "Entlang der Donau durch die Wachau, Stopp in Melk. Am Nachmittag in Wien angekommen, Spaziergang durch den Prater.", highlights: "Stift Melk\nRiesenrad im Prater", costs: [C("Stift Melk", "aktivitaeten", 38), C("Apartment (2 Nächte)", "unterkunft", 260), C("Essen", "essen", 64)] }),
+    mk(3, { place: P("Wien", 48.2082, 16.3738), title: "Wien zu Fuß", km: "", weather: "rain", tmin: "8", tmax: "13", lodging: "Apartment Neubau", text: "Regentag: Kunsthistorisches Museum, Kaffee im Café Central, am Abend Wiener Schnitzel.", highlights: "Kunsthistorisches Museum\nCafé Central", costs: [C("Museum", "aktivitaeten", 44), C("Café", "essen", 32), C("Abendessen", "essen", 88)] }),
+    mk(4, { place: P("München", 48.1351, 11.582), title: "Heimfahrt", from: "Wien", km: "435", drive: "4:15", weather: "sun", tmin: "10", tmax: "22", lodging: "", text: "Früh los, Mittagspause in Linz. Am späten Nachmittag wieder zu Hause.", highlights: "Linzer Torte", costs: [C("Diesel", "transport", 92), C("Mittagessen", "essen", 46)] }),
+  ];
+  refreshDerived(t);
+  return t;
+}
+
+/* ===== 20-themes.js ===== */
+/* ---------- Farbschemata für die PDF-Vorlagen ----------
+   Neues Schema = ein Eintrag mehr. Alle Farben als #RRGGBB. */
+const THEMES = {
+  meer:   { name: "Meer",   paper: "#FFFFFF", ink: "#1D2A33", muted: "#6B7A86", accent: "#1F6F8B", accent2: "#E0A458", soft: "#EEF4F7", rule: "#D5DFE5", onAccent: "#FFFFFF" },
+  herbst: { name: "Herbst", paper: "#FFFBF5", ink: "#2E2420", muted: "#85746A", accent: "#B5482A", accent2: "#D9A441", soft: "#F8EFE6", rule: "#E6D7C8", onAccent: "#FFFFFF" },
+  wald:   { name: "Wald",   paper: "#FFFFFF", ink: "#1F2A24", muted: "#6A7A70", accent: "#2F6B4F", accent2: "#C9A227", soft: "#EDF3EE", rule: "#D3DFD6", onAccent: "#FFFFFF" },
+  nacht:  { name: "Nacht",  paper: "#FFFFFF", ink: "#1B1D2B", muted: "#6D7080", accent: "#2B2F57", accent2: "#E4572E", soft: "#EFEFF5", rule: "#D8D9E4", onAccent: "#FFFFFF" },
+  mono:   { name: "Mono",   paper: "#FFFFFF", ink: "#1A1A1A", muted: "#777777", accent: "#222222", accent2: "#999999", soft: "#F2F2F2", rule: "#D9D9D9", onAccent: "#FFFFFF" },
+};
+
+/* Symbole im 24×24-Raster, nur Linien (gleiche Pfade in Vorschau und PDF). */
+const CLOUD = "M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 10.5a3.8 3.8 0 0 1-.5 7.5z";
+const ICONS = {
+  sun: "M12 7.5a4.5 4.5 0 1 0 0 9a4.5 4.5 0 1 0 0-9z M12 1.5v3 M12 19.5v3 M1.5 12h3 M19.5 12h3 M4.6 4.6l2.1 2.1 M17.3 17.3l2.1 2.1 M4.6 19.4l2.1-2.1 M17.3 6.7l2.1-2.1",
+  partly: "M8 3v1.6 M2.2 5.4l1.2 1.1 M13.8 5.4l-1.2 1.1 M3 11H1.5 M13 11a4 4 0 0 0-7.4-2 M8 20a4 4 0 0 1-.4-7.9A5.2 5.2 0 0 1 17.6 13a3.4 3.4 0 0 1-.4 7z",
+  cloud: CLOUD,
+  rain: "M7 15a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 7.5a3.8 3.8 0 0 1-.5 7.5z M8 18l-1 3 M12 18l-1 3 M16 18l-1 3",
+  storm: "M7 15a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 7.5a3.8 3.8 0 0 1-.5 7.5z M12.5 13l-3 4.5h3.5l-2 4",
+  snow: "M7 15a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 7.5a3.8 3.8 0 0 1-.5 7.5z M8 18.5v.01 M12 20.5v.01 M16 18.5v.01 M10 22v.01 M14 22v.01",
+  fog: "M7 13a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 5.5a3.8 3.8 0 0 1-.5 7.5z M3 17h18 M5 21h14",
+  bed: "M3 19V6 M3 15h18v4 M21 15v-3a3 3 0 0 0-3-3h-8v6 M6.5 11.5a1.5 1.5 0 1 0 0-3a1.5 1.5 0 1 0 0 3z",
+  car: "M5 16l1.3-5.2A2 2 0 0 1 8.2 9.3h7.6a2 2 0 0 1 1.9 1.5L19 16 M3 16h18v3H3z M6.5 19v1.5 M17.5 19v1.5",
+  euro: "M17.5 6.5A6.5 6.5 0 1 0 17.5 17.5 M5 10.5h8 M5 13.5h8",
+  pin: "M12 21s6.5-5.7 6.5-11a6.5 6.5 0 1 0-13 0C5.5 15.3 12 21 12 21z M12 12.2a2.4 2.4 0 1 0 0-4.8a2.4 2.4 0 1 0 0 4.8z",
+};
+
+/* ===== 30-templates.js ===== */
+/* ---------- Vorlagen nach Reiseart ----------
+   Eine Vorlage legt fest, welche Felder ein Tag hat und wie die Tagesseite
+   inhaltlich aufgebaut ist. Das Seitenlayout (Deckseite, Tagesseite, Kosten)
+   liegt in 40-layout.js und ist für alle Vorlagen gleich gebaut.
+
+   Neue Reiseart = ein Eintrag mehr:
+     id, name, label     Kennung, Anzeigename, Beschriftung auf der Deckseite
+     desc                Beschreibung in der Auswahl
+     fixedPlace          true: ein Zielort für die ganze Reise (Kurztrip)
+     defaultDays         Anzahl Tage bei „Tage erzeugen“
+     dayFields           Felder im Tages-Editor (siehe DAY_FIELDS in 80-ui.js)
+     dayHeader(t, i)     Unterzeile unter dem Tagestitel
+     sections(d)         Textabschnitte der Tagesseite: [{label, paras[]}] oder Zeitleiste [{label, kind:"timeline", items:[{time,text}]}]
+     strip               optional: Streckenleiste unter dem Kopf; strip(t, i) → {from, to, mid}
+     info(t, i)          bis zu drei Infokästen [{label, value, ico}]
+     stats(t, st)        optional: vier Kennzahlen der Deckseite [{v, l}] (sonst Standard)  */
+const TEMPLATES = {
+  kurztrip: {
+    id: "kurztrip", name: "Kurztrip", label: "Kurztrip",
+    desc: "Ein Ziel, wenige Tage. Tagesplan als Zeitleiste mit Uhrzeiten, dazu Notizen.",
+    fixedPlace: true, defaultDays: 3,
+    stats: (t, st) => [
+      { v: `${st.nDays} ${st.nDays === 1 ? "Tag" : "Tage"}`, l: st.nDays > 1 ? `Dauer · ${st.nights} Nächte` : "Dauer" },
+      { v: t.destination.name || st.places[0] || "–", l: "Reiseziel" },
+      { v: st.cost > 0 ? money(st.cost, t.currency) : "–", l: "Kosten" },
+      { v: st.cost > 0 ? money(st.perDay, t.currency) : String(st.photos || "–"), l: st.cost > 0 ? "Pro Tag" : "Fotos" },
+    ],
+    dayFields: ["title", "weather", "lodging", "plan", "text", "highlights", "costs", "photos"],
+    dayHeader: (t) => t.destination.name || "",
+    sections: (d) => [
+      { label: "Tagesplan", kind: "timeline", items: parsePlan(d.plan) },
+      { label: "Notizen", paras: String(d.text || "").split(/\r?\n/) },
+    ],
+    info: (t, i) => {
+      const d = t.days[i];
+      return [weatherInfo(d), { label: "Unterkunft", value: d.lodging, ico: "bed" },
+        { label: "Tageskosten", value: dayCosts(d) ? money(dayCosts(d), t.currency) : "", ico: "euro" }];
+    },
+  },
+
+  rundreise: {
+    id: "rundreise", name: "Rundreise", label: "Rundreise",
+    desc: "Mehrere Tage an einem oder an verschiedenen Orten. Tagebuch mit Streckenleiste (von – nach), Kilometern und Unterkunft.",
+    fixedPlace: false, defaultDays: 7, strip: true,
+    dayFields: ["place", "from", "km", "drive", "title", "weather", "lodging", "text", "highlights", "costs", "photos"],
+    dayHeader: (t, i) => {
+      const d = t.days[i], from = dayFrom(t, i), to = d.place.name;
+      if (!to) return from;
+      return !from || from === to ? to : from + " – " + to;
+    },
+    sections: (d) => [{ label: "Tagebuch", paras: String(d.text || "").split(/\r?\n/) }],
+    info: (t, i) => {
+      const d = t.days[i];
+      return [weatherInfo(d), { label: "Unterkunft", value: d.lodging, ico: "bed" },
+        { label: "Tageskosten", value: dayCosts(d) ? money(dayCosts(d), t.currency) : "", ico: "euro" }];
+    },
+    /* Streckenleiste unter dem Kopf: von – nach, Kilometer, Fahrzeit */
+    strip: (t, i) => {
+      const d = t.days[i], bits = [];
+      if (hasNum(d.km) && parseNum(d.km) > 0) bits.push(fmtNum(parseNum(d.km)) + " km");
+      if (d.drive.trim()) bits.push(d.drive.trim() + " h");
+      return { from: dayFrom(t, i), to: d.place.name, mid: bits.join("  ·  ") };
+    },
+  },
+};
+
+function weatherInfo(d) {
+  const bits = [];
+  if (d.weather) bits.push(weatherName(d.weather));
+  const a = hasNum(d.tmin), b = hasNum(d.tmax);
+  if (a && b) bits.push(`${fmtNum(parseNum(d.tmin))}–${fmtNum(parseNum(d.tmax))} °C`);
+  else if (a || b) bits.push(`${fmtNum(parseNum(a ? d.tmin : d.tmax))} °C`);
+  return { label: "Wetter", value: bits.join(" · "), ico: d.weather || "sun" };
+}
+
+/* Tagesplan: jede Zeile ein Punkt, optional mit Uhrzeit vorn („9:30 Frühstück“, „14.00 – Museum“). */
+function parsePlan(text) {
+  return String(text || "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean).map((l) => {
+    const m = /^(\d{1,2})[:.](\d{2})(?:\s*(?:Uhr|h))?\s*[-–:]?\s*(.*)$/.exec(l);
+    return m ? { time: `${m[1].padStart(2, "0")}:${m[2]}`, text: m[3] || "" } : { time: "", text: l };
+  });
+}
+
+/* ===== 35-text.js ===== */
+/* ---------- Schriften und Textmessung (identisch für Vorschau und PDF) ----------
+   Das Layout misst Texte mit den Metriken der PDF-Standardschriften. Deshalb
+   brechen Vorschau und PDF an denselben Stellen um. */
+const FONT_NAMES = {
+  R: "Helvetica", B: "HelveticaBold", I: "HelveticaOblique", BI: "HelveticaBoldOblique",
+  S: "TimesRoman", SB: "TimesRomanBold", SI: "TimesRomanItalic",
+};
+const isSerif = (f) => f[0] === "S";
+const BASELINE = { sans: 0.8465, serif: 0.8375 }; // Grundlinie unter der Oberkante bei line-height 1
+const FM = { ready: false };
+
+async function initFonts() {
+  if (!window.PDFLib) return;
+  try {
+    const d = await PDFLib.PDFDocument.create();
+    for (const k in FONT_NAMES) FM[k] = await d.embedFont(PDFLib.StandardFonts[FONT_NAMES[k]]);
+    FM.charset = new Set(FM.R.getCharacterSet());
+    FM.ready = true;
+  } catch (e) { console.warn(e); }
+}
+
+const SUBST = { "→": "–", "←": "–", "≈": "~", "≤": "<=", "≥": ">=", "✓": "x", "ł": "l", "Ł": "L", "đ": "d", "Đ": "D", "ı": "i", " ": " ", " ": " ", "\t": " " };
+function clean(s) {
+  s = String(s ?? "");
+  if (!FM.ready) return s;
+  return [...s].map((ch) => {
+    if (FM.charset.has(ch.codePointAt(0))) return ch;
+    if (SUBST[ch]) return SUBST[ch];
+    const base = ch.normalize("NFD").replace(/[̀-ͯ]/g, "");
+    return [...base].every((c) => FM.charset.has(c.codePointAt(0))) ? base : "?";
+  }).join("");
+}
+
+function tw(s, f, size, ls = 0) {
+  s = String(s);
+  const w = FM.ready ? FM[f].widthOfTextAtSize(s, size) : s.length * size * 0.52;
+  return w + ls * [...s].length;
+}
+
+function fitT(s, f, size, maxW, ls = 0) {
+  s = clean(s);
+  if (tw(s, f, size, ls) <= maxW) return s;
+  while (s.length > 1 && tw(s + "…", f, size, ls) > maxW) s = s.slice(0, -1);
+  return s.trimEnd() + "…";
+}
+
+function breakWord(w, f, size, maxW) {
+  const parts = []; let cur = "";
+  for (const ch of w) {
+    if (cur && tw(cur + ch, f, size) > maxW) { parts.push(cur); cur = ch; } else cur += ch;
+  }
+  if (cur) parts.push(cur);
+  return parts;
+}
+
+/* Bricht Text in Zeilen; jede Zeile des Eingabetextes ist ein Absatz (leere Zeile = Leerzeile). */
+function wrapAll(text, f, size, maxW) {
+  const out = [];
+  for (const para of String(text ?? "").split(/\r?\n/)) {
+    const words = clean(para).split(/\s+/).filter(Boolean);
+    if (!words.length) { out.push(""); continue; }
+    let cur = "";
+    for (const w of words) {
+      const parts = tw(w, f, size) > maxW ? breakWord(w, f, size, maxW) : [w];
+      for (const part of parts) {
+        const t = cur ? cur + " " + part : part;
+        if (!cur || tw(t, f, size) <= maxW) cur = t; else { out.push(cur); cur = part; }
+      }
+    }
+    out.push(cur);
+  }
+  return out;
+}
+
+/* Wie wrapAll, aber höchstens `maxLines` Zeilen; die letzte endet bei Bedarf mit „…“. */
+function wrapMax(text, f, size, maxW, maxLines) {
+  const lines = wrapAll(text, f, size, maxW);
+  if (lines.length <= maxLines) return { lines, cut: false };
+  const keep = lines.slice(0, maxLines);
+  keep[maxLines - 1] = fitT(keep[maxLines - 1] + " …", f, size, maxW);
+  return { lines: keep, cut: true };
+}
+
+/* ===== 40-layout.js ===== */
+/* ---------- Seitenmodell ----------
+   Aus der Reise entsteht eine Liste von Seiten {W, H, ops}. Maße in Punkt
+   (1/72 Zoll), Ursprung oben links. Vorschau (pageHtml) und PDF (buildPdf)
+   zeichnen beide nur aus diesem Modell – es gibt keine zweite Layout-Logik.
+
+   Operationen (k):
+     rect  {x,y,w,h,fill,stroke,sw,r}          Rechteck, optional abgerundet
+     line  {x1,y1,x2,y2,c,sw}                  Linie
+     t     {x,y,text,s,f,c,a,ls}               Text; y = Oberkante, a = l|c|r, ls = Buchstabenabstand
+     path  {x,y,w,h,vw,vh,d,fill,stroke,sw}    SVG-Pfad im Raster vw×vh (Symbole)
+     img   {x,y,w,h,src,iw,ih}                 Bild, füllt den Rahmen (zugeschnitten)         */
+const PW = 595.28, PH = 841.89, MX = 40, CW = PW - 2 * MX, BOTTOM = 790;
+
+class Pg {
+  constructor(T) {
+    this.W = PW; this.H = PH; this.ops = []; this.T = T;
+    if (T.paper.toUpperCase() !== "#FFFFFF") this.rect(0, 0, PW, PH, { fill: T.paper });
+  }
+  rect(x, y, w, h, o = {}) { this.ops.push({ k: "rect", x, y, w, h, fill: o.fill || null, stroke: o.stroke || null, sw: o.sw || 0.6, r: Math.min(o.r || 0, w / 2, h / 2) }); }
+  line(x1, y1, x2, y2, c, sw = 0.6) { this.ops.push({ k: "line", x1, y1, x2, y2, c, sw }); }
+  text(x, y, text, o = {}) {
+    this.ops.push({ k: "t", x, y, text: clean(text), s: o.s || 10, f: o.f || "R", c: o.c || this.T.ink, a: o.a || "l", ls: o.ls || 0 });
+  }
+  icon(name, x, y, s, c, sw = 1.6) { this.ops.push({ k: "path", x, y, w: s, h: s, vw: 24, vh: 24, d: ICONS[name] || ICONS.sun, fill: null, stroke: c, sw }); }
+  img(x, y, w, h, src, iw, ih) { this.ops.push({ k: "img", x, y, w, h, src, iw: iw || w, ih: ih || h }); }
+  label(x, y, text, c, a) { this.text(x, y, String(text).toUpperCase(), { f: "B", s: 7.5, c: c || this.T.accent, ls: 1.4, a }); }
+}
+
+/* ---------- Text in Spalten fließen lassen ---------- */
+/* blocks: [{label, paras[]}]. Liefert die neue y-Position und die Blöcke, die nicht mehr passten. */
+function flow(pg, blocks, x, y, w, yMax, o) {
+  const { T, ruled } = o, lh = 16, s = 11, multi = blocks.length > 1;
+  const hasText = (b) => (b.items ? b.items.length > 0 : b.paras.some((p) => p.trim()));
+  const rule = (yy) => pg.line(x, yy + lh - 2, x + w, yy + lh - 2, T.rule, 0.5);
+  for (let bi = 0; bi < blocks.length; bi++) {
+    const b = blocks[bi], has = hasText(b);
+    if (!has && !ruled) continue;
+    if (y + 16 + lh * 2 > yMax) return { y, rest: blocks.slice(bi).filter(hasText) };
+    pg.label(x, y, b.label + (b.cont ? " · Fortsetzung" : ""));
+    y += 16;
+    if (!has) {
+      const n = multi ? 4 : Math.floor((yMax - y) / lh);
+      for (let k = 0; k < n && y + lh <= yMax; k++) { rule(y); y += lh; }
+      y += 8; continue;
+    }
+    if (b.items) {
+      /* Zeitleiste: Uhrzeit links, senkrechte Linie mit Punkten, Text rechts */
+      const tx = x + 62, tws = w - 62, top0 = y, at = pg.ops.length;
+      const vline = (y2) => pg.ops.splice(at, 0, { k: "line", x1: x + 50, y1: top0 + lh / 2, x2: x + 50, y2, c: T.accent2, sw: 1.2 });
+      for (let ii = 0; ii < b.items.length; ii++) {
+        const it = b.items[ii], lines = wrapAll(it.text || " ", "S", s, tws), need = lines.length * lh + 6;
+        if (y + need > yMax) {
+          vline(y - 6 - lh / 2);
+          return { y, rest: [{ label: b.label, kind: "timeline", items: b.items.slice(ii), cont: true }, ...blocks.slice(bi + 1).filter(hasText)] };
+        }
+        if (it.time) pg.text(x, y + (lh - 9.5) / 2, it.time, { f: "B", s: 9.5, c: T.accent });
+        pg.rect(x + 47.5, y + lh / 2 - 2.5, 5, 5, { fill: it.time ? T.accent : T.accent2, r: 2.5 });
+        lines.forEach((l, k) => pg.text(tx, y + k * lh + (lh - s) / 2, l, { f: "S", s }));
+        y += need;
+      }
+      vline(y - 6 - lh / 2);
+      y += 6; continue;
+    }
+    for (let pi = 0; pi < b.paras.length; pi++) {
+      const para = b.paras[pi];
+      if (!para.trim()) { y += lh * 0.5; continue; }
+      const lines = wrapAll(para, "S", s, w), avail = Math.floor((yMax - y) / lh);
+      const draw = (arr) => arr.forEach((l, k) => pg.text(x, y + k * lh + (lh - s) / 2, l, { f: "S", s }));
+      if (lines.length <= avail) { draw(lines); y += lines.length * lh; continue; }
+      let left;
+      if (avail >= 2) { draw(lines.slice(0, avail)); y += avail * lh; left = [lines.slice(avail).join(" "), ...b.paras.slice(pi + 1)]; }
+      else left = b.paras.slice(pi);
+      return { y, rest: [{ label: b.label, paras: left, cont: true }, ...blocks.slice(bi + 1).filter(hasText)] };
+    }
+    y += 10;
+  }
+  return { y, rest: [] };
+}
+
+function rulesTo(pg, x, y, w, yMax) {
+  for (; y + 16 <= yMax; y += 16) pg.line(x, y + 14, x + w, y + 14, pg.T.rule, 0.5);
+}
+
+/* ---------- Kopf für Folgeseiten (Fortsetzung, Fotos, Kosten) ---------- */
+function miniHeader(pg, kicker, title) {
+  pg.label(MX, 40, kicker);
+  pg.text(MX, 54, fitT(title, "SB", 20, CW), { f: "SB", s: 20 });
+  pg.line(MX, 86, PW - MX, 86, pg.T.rule, 0.8);
+  return 106;
+}
+
+/* ---------- Deckseite ---------- */
+function coverPage(t, st, T, warns) {
+  const tpl = TEMPLATES[t.template], pg = new Pg(T);
+  const BAND = 290;
+  const photo = !!t.coverPhoto;
+  if (photo) pg.img(0, 0, PW, BAND, t.coverPhoto, t.coverW, t.coverH);
+  else {
+    pg.rect(0, 0, PW, BAND, { fill: T.accent });
+    pg.icon("pin", PW - MX - 190, 62, 190, mix(T.accent, "#FFFFFF", 0.14), 0.9); /* Dekor */
+  }
+  const soft = mix(T.accent, "#FFFFFF", 0.78);
+  pg.text(MX, 44, "REISEPROTOKOLL  ·  " + tpl.label.toUpperCase(), { f: "B", s: 8, c: soft, ls: 1.8 });
+  if (st.range) pg.text(PW - MX, 44, st.range, { f: "B", s: 9, c: T.onAccent, a: "r" });
+
+  /* Titel so groß wie möglich (höchstens zwei Zeilen bei großer, drei bei kleiner Schrift) */
+  const ttl = t.title.trim() || "Meine Reise";
+  let ts = 32, title = wrapMax(ttl, "SB", 32, CW, 3).lines;
+  for (const sz of [58, 50, 44, 38]) {
+    const l = wrapAll(ttl, "SB", sz, CW);
+    if (l.length <= (sz >= 44 ? 2 : 3)) { ts = sz; title = l; break; }
+  }
+  const tl = ts * 1.1;
+  const sub = t.subtitle.trim() ? wrapMax(t.subtitle, "SI", 16, CW, 2).lines : [];
+  const blockH = title.length * tl + (sub.length ? 10 + sub.length * 20 : 0);
+  const top = Math.max(96, 266 - blockH);
+  pg.rect(MX, top - 18, 44, 3, { fill: T.accent2 });
+  title.forEach((l, k) => pg.text(MX, top + k * tl, l, { f: "SB", s: ts, c: T.onAccent }));
+  sub.forEach((l, k) => pg.text(MX, top + title.length * tl + 10 + k * 20, l, { f: "SI", s: 16, c: soft }));
+
+  /* Kennzahlen */
+  const stats = (tpl.stats ? tpl.stats(t, st) : defaultStats(t, st)).slice(0, 4);
+  const gap = 12, cw = (CW - gap * 3) / 4, sy = BAND + 22;
+  stats.forEach((c, k) => {
+    const x = MX + k * (cw + gap);
+    pg.rect(x, sy, cw, 64, { fill: T.soft, r: 8 });
+    pg.text(x + 12, sy + 12, fitT(c.v, "SB", 21, cw - 24), { f: "SB", s: 21, c: T.accent });
+    pg.text(x + 12, sy + 45, fitT(c.l.toUpperCase(), "B", 6.8, cw - 24, 1), { f: "B", s: 6.8, c: T.muted, ls: 1 });
+  });
+
+  /* Karte */
+  const my = sy + 64 + 18, mh = 236;
+  if (t.mapImg) {
+    pg.img(MX, my, CW, mh, t.mapImg, t.mapW, t.mapH);
+    pg.rect(MX, my, CW, mh, { stroke: T.rule, sw: 0.8 });
+  } else {
+    pg.rect(MX, my, CW, mh, { fill: T.soft, r: 8 });
+    pg.icon("pin", PW / 2 - 14, my + mh / 2 - 26, 28, T.muted, 1.4);
+    pg.text(PW / 2, my + mh / 2 + 10, "Karte noch nicht erzeugt (Reiter „Karte“)", { s: 9, c: T.muted, a: "c" });
+    warns.push("Die Karte für die Deckseite fehlt noch (Reiter „Karte“).");
+  }
+  const pts = t.route.points.map((p) => p.name).filter(Boolean);
+  if (pts.length) pg.text(MX, my + mh + 7, fitT(pts.join("  –  "), "R", 8, CW), { s: 8, c: T.muted });
+
+  /* Zusammenfassung */
+  const zy = my + mh + 34;
+  pg.label(MX, zy, "Zusammenfassung");
+  pg.line(MX + 100, zy + 4, PW - MX, zy + 4, T.rule);
+  const sum = wrapMax(t.summary.trim() || "–", "S", 11, CW, 6);
+  sum.lines.forEach((l, k) => pg.text(MX, zy + 20 + k * 16, l, { f: "S", s: 11 }));
+  if (sum.cut) warns.push("Die Zusammenfassung ist für die Deckseite zu lang und wird abgeschnitten (höchstens 6 Zeilen).");
+  if (t.travelers.trim()) pg.text(MX, 806, fitT("Reisende: " + t.travelers.trim(), "R", 8.5, CW), { s: 8.5, c: T.muted });
+  return pg;
+}
+
+function defaultStats(t, st) {
+  const cost = st.cost > 0 ? money(st.cost, t.currency) : "–";
+  return [
+    { v: `${st.nDays} ${st.nDays === 1 ? "Tag" : "Tage"}`, l: st.nDays > 1 ? `Dauer · ${st.nights} Nächte` : "Dauer" },
+    { v: String(st.places.length || "–"), l: "Orte" },
+    { v: st.km ? (st.kmEst ? "~" : "") + fmtNum(st.km) + " km" : "–", l: "Strecke" },
+    { v: cost, l: "Kosten" },
+  ];
+}
+
+/* ---------- Tagesseite ---------- */
+function dayPages(t, i, T, warns) {
+  const tpl = TEMPLATES[t.template], d = t.days[i], out = [];
+  const pg = new Pg(T); out.push(pg);
+  const title = d.title.trim() || "Tag " + (i + 1);
+
+  pg.rect(MX, 40, 56, 56, { fill: T.accent, r: 10 });
+  pg.text(MX + 28, 50, "TAG", { f: "B", s: 6.5, c: mix(T.accent, "#FFFFFF", 0.75), a: "c", ls: 1.5 });
+  pg.text(MX + 28, 60, String(i + 1), { f: "SB", s: i + 1 > 99 ? 20 : 26, c: T.onAccent, a: "c" });
+  const hx = MX + 74, hw = CW - 74;
+  pg.text(hx, 42, (fmtLong(d.date) || "Tag " + (i + 1)).toUpperCase(), { f: "B", s: 7.5, c: T.muted, ls: 1.2 });
+  pg.text(hx, 56, fitT(title, "SB", 21, hw), { f: "SB", s: 21 });
+  const sub = tpl.dayHeader(t, i);
+  if (sub) pg.text(hx, 83, fitT(sub, "B", 10, hw), { f: "B", s: 10, c: T.accent });
+  pg.line(MX, 110, PW - MX, 110, T.rule, 0.8);
+
+  /* Infokästen */
+  const bw = (CW - 20) / 3;
+  tpl.info(t, i).slice(0, 3).forEach((b, k) => {
+    const x = MX + k * (bw + 10), y = 122;
+    pg.rect(x, y, bw, 46, { fill: T.soft, r: 8 });
+    pg.label(x + 12, y + 8, b.label, T.muted);
+    pg.icon(b.ico, x + 11, y + 21, 17, T.accent, 1.5);
+    const v = (b.value || "").trim();
+    pg.text(x + 35, y + 25, fitT(v || "–", "R", 9.5, bw - 46), { s: 9.5, c: v ? T.ink : T.muted });
+  });
+
+  /* Fotos (die ersten drei als Streifen) */
+  const shown = d.photos.slice(0, 3), stripY = BOTTOM - 104;
+  const bodyBottom = shown.length ? stripY - 18 : BOTTOM - 4;
+  if (shown.length) {
+    const g = 8, w = (CW - g * (shown.length - 1)) / shown.length;
+    shown.forEach((p, k) => pg.img(MX + k * (w + g), stripY, w, 104, p.src, p.w, p.h));
+  }
+
+  /* Text links */
+  const lw = 316;
+  let bodyTop = 188;
+  const sp = tpl.strip ? tpl.strip(t, i) : null;
+  if (sp && (sp.from || sp.to)) { routeStrip(pg, sp, T, 182); bodyTop = 236; }
+  const blocks = tpl.sections(d);
+  let r = flow(pg, blocks, MX, bodyTop, lw, bodyBottom, { T, ruled: t.ruled });
+  if (!r.rest.length && t.ruled) rulesTo(pg, MX, r.y, lw, bodyBottom);
+
+  /* Highlights und Ausgaben rechts */
+  rightColumn(pg, t, d, T, MX + lw + 24, bodyTop, PW - MX - (MX + lw + 24), bodyBottom, warns, i);
+
+  /* Fortsetzungsseiten */
+  for (let n = 0; r.rest.length && n < 8; n++) {
+    const p2 = new Pg(T); out.push(p2);
+    const y0 = miniHeader(p2, `Tag ${i + 1} · Fortsetzung`, title);
+    r = flow(p2, r.rest, MX, y0, CW, BOTTOM, { T, ruled: false });
+  }
+  if (r.rest.length) warns.push(`Tag ${i + 1}: Der Text ist zu lang und wird abgeschnitten.`);
+
+  /* weitere Fotos: Aufteilung nach Anzahl, gleichmäßig auf Seiten verteilt */
+  const more = d.photos.slice(3), per = more.length ? Math.ceil(more.length / Math.ceil(more.length / 6)) : 6;
+  for (let k = 0; k < more.length; k += per) {
+    const p3 = new Pg(T); out.push(p3);
+    const y0 = miniHeader(p3, `Tag ${i + 1} · Fotos`, title), chunk = more.slice(k, k + per);
+    galleryCells(chunk.length, MX, y0, CW, BOTTOM - y0).forEach((c, n) => p3.img(c.x, c.y, c.w, c.h, chunk[n].src, chunk[n].w, chunk[n].h));
+  }
+  return out;
+}
+
+/* Rahmen für n Fotos (1–6) in einer Fläche; Höhen begrenzt, damit nichts überlang wird */
+function galleryCells(n, x, y, w, h) {
+  const g = 12, half = (w - g) / 2, cap = (v) => Math.min(v, 300), out = [];
+  const rows = (cols, nr) => { const ch = cap((h - g * (nr - 1)) / nr); return ch; };
+  if (n === 1) out.push({ x, y, w, h: Math.min(h, 460) });
+  else if (n === 2) { const ch = cap((h - g) / 2); out.push({ x, y, w, h: ch }, { x, y: y + ch + g, w, h: ch }); }
+  else if (n === 3) {
+    const top = Math.min(300, (h - g) * 0.55), bot = Math.min(220, h - top - g);
+    out.push({ x, y, w, h: top }, { x, y: y + top + g, w: half, h: bot }, { x: x + half + g, y: y + top + g, w: half, h: bot });
+  } else {
+    const nr = Math.ceil(n / 2), ch = rows(2, nr);
+    for (let k = 0; k < n; k++) out.push({ x: x + (k % 2) * (half + g), y: y + Math.floor(k / 2) * (ch + g), w: half, h: ch });
+  }
+  return out;
+}
+
+/* Streckenleiste (Rundreise): Start – Ziel mit Kilometern in der Mitte */
+function routeStrip(pg, sp, T, y) {
+  const ly = y + 30;
+  if (sp.from) pg.text(MX, y, fitT(sp.from, "B", 10.5, CW / 2 - 40), { f: "B", s: 10.5 });
+  if (sp.to) pg.text(PW - MX, y, fitT(sp.to, "B", 10.5, CW / 2 - 40), { f: "B", s: 10.5, a: "r" });
+  pg.line(MX + 8, ly, PW - MX - 8, ly, T.accent2, 1.4);
+  pg.rect(MX, ly - 5, 10, 10, { fill: T.paper, stroke: T.accent, sw: 2, r: 5 });
+  pg.rect(PW - MX - 10, ly - 5, 10, 10, { fill: T.accent, r: 5 });
+  if (sp.mid) {
+    const w = tw(sp.mid, "B", 9) + 36;
+    pg.rect(PW / 2 - w / 2, ly - 11, w, 22, { fill: T.paper, stroke: T.accent2, sw: 1, r: 11 });
+    pg.icon("car", PW / 2 - w / 2 + 9, ly - 8, 15, T.accent, 1.6);
+    pg.text(PW / 2 - w / 2 + 28, ly - 4.5, sp.mid, { f: "B", s: 9, c: T.ink });
+  }
+}
+
+function rightColumn(pg, t, d, T, x, y, w, yMax, warns, i) {
+  const hl = dayHighlights(d), costs = d.costs.filter((c) => c.l.trim() || parseNum(c.a));
+  const rows = 14, costH = costs.length ? 16 + Math.min(costs.length, 9) * rows + 26 : 0;
+  if (hl.length) {
+    pg.label(x, y, "Highlights"); y += 16;
+    const limit = yMax - costH - (costH ? 14 : 0);
+    for (const h of hl) {
+      const lines = wrapMax(h, "R", 9.5, w - 13, 3).lines, need = lines.length * 13 + 4;
+      if (y + need > limit) { warns.push(`Tag ${i + 1}: Nicht alle Highlights passen auf die Seite.`); break; }
+      pg.rect(x, y + 4.5, 4, 4, { fill: T.accent2, r: 2 });
+      lines.forEach((l, k) => pg.text(x + 13, y + k * 13 + 1.5, l, { s: 9.5 }));
+      y += need;
+    }
+    y += 12;
+  }
+  if (costs.length) {
+    pg.label(x, y, "Ausgaben"); y += 17;
+    const max = 9, list = costs.length > max ? costs.slice(0, max - 1) : costs;
+    for (const c of list) {
+      const a = money(parseNum(c.a), t.currency), aw = tw(a, "R", 9);
+      pg.text(x, y, fitT(c.l || "–", "R", 9, w - aw - 8), { s: 9 });
+      pg.text(x + w, y, a, { s: 9, a: "r" });
+      y += rows;
+    }
+    if (costs.length > max) {
+      const rest = costs.slice(max - 1);
+      pg.text(x, y, `+ ${rest.length} weitere`, { s: 9, c: T.muted });
+      pg.text(x + w, y, money(rest.reduce((s, c) => s + parseNum(c.a), 0), t.currency), { s: 9, a: "r", c: T.muted });
+      y += rows;
+    }
+    pg.line(x, y + 2, x + w, y + 2, T.rule, 0.8);
+    pg.text(x, y + 8, "Summe", { f: "B", s: 9.5 });
+    pg.text(x + w, y + 8, money(dayCosts(d), t.currency), { f: "B", s: 9.5, a: "r", c: T.accent });
+  }
+}
+
+/* ---------- Kostenübersicht ---------- */
+function costPages(t, st, T) {
+  if (!(st.cost > 0)) return [];
+  const out = [], pg = new Pg(T); out.push(pg);
+  miniHeader(pg, "Auswertung", "Kostenübersicht");
+  let y = 112;
+  pg.text(MX, y, money(st.cost, t.currency), { f: "SB", s: 36, c: T.accent });
+  pg.text(MX, y + 46, `insgesamt  ·  ${money(st.perDay, t.currency)} pro Tag  ·  ${st.nDays} ${st.nDays === 1 ? "Tag" : "Tage"}`, { s: 10, c: T.muted });
+  y += 84;
+  pg.label(MX, y, "Nach Kategorie"); y += 22;
+  const cats = CATS.filter((c) => st.byCat[c.id] > 0).sort((a, b) => st.byCat[b.id] - st.byCat[a.id]);
+  const bx = MX + 120, bwid = CW - 120 - 112;
+  for (const c of cats) {
+    const v = st.byCat[c.id], frac = v / st.cost;
+    pg.text(MX, y, c.name, { s: 10 });
+    pg.rect(bx, y + 1, bwid, 10, { fill: T.soft, r: 5 });
+    pg.rect(bx, y + 1, Math.max(4, bwid * frac), 10, { fill: T.accent, r: 5 });
+    pg.text(PW - MX, y, money(v, t.currency), { f: "B", s: 10, a: "r" });
+    pg.text(PW - MX - 70, y, fmtNum(frac * 100) + " %", { s: 9, c: T.muted, a: "r" });
+    y += 24;
+  }
+  y += 14;
+  const rowsAll = t.days.map((d, i) => ({ i, d, sum: dayCosts(d) }));
+  let cur = pg, first = true;
+  pg.label(MX, y, "Nach Tag"); y += 22;
+  for (const r of rowsAll) {
+    if (y + 18 > BOTTOM) {
+      cur = new Pg(T); out.push(cur);
+      y = miniHeader(cur, "Auswertung", "Kostenübersicht · Fortsetzung"); first = false;
+    }
+    const place = dayPlaceName(t, r.d);
+    cur.text(MX, y, `Tag ${r.i + 1}`, { f: "B", s: 9.5 });
+    cur.text(MX + 52, y, fitT([fmtDate(r.d.date, { day: "numeric", month: "short" }), place].filter(Boolean).join("  ·  "), "R", 9.5, CW - 52 - 100), { s: 9.5, c: T.muted });
+    cur.text(PW - MX, y, r.sum ? money(r.sum, t.currency) : "–", { s: 9.5, a: "r", c: r.sum ? T.ink : T.muted });
+    cur.line(MX, y + 15, PW - MX, y + 15, T.rule, 0.5);
+    y += 20;
+  }
+  return out;
+}
+
+/* ---------- Gesamtreise ---------- */
+function layoutTrip(t) {
+  const T = THEMES[t.theme] || THEMES.meer, st = tripStats(t), warns = [], pages = [];
+  pages.push(coverPage(t, st, T, warns));
+  t.days.forEach((_, i) => pages.push(...dayPages(t, i, T, warns)));
+  if (t.costPage) pages.push(...costPages(t, st, T));
+  const N = pages.length;
+  pages.forEach((pg, n) => {
+    if (!n) return;
+    pg.line(MX, 800, PW - MX, 800, T.rule, 0.6);
+    pg.text(MX, 810, fitT(t.title.trim() || "Meine Reise", "R", 7.5, CW - 80), { s: 7.5, c: T.muted });
+    pg.text(PW - MX, 810, `Seite ${n + 1} von ${N}`, { s: 7.5, c: T.muted, a: "r" });
+  });
+  if (!t.days.length) warns.push("Noch keine Tage angelegt (Reiter „Tage“).");
+  return { pages, warns, stats: st };
+}
+
+/* ===== 50-render.js ===== */
+/* ---------- Vorschau (HTML) und PDF aus dem Seitenmodell ---------- */
+
+const FONT_CSS = {
+  R: "font-family:Helvetica,Arial,'Liberation Sans',sans-serif", B: "font-family:Helvetica,Arial,'Liberation Sans',sans-serif;font-weight:700",
+  I: "font-family:Helvetica,Arial,'Liberation Sans',sans-serif;font-style:italic", BI: "font-family:Helvetica,Arial,'Liberation Sans',sans-serif;font-weight:700;font-style:italic",
+  S: "font-family:'Times New Roman',Times,'Liberation Serif',serif", SB: "font-family:'Times New Roman',Times,'Liberation Serif',serif;font-weight:700",
+  SI: "font-family:'Times New Roman',Times,'Liberation Serif',serif;font-style:italic",
+};
+
+function pageHtml(pg) {
+  const X = (v) => (v / pg.W * 100).toFixed(4) + "%", Y = (v) => (v / pg.H * 100).toFixed(4) + "%";
+  const U = (v) => (v / pg.W * 100).toFixed(4) + "cqw";
+  const box = (o) => `left:${X(o.x)};top:${Y(o.y)};width:${X(o.w)};height:${Y(o.h)}`;
+  let h = "";
+  for (const o of pg.ops) {
+    if (o.k === "rect") {
+      const st = o.stroke ? `border:${U(o.sw)} solid ${o.stroke};box-sizing:border-box;` : "";
+      h += `<div class="ab" style="${box(o)};${o.fill ? "background:" + o.fill + ";" : ""}${st}${o.r ? "border-radius:" + U(o.r) : ""}"></div>`;
+    } else if (o.k === "line") {
+      const horiz = o.y1 === o.y2;
+      h += horiz
+        ? `<div class="ab" style="left:${X(Math.min(o.x1, o.x2))};top:${Y(o.y1 - o.sw / 2)};width:${X(Math.abs(o.x2 - o.x1))};height:${Y(o.sw)};background:${o.c}"></div>`
+        : `<svg class="ab" style="left:0;top:0;width:100%;height:100%" viewBox="0 0 ${pg.W} ${pg.H}" preserveAspectRatio="none"><line x1="${o.x1}" y1="${o.y1}" x2="${o.x2}" y2="${o.y2}" stroke="${o.c}" stroke-width="${o.sw}"/></svg>`;
+    } else if (o.k === "t") {
+      const w = tw(o.text, o.f, o.s, o.ls), x = o.a === "c" ? o.x - w / 2 : o.a === "r" ? o.x - w : o.x;
+      h += `<div class="ab t" style="left:${X(x)};top:${Y(o.y)};font-size:${U(o.s)};color:${o.c};${FONT_CSS[o.f]};${o.ls ? "letter-spacing:" + U(o.ls) + ";" : ""}">${esc(o.text)}</div>`;
+    } else if (o.k === "path") {
+      h += `<svg class="ab" style="${box(o)}" viewBox="0 0 ${o.vw} ${o.vh}"><path d="${o.d}" fill="${o.fill || "none"}" stroke="${o.stroke || "none"}" stroke-width="${o.sw}" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    } else if (o.k === "img") {
+      h += `<img class="ab im" style="${box(o)}" src="${o.src}" alt="">`;
+    }
+  }
+  return h;
+}
+
+/* ---------- PDF ---------- */
+function bytesOfDataUrl(u) {
+  const b = atob(u.slice(u.indexOf(",") + 1)), a = new Uint8Array(b.length);
+  for (let i = 0; i < b.length; i++) a[i] = b.charCodeAt(i);
+  return a;
+}
+
+async function buildPdf(pages, meta, onProgress) {
+  const L = PDFLib, doc = await L.PDFDocument.create();
+  doc.setTitle(meta.title || "Reiseprotokoll"); doc.setCreator("Reise-Protokoll"); doc.setProducer("Reise-Protokoll (pdf-lib)");
+  if (meta.author) doc.setAuthor(meta.author);
+  const fonts = {};
+  for (const k in FONT_NAMES) fonts[k] = await doc.embedFont(L.StandardFonts[FONT_NAMES[k]]);
+  const rgbOf = (hex) => { const [r, g, b] = hexRgb(hex); return L.rgb(r / 255, g / 255, b / 255); };
+  const imgs = new Map();
+  const embed = async (src) => {
+    if (!imgs.has(src)) imgs.set(src, /^data:image\/png/.test(src) ? await doc.embedPng(bytesOfDataUrl(src)) : await doc.embedJpg(bytesOfDataUrl(src)));
+    return imgs.get(src);
+  };
+  const rrPath = (w, h, r) => `M${r} 0H${w - r}A${r} ${r} 0 0 1 ${w} ${r}V${h - r}A${r} ${r} 0 0 1 ${w - r} ${h}H${r}A${r} ${r} 0 0 1 0 ${h - r}V${r}A${r} ${r} 0 0 1 ${r} 0Z`;
+
+  for (let n = 0; n < pages.length; n++) {
+    const pg = pages[n], page = doc.addPage([pg.W, pg.H]), Y = (y) => pg.H - y;
+    for (const o of pg.ops) {
+      if (o.k === "rect") {
+        const opt = {};
+        if (o.fill) opt.color = rgbOf(o.fill);
+        if (o.stroke) { opt.borderColor = rgbOf(o.stroke); opt.borderWidth = o.sw; }
+        if (o.r > 0) page.drawSvgPath(rrPath(o.w, o.h, o.r), { x: o.x, y: Y(o.y), ...opt });
+        else page.drawRectangle({ x: o.x, y: Y(o.y + o.h), width: o.w, height: o.h, ...opt });
+      } else if (o.k === "line") {
+        page.drawLine({ start: { x: o.x1, y: Y(o.y1) }, end: { x: o.x2, y: Y(o.y2) }, thickness: o.sw, color: rgbOf(o.c) });
+      } else if (o.k === "t") {
+        const font = fonts[o.f], base = o.y + (isSerif(o.f) ? BASELINE.serif : BASELINE.sans) * o.s;
+        const w = tw(o.text, o.f, o.s, o.ls);
+        let x = o.a === "c" ? o.x - w / 2 : o.a === "r" ? o.x - w : o.x;
+        if (!o.ls) page.drawText(o.text, { x, y: Y(base), size: o.s, font, color: rgbOf(o.c) });
+        else for (const ch of o.text) {
+          page.drawText(ch, { x, y: Y(base), size: o.s, font, color: rgbOf(o.c) });
+          x += font.widthOfTextAtSize(ch, o.s) + o.ls;
+        }
+      } else if (o.k === "path") {
+        const opt = { x: o.x, y: Y(o.y), scale: o.w / o.vw, borderLineCap: L.LineCapStyle.Round };
+        if (o.fill) opt.color = rgbOf(o.fill);
+        if (o.stroke) { opt.borderColor = rgbOf(o.stroke); opt.borderWidth = o.sw; }
+        page.drawSvgPath(o.d, opt);
+      } else if (o.k === "img") {
+        const im = await embed(o.src), s = Math.max(o.w / im.width, o.h / im.height);
+        const dw = im.width * s, dh = im.height * s;
+        page.pushOperators(L.pushGraphicsState(), L.moveTo(o.x, Y(o.y + o.h)), L.lineTo(o.x + o.w, Y(o.y + o.h)),
+          L.lineTo(o.x + o.w, Y(o.y)), L.lineTo(o.x, Y(o.y)), L.closePath(), L.clip(), L.endPath());
+        page.drawImage(im, { x: o.x + (o.w - dw) / 2, y: Y(o.y + o.h) + (o.h - dh) / 2, width: dw, height: dh });
+        page.pushOperators(L.popGraphicsState());
+      }
+    }
+    if (onProgress) onProgress(n + 1, pages.length);
+  }
+  return doc.save({ useObjectStreams: true });
+}
+
+/* ===== 60-map.js ===== */
+/* ---------- Karte der Fahrstrecke ----------
+   Die Karte wird einmal aus OpenStreetMap-Kacheln zusammengesetzt, mit der Route
+   übermalt und als JPEG in der Reise gespeichert. Danach ist sie statisch.
+   Gehen die Kacheln nicht (offline, gesperrt), entsteht eine Schemakarte. */
+const MAP_W = 1236, MAP_H = 566, TILE = 256;
+const mapProj = (lat, lon, z) => {
+  const n = TILE * 2 ** z, s = Math.sin(lat * Math.PI / 180);
+  return { x: (lon + 180) / 360 * n, y: (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * n };
+};
+
+function mapSignature(t) {
+  return JSON.stringify([t.route.points.filter(hasGeo).map((p) => [p.name, +p.lat.toFixed(3), +p.lon.toFixed(3)]), !!t.route.road, t.theme]);
+}
+
+/* Straßenroute über OSRM (öffentlicher Demo-Server, nur für wenige Anfragen gedacht). */
+async function osrmRoute(pts) {
+  const q = pts.map((p) => p.lon.toFixed(5) + "," + p.lat.toFixed(5)).join(";");
+  const r = await fetch(`https://router.project-osrm.org/route/v1/driving/${q}?overview=full&geometries=geojson`, { signal: AbortSignal.timeout(15000) });
+  if (!r.ok) throw new Error("OSRM " + r.status);
+  const j = await r.json();
+  if (!j.routes || !j.routes[0]) throw new Error("keine Route");
+  const rt = j.routes[0];
+  return {
+    geom: rt.geometry.coordinates.map(([lon, lat]) => ({ lat, lon })),
+    km: rt.distance / 1000,
+    legs: rt.legs.map((l) => ({ km: l.distance / 1000, min: l.duration / 60 })),
+  };
+}
+
+function loadTile(z, x, y) {
+  return new Promise((res) => {
+    const im = new Image();
+    im.crossOrigin = "anonymous";
+    const to = setTimeout(() => res(null), 9000);
+    im.onload = () => { clearTimeout(to); res(im); };
+    im.onerror = () => { clearTimeout(to); res(null); };
+    im.src = `https://tile.openstreetmap.org/${z}/${x}/${y}.png`;
+  });
+}
+
+/* Liefert {src, w, h, mode: "osm"|"schema", legs?, km?} */
+async function renderMap(t, { road = true, onStatus = () => {}, noTiles = false, pre = null } = {}) {
+  const T = THEMES[t.theme] || THEMES.meer;
+  const pts = t.route.points.filter(hasGeo);
+  if (!pts.length) throw new Error("Keine Orte mit Koordinaten. Bitte Orte über die Suche wählen.");
+
+  let geom = pts, info = pre || {};
+  if (pre && pre.geom) geom = pre.geom;
+  else if (road && pts.length > 1) {
+    try { onStatus("Straßenroute wird berechnet …"); info = await osrmRoute(pts); geom = info.geom; }
+    catch (e) { console.warn(e); onStatus("Straßenroute nicht verfügbar, es werden Luftlinien gezeichnet …"); }
+  }
+
+  /* Ausschnitt */
+  const lats = geom.map((p) => p.lat), lons = geom.map((p) => p.lon);
+  const pad = 70, bb = { a: Math.min(...lats), b: Math.max(...lats), c: Math.min(...lons), d: Math.max(...lons) };
+  let z = 12;
+  if (pts.length > 1 || geom.length > 1) {
+    for (z = 15; z > 2; z--) {
+      const p1 = mapProj(bb.b, bb.c, z), p2 = mapProj(bb.a, bb.d, z);
+      if (p2.x - p1.x <= MAP_W - 2 * pad && p2.y - p1.y <= MAP_H - 2 * pad) break;
+    }
+  }
+  const c1 = mapProj(bb.b, bb.c, z), c2 = mapProj(bb.a, bb.d, z);
+  const ox = (c1.x + c2.x) / 2 - MAP_W / 2, oy = (c1.y + c2.y) / 2 - MAP_H / 2;
+  const to = (p) => { const q = mapProj(p.lat, p.lon, z); return { x: q.x - ox, y: q.y - oy }; };
+
+  const cv = document.createElement("canvas"); cv.width = MAP_W; cv.height = MAP_H;
+  const g = cv.getContext("2d");
+  g.fillStyle = mix(T.soft, "#FFFFFF", 0.4); g.fillRect(0, 0, MAP_W, MAP_H);
+
+  /* Kacheln */
+  if (!noTiles) onStatus("Kartenkacheln werden geladen …");
+  const tx0 = Math.floor(ox / TILE), tx1 = Math.floor((ox + MAP_W) / TILE), ty0 = Math.floor(oy / TILE), ty1 = Math.floor((oy + MAP_H) / TILE);
+  const jobs = [], nT = 2 ** z;
+  for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) {
+    if (ty < 0 || ty >= nT) continue;
+    const wx = ((tx % nT) + nT) % nT;
+    if (noTiles) continue;
+    jobs.push(loadTile(z, wx, ty).then((im) => ({ im, tx, ty })));
+  }
+  const tiles = await Promise.all(jobs);
+  const ok = tiles.filter((x) => x.im);
+  let mode = ok.length >= Math.max(1, tiles.length * 0.7) ? "osm" : "schema";
+  if (mode === "osm") for (const { im, tx, ty } of ok) g.drawImage(im, tx * TILE - ox, ty * TILE - oy);
+  else drawSchemaGrid(g, T);
+
+  /* Route */
+  const path = (arr) => { g.beginPath(); arr.forEach((p, i) => { const q = to(p); i ? g.lineTo(q.x, q.y) : g.moveTo(q.x, q.y); }); };
+  g.lineJoin = "round"; g.lineCap = "round";
+  if (geom.length > 1) {
+    path(geom); g.strokeStyle = "rgba(255,255,255,.95)"; g.lineWidth = 13; g.stroke();
+    path(geom); g.strokeStyle = T.accent; g.lineWidth = 7; g.stroke();
+  }
+
+  /* Marker mit Nummer und Name; doppelte Orte (Rückkehr zum Start) nur einmal */
+  const marks = [];
+  pts.forEach((p, i) => {
+    const prev = marks.find((m) => haversine(m.p, p) < 1);
+    if (prev) { prev.nums.push(i + 1); return; }
+    marks.push({ p, nums: [i + 1], name: p.name });
+  });
+  g.textBaseline = "middle";
+  const placed = [];
+  for (const m of marks) {
+    const q = to(m.p);
+    g.beginPath(); g.arc(q.x, q.y, 19, 0, 7); g.fillStyle = "#fff"; g.fill();
+    g.beginPath(); g.arc(q.x, q.y, 15, 0, 7); g.fillStyle = T.accent2; g.fill();
+    g.fillStyle = T.ink; g.font = "700 17px Helvetica, Arial, sans-serif"; g.textAlign = "center";
+    g.fillText(m.nums.length > 1 ? m.nums[0] + "/" + m.nums[m.nums.length - 1] : String(m.nums[0]), q.x, q.y + 1, 28);
+    /* Beschriftung rechts, sonst links; bei Überlappung darunter */
+    g.font = "700 21px Helvetica, Arial, sans-serif";
+    const w = g.measureText(m.name).width;
+    const cands = [[q.x + 26, q.y, "left"], [q.x - 26, q.y, "right"], [q.x, q.y + 38, "center"], [q.x, q.y - 38, "center"]];
+    let pick = cands[0];
+    for (const c of cands) {
+      const x0 = c[2] === "left" ? c[0] : c[2] === "right" ? c[0] - w : c[0] - w / 2;
+      const r = { x0, x1: x0 + w, y0: c[1] - 13, y1: c[1] + 13 };
+      if (r.x0 < 8 || r.x1 > MAP_W - 8 || r.y0 < 8 || r.y1 > MAP_H - 8) continue;
+      if (placed.some((o) => r.x0 < o.x1 && r.x1 > o.x0 && r.y0 < o.y1 && r.y1 > o.y0)) continue;
+      pick = c; placed.push(r); break;
+    }
+    g.textAlign = pick[2]; g.lineWidth = 6; g.strokeStyle = "rgba(255,255,255,.95)"; g.strokeText(m.name, pick[0], pick[1]);
+    g.fillStyle = T.ink; g.fillText(m.name, pick[0], pick[1]);
+  }
+
+  /* Quellenangabe */
+  const credit = mode === "osm" ? "© OpenStreetMap-Mitwirkende" : "Schemakarte (ohne Kartenhintergrund)";
+  g.font = "15px Helvetica, Arial, sans-serif"; g.textAlign = "right"; g.textBaseline = "alphabetic";
+  const cw = g.measureText(credit).width + 14;
+  g.fillStyle = "rgba(255,255,255,.85)"; g.fillRect(MAP_W - cw, MAP_H - 24, cw, 24);
+  g.fillStyle = "#333"; g.fillText(credit, MAP_W - 7, MAP_H - 7);
+
+  let src;
+  try { src = cv.toDataURL("image/jpeg", 0.88); }
+  catch (e) { /* Canvas durch fremde Kacheln gesperrt: Schemakarte */ return renderMap(t, { noTiles: true, pre: { ...info, geom } }); }
+  return { src, w: MAP_W, h: MAP_H, mode, km: info.km, legs: info.legs };
+}
+
+function drawSchemaGrid(g, T) {
+  g.strokeStyle = mix(T.rule, "#FFFFFF", 0.3); g.lineWidth = 2;
+  for (let x = 0; x < MAP_W; x += 103) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, MAP_H); g.stroke(); }
+  for (let y = 0; y < MAP_H; y += 103) { g.beginPath(); g.moveTo(0, y); g.lineTo(MAP_W, y); g.stroke(); }
+}
+
+/* ===== 70-photos.js ===== */
+/* ---------- Fotos und Orte ----------
+   Fotos werden auf 1600 px verkleinert und als JPEG in der Reise gespeichert.
+   Aus EXIF kommen Aufnahmetag und GPS-Position. */
+const PHOTO_EDGE = 1600;
+
+function exifDay(raw) {
+  const m = /^(\d{4}):(\d{2}):(\d{2})/.exec(String(raw || ""));
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : "";
+}
+
+async function readPhoto(file) {
+  const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+  const s = Math.min(1, PHOTO_EDGE / Math.max(bmp.width, bmp.height));
+  const cv = document.createElement("canvas");
+  cv.width = Math.round(bmp.width * s); cv.height = Math.round(bmp.height * s);
+  cv.getContext("2d").drawImage(bmp, 0, 0, cv.width, cv.height);
+  bmp.close && bmp.close();
+  let gps = null, day = "";
+  if (window.exifr) {
+    try { const g = await exifr.gps(file); if (g && Number.isFinite(g.latitude)) gps = { lat: g.latitude, lon: g.longitude }; } catch (e) { /* kein GPS */ }
+    try {
+      const x = await exifr.parse(file, { pick: ["DateTimeOriginal", "CreateDate"], reviveValues: false });
+      day = exifDay(x && (x.DateTimeOriginal || x.CreateDate));
+    } catch (e) { /* kein Datum */ }
+  }
+  if (!day && file.lastModified) day = isoOf(new Date(file.lastModified));
+  return { id: uid(), name: file.name, src: cv.toDataURL("image/jpeg", 0.85), w: cv.width, h: cv.height, gps, day };
+}
+
+/* ---------- Nominatim (OpenStreetMap): Suche und Ortsname, höchstens eine Anfrage pro Sekunde ---------- */
+let nomChain = Promise.resolve();
+function nominatim(path) {
+  const run = () => fetch("https://nominatim.openstreetmap.org/" + path, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(12000) })
+    .then((r) => { if (!r.ok) throw new Error("Nominatim " + r.status); return r.json(); });
+  const p = nomChain.then(run, run);
+  nomChain = p.then(() => new Promise((r) => setTimeout(r, 1100)), () => new Promise((r) => setTimeout(r, 1100)));
+  return p;
+}
+const placeNameOf = (r) => {
+  const a = r.address || {};
+  return a.city || a.town || a.village || a.municipality || a.hamlet || a.county || r.name || String(r.display_name || "").split(",")[0];
+};
+async function searchPlace(q) {
+  const r = await nominatim(`search?format=jsonv2&addressdetails=1&limit=6&accept-language=de&q=${encodeURIComponent(q)}`);
+  return r.map((x) => ({ name: placeNameOf(x) || q, lat: +x.lat, lon: +x.lon, info: x.display_name }));
+}
+async function reversePlace(lat, lon) {
+  const r = await nominatim(`reverse?format=jsonv2&zoom=10&addressdetails=1&accept-language=de&lat=${lat}&lon=${lon}`);
+  return placeNameOf(r) || "";
+}
+
+/* ===== 80-ui.js ===== */
+/* ---------- Oberfläche ---------- */
+const S = { trip: newTrip(), tab: "trip", open: new Set(), newPoint: blankPlace(), busy: false };
+
+/* ---------- Zugriff auf Felder über Schlüssel ----------
+   "title", "startPlace.name", "d:<tagId>.place.name", "d:<tagId>.costs.<id>.l", "route.points.<id>.name" */
+function getRef(key) {
+  const parts = key.split(".");
+  let obj = S.trip;
+  if (parts[0].startsWith("d:")) { obj = S.trip.days.find((d) => d.id === parts[0].slice(2)); parts.shift(); }
+  else if (parts[0] === "$new") { obj = S.newPoint; parts.shift(); }
+  for (let i = 0; i < parts.length - 1 && obj; i++) obj = Array.isArray(obj) ? obj.find((x) => x.id === parts[i]) : obj[parts[i]];
+  return obj ? { obj, prop: parts[parts.length - 1] } : null;
+}
+const dayOf = (id) => S.trip.days.find((d) => d.id === id);
+
+/* ---------- Bausteine ---------- */
+const fld = (label, key, val, o = {}) => `<label class="f ${o.cls || ""}"><span>${label}</span>${o.rows
+  ? `<textarea data-k="${key}" rows="${o.rows}" placeholder="${esc(o.ph || "")}">${esc(val)}</textarea>`
+  : `<input data-k="${key}" type="${o.type || "text"}" value="${esc(val)}" placeholder="${esc(o.ph || "")}" ${o.inputmode ? `inputmode="${o.inputmode}"` : ""}>`}</label>`;
+const selFld = (label, key, val, opts, o = {}) => `<label class="f ${o.cls || ""}"><span>${label}</span><select data-k="${key}">${opts.map(([v, n]) => `<option value="${esc(v)}" ${v === val ? "selected" : ""}>${esc(n)}</option>`).join("")}</select></label>`;
+const chk = (label, key, val) => `<label class="chk"><input type="checkbox" data-k="${key}" ${val ? "checked" : ""}> ${label}</label>`;
+const geoText = (p) => (hasGeo(p) ? `✓ Position ${p.lat.toFixed(3)}, ${p.lon.toFixed(3)}` : "Keine Position: Ort wird nicht auf der Karte gezeigt. „Suchen“ wählt einen Treffer.");
+const placeFld = (label, key, p) => `<div class="f pp" data-pp="${key}"><span>${label}</span><div class="row"><input data-k="${key}.name" value="${esc(p.name)}" placeholder="Ort eingeben, dann Suchen"><button type="button" data-act="search" data-key="${key}">Suchen</button></div><small class="geo ${hasGeo(p) ? "ok" : ""}">${geoText(p)}</small><div class="res"></div></div>`;
+
+/* ---------- Reiter „Reise“ ---------- */
+function panelTrip() {
+  const t = S.trip, tpl = TEMPLATES[t.template];
+  return `<h3>Vorlage</h3><div class="tpls">${Object.values(TEMPLATES).map((x) => `<button class="tpl ${x.id === t.template ? "on" : ""}" data-act="tpl" data-id="${x.id}"><b>${esc(x.name)}</b><small>${esc(x.desc)}</small></button>`).join("")}</div>
+  <h3>Reise</h3>
+  ${fld("Titel", "title", t.title, { ph: "z. B. Alpenrundreise 2026" })}
+  ${fld("Untertitel", "subtitle", t.subtitle, { ph: "optional" })}
+  ${fld("Reisende", "travelers", t.travelers, { ph: "z. B. Anna & Ben" })}
+  <div class="row two">${fld("Reisebeginn", "start", t.start, { type: "date" })}${selFld("Währung", "currency", t.currency, [["EUR", "Euro (€)"], ["CHF", "Franken (CHF)"], ["USD", "US-Dollar ($)"], ["GBP", "Pfund (£)"], ["SEK", "Schwedische Kronen"], ["NOK", "Norwegische Kronen"], ["DKK", "Dänische Kronen"], ["PLN", "Złoty"], ["CZK", "Tschechische Kronen"]])}</div>
+  ${placeFld("Startort (Heimat)", "startPlace", t.startPlace)}
+  ${tpl.fixedPlace ? placeFld("Reiseziel", "destination", t.destination) : ""}
+  ${chk("Rückreise zum Startort auf der Karte", "roundTrip", t.roundTrip)}
+  <h3>Design</h3>
+  <div class="btnrow"><label class="drop" style="padding:5px 10px;margin:0;display:inline-block">${t.coverPhoto ? "Titelfoto ändern …" : "Titelfoto wählen …"}<input type="file" accept="image/*" hidden id="coverFile"></label>${t.coverPhoto ? `<button data-act="delCover">Titelfoto entfernen</button>` : ""}</div>
+  <div class="themes">${Object.entries(THEMES).map(([id, th]) => `<button class="theme ${id === t.theme ? "on" : ""}" data-act="theme" data-id="${id}"><i style="background:${th.accent}"></i>${esc(th.name)}</button>`).join("")}</div>
+  <h3>Seiten</h3>
+  ${chk("Linien zum Handschreiben in freien Textbereichen", "ruled", t.ruled)}
+  ${chk("Kostenübersicht am Ende", "costPage", t.costPage)}`;
+}
+
+/* ---------- Reiter „Tage“ ---------- */
+const DAY_FIELDS = {
+  place: (d) => placeFld("Ort / Ziel des Tages", `d:${d.id}.place`, d.place),
+  from: (d) => fld("Start (leer = vorheriger Ort)", `d:${d.id}.from`, d.from),
+  km: (d) => fld("Kilometer", `d:${d.id}.km`, d.km, { inputmode: "decimal" }),
+  drive: (d) => fld("Fahrzeit (Std:Min)", `d:${d.id}.drive`, d.drive, { ph: "2:30" }),
+  title: (d) => fld("Titel des Tages", `d:${d.id}.title`, d.title, { ph: "z. B. Salzkammergut" }),
+  weather: (d) => `<div class="wx">${selFld("Wetter", `d:${d.id}.weather`, d.weather, [["", "–"], ...WEATHER.map((w) => [w.id, w.name])])}${fld("Min °C", `d:${d.id}.tmin`, d.tmin, { inputmode: "decimal" })}${fld("Max °C", `d:${d.id}.tmax`, d.tmax, { inputmode: "decimal" })}</div>`,
+  lodging: (d) => fld("Unterkunft", `d:${d.id}.lodging`, d.lodging),
+  text: (d) => fld(S.trip.template === "kurztrip" ? "Notizen" : "Tagebuch", `d:${d.id}.text`, d.text, { rows: 7, ph: "Was haben wir erlebt?" }),
+  plan: (d) => fld("Tagesplan (eine Zeile pro Punkt, Uhrzeit vorn)", `d:${d.id}.plan`, d.plan, { rows: 7, ph: "09:30 Frühstück im Café, 11:00 Stadtrundgang, …" }),
+  highlights: (d) => fld("Highlights (eine pro Zeile)", `d:${d.id}.highlights`, d.highlights, { rows: 3 }),
+  costs: (d) => `<div class="f"><span>Ausgaben <b data-sum="${d.id}">${dayCosts(d) ? "· " + money(dayCosts(d), S.trip.currency) : ""}</b></span>${d.costs.map((c) => `<div class="cost"><input data-k="d:${d.id}.costs.${c.id}.l" value="${esc(c.l)}" placeholder="Bezeichnung"><select data-k="d:${d.id}.costs.${c.id}.cat">${CATS.map((k) => `<option value="${k.id}" ${k.id === c.cat ? "selected" : ""}>${esc(k.name)}</option>`).join("")}</select><input data-k="d:${d.id}.costs.${c.id}.a" value="${esc(c.a)}" inputmode="decimal" placeholder="0,00"><button class="ico" data-act="delCost" data-day="${d.id}" data-id="${c.id}" title="Entfernen">×</button></div>`).join("")}<button data-act="addCost" data-day="${d.id}">+ Ausgabe</button></div>`,
+  photos: (d) => `<div class="f"><span>Fotos (${d.photos.length})</span><div class="thumbs">${d.photos.map((p) => `<div class="thumb"><img src="${p.src}" alt=""><button data-act="delPhoto" data-day="${d.id}" data-id="${p.id}" title="Entfernen">×</button></div>`).join("")}</div><label class="drop" style="padding:6px;margin:0">+ Fotos wählen<input type="file" accept="image/*" multiple hidden data-photos="${d.id}"></label></div>`,
+};
+
+function daySummary(i) {
+  const d = S.trip.days[i], name = dayPlaceName(S.trip, d);
+  return `Tag ${i + 1}${d.date ? ` <small>${esc(fmtDate(d.date, { weekday: "short", day: "numeric", month: "short" }))}</small>` : ""}${d.title || name ? ` · ${esc(d.title || name)}` : ""}`;
+}
+
+function panelDays() {
+  const t = S.trip, tpl = TEMPLATES[t.template];
+  const startDefault = t.days.length ? addDays(t.days[t.days.length - 1].date || t.start || isoOf(new Date()), 1) : t.start;
+  return `<label class="drop" id="dropAll">Fotos hierher ziehen oder klicken: sie werden nach Aufnahmedatum den Tagen zugeordnet (fehlende Tage entstehen dabei)<input type="file" accept="image/*" multiple hidden id="photoAll"></label>
+  <div class="btnrow"><button data-act="addDay">+ Tag hinzufügen</button>
+    <span class="row" style="gap:4px">ab <input type="date" id="genStart" value="${esc(startDefault || "")}" style="border:1px solid var(--line);border-radius:8px;padding:5px"> <input type="number" id="genN" min="1" max="60" value="${tpl.defaultDays}" style="width:60px;border:1px solid var(--line);border-radius:8px;padding:5px"> Tage <button data-act="genDays">anlegen</button></span>
+    <button data-act="sortDays" title="Nach Datum sortieren">Sortieren</button></div>
+  ${t.days.map((d, i) => `<details class="day" data-day="${d.id}" ${S.open.has(d.id) ? "open" : ""}><summary><span class="dsum">${daySummary(i)}</span></summary><div class="body">
+    ${fld("Datum", `d:${d.id}.date`, d.date, { type: "date" })}
+    ${tpl.dayFields.map((k) => DAY_FIELDS[k](d)).join("")}
+    <div class="btnrow"><button data-act="dayUp" data-day="${d.id}">↑ Nach oben</button><button data-act="dayDown" data-day="${d.id}">↓ Nach unten</button><button data-act="delDay" data-day="${d.id}">Tag löschen</button></div>
+  </div></details>`).join("") || "<p><small>Noch keine Tage. Mit „Tag hinzufügen“ oder „anlegen“ beginnen.</small></p>"}`;
+}
+
+/* ---------- Reiter „Karte“ ---------- */
+function mapStale(t) { return t.mapImg && !t.mapUser && t.route.mapSig !== mapSignature(t); }
+
+function panelMap() {
+  const t = S.trip, r = t.route;
+  const canLegs = r.auto && r.legs && r.legs.length && r.legs.length === r.points.length - 1 && r.points.every(hasGeo) && !TEMPLATES[t.template].fixedPlace;
+  return `<h3>Route</h3>
+  ${chk("Orte automatisch aus Startort, Tagen und Foto-GPS bilden", "route.auto", r.auto)}
+  ${r.points.length ? r.points.map((p, i) => `<div class="pt"><span class="n">${i + 1}</span>${placeFld("", `route.points.${p.id}`, p).replace("<span></span>", "")}<span class="row"><button class="ico" data-act="ptUp" data-id="${p.id}">↑</button><button class="ico" data-act="ptDown" data-id="${p.id}">↓</button><button class="ico" data-act="ptDel" data-id="${p.id}">×</button></span></div>`).join("") : "<p><small>Noch keine Orte. Startort, Tagesorte oder Fotos mit GPS liefern sie automatisch, oder unten von Hand ergänzen.</small></p>"}
+  ${placeFld("Ort am Ende hinzufügen", "$new", S.newPoint)}
+  <h3>Karte</h3>
+  ${chk("Straßenroute berechnen (OSRM, sonst Luftlinie)", "route.road", r.road)}
+  <div class="btnrow"><button class="primary" data-act="makeMap" id="mapBtn">Karte erzeugen</button><label class="drop" style="padding:5px 10px;margin:0;display:inline-block">Eigenes Bild …<input type="file" accept="image/*" hidden id="mapFile"></label>${t.mapImg ? `<button data-act="delMap">Karte entfernen</button>` : ""}${canLegs ? `<button data-act="applyLegs" title="Trägt Kilometer und Fahrzeit der berechneten Straßenroute in die Tage ein">km und Fahrzeit in Tage übernehmen</button>` : ""}</div>
+  <small id="mapStatus"></small>
+  ${mapStale(t) ? `<div class="note">Die Route hat sich seit dem Erzeugen der Karte geändert. Die Karte bleibt unverändert, bis du sie neu erzeugst.</div>` : ""}
+  ${t.mapImg ? `<img class="mapimg" src="${t.mapImg}" alt="Karte">` : ""}
+  <p><small>Die Karte wird einmal aus OpenStreetMap-Kacheln zusammengesetzt (© OpenStreetMap-Mitwirkende) und danach als festes Bild in der Reise gespeichert. Ohne Internet entsteht eine Schemakarte.</small></p>`;
+}
+
+/* ---------- Reiter „Zusammenfassung“ ---------- */
+function panelSum() {
+  const t = S.trip, st = tripStats(t);
+  return `<h3>Text für die Deckseite</h3>
+  ${fld("Zusammenfassung", "summary", t.summary, { rows: 9 })}
+  ${chk("Automatisch aus Tagen und Fotos erzeugen (Änderungen schalten das aus)", "summaryAuto", t.summaryAuto)}
+  <div class="btnrow"><button data-act="resum">Vorschlag neu erzeugen</button></div>
+  <h3>Kennzahlen</h3>
+  <div class="stat"><span>Dauer</span><b>${st.nDays} Tage${st.range ? " · " + esc(st.range) : ""}</b></div>
+  <div class="stat"><span>Stationen</span><b>${st.places.length}</b></div>
+  <div class="stat"><span>Strecke</span><b>${st.km ? (st.kmEst ? "etwa " : "") + fmtNum(st.km) + " km" : "–"}</b></div>
+  <div class="stat"><span>Kosten</span><b>${st.cost ? money(st.cost, t.currency) : "–"}</b></div>
+  <div class="stat"><span>Fotos</span><b>${st.photos}</b></div>`;
+}
+
+/* ---------- Rendern ---------- */
+function renderPanel() {
+  const el = $("#panel"), top = el.scrollTop;
+  el.innerHTML = { trip: panelTrip, days: panelDays, map: panelMap, sum: panelSum }[S.tab]();
+  el.scrollTop = top;
+  $$("#tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === S.tab));
+  if (S.tab === "days") bindDrop();
+}
+
+let prevTimer, saveTimer;
+function schedulePreview() { clearTimeout(prevTimer); prevTimer = setTimeout(renderPreview, 220); }
+function renderPreview() {
+  const { pages, warns } = layoutTrip(S.trip);
+  $("#pages").innerHTML = pages.map((pg) => `<div class="sheet" style="aspect-ratio:${pg.W}/${pg.H}">${pageHtml(pg)}</div>`).join("");
+  $("#pageCount").textContent = `${pages.length} ${pages.length === 1 ? "Seite" : "Seiten"}`;
+  $("#warn").textContent = warns.length ? "⚠ " + warns[0] + (warns.length > 1 ? ` (+${warns.length - 1})` : "") : "";
+  $("#warn").title = warns.join("\n");
+}
+
+function scheduleSave() { clearTimeout(saveTimer); saveTimer = setTimeout(() => idbSet("trip", S.trip).catch(() => {}), 600); }
+
+/* Nach jeder Änderung: Abgeleitetes aktualisieren, Vorschau und Autosave anstoßen. */
+function changed(key) {
+  const t = S.trip;
+  if (key && key.startsWith("route.points")) t.route.auto = false;
+  if (key === "summary") t.summaryAuto = false;
+  refreshDerived(t);
+  if (key && key.startsWith("route.points")) { const c = $('[data-k="route.auto"]'); if (c) c.checked = false; }
+  const sm = $('[data-k="summary"]'); if (sm && t.summaryAuto && document.activeElement !== sm) sm.value = t.summary;
+  const sa = $('[data-k="summaryAuto"]'); if (sa) sa.checked = t.summaryAuto;
+  schedulePreview(); scheduleSave();
+}
+
+/* ---------- Ereignisse ---------- */
+document.addEventListener("input", (e) => {
+  const el = e.target, key = el.dataset && el.dataset.k;
+  if (!key) return;
+  const r = getRef(key); if (!r) return;
+  r.obj[r.prop] = el.type === "checkbox" ? el.checked : el.value;
+  if (key === "route.auto" && el.checked) t_resetRoute();
+  if (key === "summaryAuto" && el.checked) { S.trip.summary = suggestSummary(S.trip); const sm = $('[data-k="summary"]'); if (sm) sm.value = S.trip.summary; }
+  const card = el.closest("details.day");
+  if (card) {
+    const i = S.trip.days.findIndex((d) => d.id === card.dataset.day);
+    if (i >= 0) { $(".dsum", card).innerHTML = daySummary(i); const sum = $(`[data-sum="${card.dataset.day}"]`, card); if (sum) { const c = dayCosts(S.trip.days[i]); sum.textContent = c ? "· " + money(c, S.trip.currency) : ""; } }
+  }
+  if (key === "route.road" || key === "currency") { if (key === "currency") schedulePreview(); }
+  changed(key);
+});
+function t_resetRoute() { S.trip.route.auto = true; rebuildRoute(S.trip); renderPanel(); }
+
+document.addEventListener("toggle", (e) => {
+  const d = e.target;
+  if (d.matches && d.matches("details.day")) d.open ? S.open.add(d.dataset.day) : S.open.delete(d.dataset.day);
+}, true);
+
+document.addEventListener("change", (e) => {
+  const el = e.target;
+  if (el.matches("[data-photos]")) addPhotosToDay(el.dataset.photos, [...el.files]);
+  else if (el.id === "photoAll") distributePhotos([...el.files]);
+  else if (el.id === "mapFile") useOwnMap(el.files[0]);
+  else if (el.id === "coverFile") useCover(el.files[0]);
+  else if (el.id === "openFile") openProject(el.files[0]);
+  else if (el.id === "demo") { if (el.value) loadTrip(demoTrip(el.value)); el.value = ""; }
+  else if (el.id === "zoom") document.documentElement.style.setProperty("--z", el.value / 100);
+  else if (el.dataset.k === "start" || el.dataset.k === "roundTrip" || el.dataset.k === "ruled" || el.dataset.k === "costPage") { /* nur Vorschau */ }
+  if (el.dataset && el.dataset.k && /\.(weather|cat|date)$/.test(el.dataset.k)) renderPanel();
+});
+
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-act],[data-tab]");
+  if (!b) return;
+  if (b.dataset.tab) { S.tab = b.dataset.tab; renderPanel(); return; }
+  const t = S.trip, id = b.dataset.id, dayId = b.dataset.day;
+  switch (b.dataset.act) {
+    case "tpl": {
+      t.template = id;
+      if (TEMPLATES[id].fixedPlace && !t.destination.name) { const d = t.days.find((x) => x.place.name); if (d) t.destination = { ...d.place }; }
+      changed(); renderPanel(); break;
+    }
+    case "theme": t.theme = id; changed(); renderPanel(); break;
+    case "addDay": {
+      const last = t.days[t.days.length - 1], d = newDay(last && last.date ? addDays(last.date, 1) : t.start || "");
+      if (TEMPLATES[t.template].fixedPlace) d.place = { ...t.destination };
+      t.days.push(d); S.open.add(d.id); changed(); renderPanel(); break;
+    }
+    case "genDays": {
+      const start = $("#genStart").value, n = clamp(parseInt($("#genN").value) || 0, 1, 60);
+      if (!parseIso(start)) { toast("Bitte ein Startdatum wählen."); break; }
+      for (let k = 0; k < n; k++) {
+        const date = addDays(start, k);
+        if (t.days.some((d) => d.date === date)) continue;
+        const d = newDay(date); if (TEMPLATES[t.template].fixedPlace) d.place = { ...t.destination };
+        t.days.push(d);
+      }
+      t.days.sort(byDate); if (!t.start) t.start = start;
+      changed(); renderPanel(); break;
+    }
+    case "sortDays": t.days.sort(byDate); changed(); renderPanel(); break;
+    case "delDay": if (confirm("Diesen Tag mit Text, Ausgaben und Fotos löschen?")) { t.days = t.days.filter((d) => d.id !== dayId); changed(); renderPanel(); } break;
+    case "dayUp": case "dayDown": {
+      const i = t.days.findIndex((d) => d.id === dayId), j = i + (b.dataset.act === "dayUp" ? -1 : 1);
+      if (j >= 0 && j < t.days.length) { [t.days[i], t.days[j]] = [t.days[j], t.days[i]]; changed(); renderPanel(); }
+      break;
+    }
+    case "addCost": dayOf(dayId).costs.push({ id: uid(), l: "", cat: "sonstiges", a: "" }); S.open.add(dayId); renderPanel(); break;
+    case "delCost": { const d = dayOf(dayId); d.costs = d.costs.filter((c) => c.id !== id); changed(); renderPanel(); break; }
+    case "delPhoto": { const d = dayOf(dayId); d.photos = d.photos.filter((p) => p.id !== id); changed(); renderPanel(); break; }
+    case "search": doSearch(b.dataset.key, b.closest(".pp")); break;
+    case "pick": pickPlace(b); break;
+    case "ptUp": case "ptDown": {
+      const pts = t.route.points, i = pts.findIndex((p) => p.id === id), j = i + (b.dataset.act === "ptUp" ? -1 : 1);
+      if (j >= 0 && j < pts.length) { [pts[i], pts[j]] = [pts[j], pts[i]]; changed("route.points"); renderPanel(); }
+      break;
+    }
+    case "ptDel": t.route.points = t.route.points.filter((p) => p.id !== id); changed("route.points"); renderPanel(); break;
+    case "makeMap": makeMap(); break;
+    case "delCover": t.coverPhoto = ""; changed(); renderPanel(); break;
+    case "delMap": t.mapImg = ""; t.mapUser = false; changed(); renderPanel(); break;
+    case "applyLegs": applyLegs(); break;
+    case "resum": t.summary = suggestSummary(t); t.summaryAuto = true; changed(); renderPanel(); break;
+    case "new": if (confirm("Alle Eingaben verwerfen und neu beginnen?")) loadTrip(newTrip(t.template), true); break;
+    case "open": $("#openFile").click(); break;
+    case "save": saveProject(); break;
+    case "pdf": makePdf(); break;
+  }
+});
+
+const byDate = (a, b) => (a.date || "9999").localeCompare(b.date || "9999");
+
+/* ---------- Ortssuche ---------- */
+async function doSearch(key, box) {
+  const input = $(`[data-k="${key}.name"]`, box), res = $(".res", box), q = input.value.trim();
+  if (!q) return;
+  res.innerHTML = "<small>Suche …</small>";
+  try {
+    const list = await searchPlace(q);
+    window._results = window._results || {}; window._results[key] = list;
+    res.innerHTML = list.length ? list.map((r, i) => `<button data-act="pick" data-key="${esc(key)}" data-i="${i}">${esc(r.name)} <small>${esc(r.info.split(",").slice(1, 4).join(","))}</small></button>`).join("") : "<small>Nichts gefunden.</small>";
+  } catch (e) { res.innerHTML = "<small>Die Suche ist nicht erreichbar (kein Internet oder gesperrt). Der Ort bleibt ohne Position.</small>"; }
+}
+function pickPlace(b) {
+  const key = b.dataset.key, r = window._results[key][+b.dataset.i], t = S.trip;
+  if (key === "$new") {
+    t.route.points.push({ id: uid(), name: r.name, lat: r.lat, lon: r.lon, day: -1 }); t.route.auto = false;
+    S.newPoint = blankPlace();
+  } else {
+    const ref = getRef(key + ".name"); if (!ref) return;
+    const o = ref.obj; o.name = r.name; o.lat = r.lat; o.lon = r.lon;
+    if (key.startsWith("route.points")) t.route.auto = false;
+  }
+  changed(key); renderPanel();
+}
+
+/* ---------- Fotos ---------- */
+function bindDrop() {
+  const z = $("#dropAll"); if (!z) return;
+  z.addEventListener("dragover", (e) => { e.preventDefault(); z.classList.add("over"); });
+  z.addEventListener("dragleave", () => z.classList.remove("over"));
+  z.addEventListener("drop", (e) => { e.preventDefault(); z.classList.remove("over"); distributePhotos([...e.dataTransfer.files]); });
+}
+const isImg = (f) => /^image\//.test(f.type) || /\.(jpe?g|png|webp)$/i.test(f.name);
+
+async function readAll(files) {
+  const out = [];
+  for (const f of files.filter(isImg)) {
+    try { out.push(await readPhoto(f)); } catch (e) { toast(`„${f.name}“ konnte nicht gelesen werden (HEIC bitte vorher in JPEG wandeln).`); }
+  }
+  return out;
+}
+async function addPhotosToDay(dayId, files) {
+  const d = dayOf(dayId); if (!d) return;
+  toast("Fotos werden gelesen …", 20000);
+  d.photos.push(...(await readAll(files)));
+  S.open.add(dayId); changed(); renderPanel(); toast("Fotos hinzugefügt.");
+}
+async function distributePhotos(files) {
+  const t = S.trip;
+  toast("Fotos werden gelesen …", 60000);
+  const list = (await readAll(files)).sort((a, b) => (a.day || "").localeCompare(b.day || ""));
+  let made = 0, nameJobs = [];
+  for (const p of list) {
+    let d = p.day ? t.days.find((x) => x.date === p.day) : t.days[t.days.length - 1];
+    if (!d) {
+      d = newDay(p.day); if (TEMPLATES[t.template].fixedPlace) d.place = { ...t.destination };
+      t.days.push(d); t.days.sort(byDate); made++;
+      if (p.gps && !TEMPLATES[t.template].fixedPlace) nameJobs.push([d, p.gps]);
+    }
+    d.photos.push(p);
+  }
+  changed(); renderPanel();
+  toast(`${list.length} Fotos zugeordnet${made ? `, ${made} neue Tage angelegt` : ""}.`);
+  for (const [d, g] of nameJobs) {
+    try { const name = await reversePlace(g.lat, g.lon); if (name && !d.place.name) { d.place = { name, lat: g.lat, lon: g.lon }; changed(); if (S.tab === "days") renderPanel(); } } catch (e) { break; }
+  }
+}
+
+/* ---------- Karte ---------- */
+async function makeMap() {
+  const t = S.trip, btn = $("#mapBtn"), st = $("#mapStatus");
+  if (btn) btn.disabled = true;
+  try {
+    const r = await renderMap(t, { road: t.route.road, onStatus: (m) => { const e = $("#mapStatus"); if (e) e.textContent = m; } });
+    t.mapImg = r.src; t.mapW = r.w; t.mapH = r.h; t.mapUser = false; t.route.mapSig = mapSignature(t);
+    if (r.legs) { t.route.legs = r.legs; t.route.km = r.km; }
+    changed(); renderPanel();
+    toast(r.mode === "osm" ? "Karte erzeugt." : "Karte erzeugt, aber ohne Kartenhintergrund (Kacheln nicht erreichbar).");
+  } catch (e) { if (st) st.textContent = e.message; toast(e.message); if (btn) btn.disabled = false; }
+}
+async function useOwnMap(file) {
+  if (!file) return;
+  try {
+    const bmp = await createImageBitmap(file), s = Math.min(1, 2000 / Math.max(bmp.width, bmp.height));
+    const cv = document.createElement("canvas"); cv.width = Math.round(bmp.width * s); cv.height = Math.round(bmp.height * s);
+    cv.getContext("2d").drawImage(bmp, 0, 0, cv.width, cv.height);
+    S.trip.mapImg = cv.toDataURL("image/jpeg", 0.9); S.trip.mapW = cv.width; S.trip.mapH = cv.height; S.trip.mapUser = true;
+    changed(); renderPanel(); toast("Eigenes Kartenbild übernommen (wird auf der Deckseite zugeschnitten eingepasst).");
+  } catch (e) { toast("Das Bild konnte nicht gelesen werden."); }
+}
+/* Titelfoto: auf das Seitenverhältnis des Farbbalkens zuschneiden und abdunkeln, damit weiße Schrift lesbar bleibt. */
+async function useCover(file) {
+  if (!file) return;
+  try {
+    const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+    const W = 1500, H = Math.round(W * 290 / PW), cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+    const g = cv.getContext("2d"), k = Math.max(W / bmp.width, H / bmp.height);
+    g.drawImage(bmp, (W - bmp.width * k) / 2, (H - bmp.height * k) / 2, bmp.width * k, bmp.height * k);
+    const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, "rgba(0,0,0,.35)"); gr.addColorStop(1, "rgba(0,0,0,.68)");
+    g.fillStyle = gr; g.fillRect(0, 0, W, H);
+    S.trip.coverPhoto = cv.toDataURL("image/jpeg", 0.88); S.trip.coverW = W; S.trip.coverH = H;
+    changed(); renderPanel(); toast("Titelfoto übernommen.");
+  } catch (e) { toast("Das Bild konnte nicht gelesen werden."); }
+}
+function applyLegs() {
+  const t = S.trip, pts = t.route.points, legs = t.route.legs;
+  let n = 0;
+  legs.forEach((leg, k) => {
+    const di = pts[k + 1] && pts[k + 1].day;
+    if (di == null || di < 0 || !t.days[di]) return;
+    const d = t.days[di];
+    d.km = String(Math.round(leg.km));
+    const m = Math.round(leg.min); d.drive = `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}`;
+    n++;
+  });
+  changed(); renderPanel(); toast(n ? `Kilometer und Fahrzeit für ${n} Tage eingetragen.` : "Keine passenden Tage gefunden.");
+}
+
+/* ---------- Projekt: speichern, öffnen, PDF ---------- */
+function loadTrip(t, fresh) {
+  S.trip = normalizeTrip(t); S.open = new Set(); S.newPoint = blankPlace();
+  if (!fresh && S.trip.days[0]) S.open.add(S.trip.days[0].id);
+  refreshDerived(S.trip);
+  S.tab = fresh ? "trip" : "trip";
+  renderPanel(); renderPreview(); scheduleSave();
+}
+function saveProject() {
+  download(new Blob([JSON.stringify(S.trip)], { type: "application/json" }), safeName(S.trip.title) + ".reise.json");
+  toast("Projektdatei gespeichert (mit Fotos und Karte).");
+}
+async function openProject(file) {
+  if (!file) return;
+  try {
+    const t = JSON.parse(await file.text());
+    if (!t || !Array.isArray(t.days)) throw new Error("kein Reiseprojekt");
+    loadTrip(t); toast("Projekt geöffnet.");
+  } catch (e) { toast("Die Datei ist kein gültiges Reise-Projekt."); }
+  $("#openFile").value = "";
+}
+async function makePdf() {
+  const btn = $("#pdfBtn"); if (S.busy) return;
+  if (!window.PDFLib) { toast("Die PDF-Bibliothek konnte nicht geladen werden (Internet nötig)."); return; }
+  S.busy = true; btn.disabled = true;
+  try {
+    const { pages } = layoutTrip(S.trip);
+    const bytes = await buildPdf(pages, { title: S.trip.title, author: S.trip.travelers }, (n, N) => (btn.textContent = `Seite ${n}/${N} …`));
+    download(new Blob([bytes], { type: "application/pdf" }), safeName(S.trip.title) + ".pdf");
+    toast("PDF erstellt.");
+  } catch (e) { console.error(e); toast("PDF-Fehler: " + e.message); }
+  S.busy = false; btn.disabled = false; btn.textContent = "PDF erstellen";
+}
+
+/* ---------- Autosave im Browser (IndexedDB, wegen der Fotos) ---------- */
+function idb() {
+  return new Promise((res, rej) => {
+    const q = indexedDB.open("reise-protokoll", 1);
+    q.onupgradeneeded = () => q.result.createObjectStore("kv");
+    q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error);
+  });
+}
+const idbSet = (k, v) => idb().then((db) => new Promise((res, rej) => { const tx = db.transaction("kv", "readwrite"); tx.objectStore("kv").put(v, k); tx.oncomplete = res; tx.onerror = () => rej(tx.error); }));
+const idbGet = (k) => idb().then((db) => new Promise((res, rej) => { const r = db.transaction("kv").objectStore("kv").get(k); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }));
+
+/* ===== 90-main.js ===== */
+/* ---------- Start ---------- */
+(async function main() {
+  let saved = null;
+  try { saved = await idbGet("trip"); } catch (e) { /* kein Speicher verfügbar */ }
+  if (saved && saved.days) { S.trip = normalizeTrip(saved); refreshDerived(S.trip); }
+  else S.trip = demoTrip("rundreise");
+  renderPanel(); renderPreview();
+  await initFonts();
+  renderPanel(); renderPreview();
+})();
+</script>
+</body></html>

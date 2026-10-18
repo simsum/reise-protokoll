@@ -1,0 +1,192 @@
+/* ---------- Datenmodell ----------
+   Eine Reise (`trip`) besteht aus Einstellungen, Tagen, Route und Karte.
+   Alles ist einfaches JSON und wird als Projektdatei gespeichert. */
+
+const CATS = [
+  { id: "unterkunft", name: "Unterkunft" },
+  { id: "essen", name: "Essen & Trinken" },
+  { id: "transport", name: "Transport" },
+  { id: "aktivitaeten", name: "Aktivitäten" },
+  { id: "sonstiges", name: "Sonstiges" },
+];
+const WEATHER = [
+  { id: "sun", name: "Sonnig" }, { id: "partly", name: "Heiter" }, { id: "cloud", name: "Bewölkt" },
+  { id: "rain", name: "Regen" }, { id: "storm", name: "Gewitter" }, { id: "snow", name: "Schnee" }, { id: "fog", name: "Nebel" },
+];
+const weatherName = (id) => (WEATHER.find((w) => w.id === id) || {}).name || "";
+
+const blankPlace = () => ({ name: "", lat: null, lon: null });
+
+function newDay(date = "") {
+  return {
+    id: uid(), date, place: blankPlace(), from: "", km: "", drive: "", title: "", lodging: "",
+    weather: "", tmin: "", tmax: "", text: "", plan: "",
+    highlights: "", costs: [], photos: [],
+  };
+}
+
+function newTrip(template = "rundreise") {
+  return {
+    format: 1, template, theme: "meer", title: "", subtitle: "", travelers: "", currency: "EUR", start: "",
+    startPlace: blankPlace(), destination: blankPlace(), roundTrip: false,
+    days: [], summary: "", summaryAuto: true,
+    route: { auto: true, road: true, points: [], km: null, legs: [], mapSig: "" },
+    mapImg: "", mapUser: false, coverPhoto: "", ruled: true, costPage: true,
+  };
+}
+
+/* Fehlende Felder ergänzen (beim Laden älterer oder fremder Dateien). */
+function normalizeTrip(t) {
+  const base = newTrip(TEMPLATES[t && t.template] ? t.template : "rundreise");
+  const out = { ...base, ...t };
+  out.startPlace = { ...blankPlace(), ...(t.startPlace || {}) };
+  out.destination = { ...blankPlace(), ...(t.destination || {}) };
+  out.route = { ...base.route, ...(t.route || {}) };
+  if (!THEMES[out.theme]) out.theme = "meer";
+  out.days = (Array.isArray(t.days) ? t.days : []).map((d) => ({
+    ...newDay(), ...d, place: { ...blankPlace(), ...(d.place || {}) },
+    costs: Array.isArray(d.costs) ? d.costs.map((c) => ({ id: uid(), l: "", cat: "sonstiges", a: "", ...c })) : [],
+    photos: Array.isArray(d.photos) ? d.photos : [],
+  }));
+  return out;
+}
+
+/* ---------- Ableitungen ---------- */
+const dayCosts = (d) => d.costs.reduce((s, c) => s + parseNum(c.a), 0);
+const dayHighlights = (d) => String(d.highlights || "").split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+
+function dayFrom(t, i) {
+  const d = t.days[i];
+  if (d.from.trim()) return d.from.trim();
+  if (i > 0) return t.days[i - 1].place.name || "";
+  return t.startPlace.name || "";
+}
+const dayPlaceName = (t, d) => (TEMPLATES[t.template].fixedPlace ? t.destination.name || d.place.name : d.place.name);
+
+function tripStats(t) {
+  const days = t.days, n = days.length;
+  const dated = days.map((d) => d.date).filter((x) => parseIso(x)).sort();
+  const start = dated[0] || t.start || "", end = dated[dated.length - 1] || "";
+  const places = [], seen = new Set();
+  const addP = (name) => {
+    name = (name || "").trim();
+    if (name && !seen.has(name.toLowerCase())) { seen.add(name.toLowerCase()); places.push(name); }
+  };
+  if (TEMPLATES[t.template].fixedPlace) addP(t.destination.name);
+  else days.forEach((d) => addP(d.place.name));
+  let km = days.reduce((s, d) => s + parseNum(d.km), 0), kmEst = false;
+  if (!km && t.route.km) km = t.route.km;
+  if (!km) {
+    const pts = t.route.points.filter(hasGeo);
+    for (let i = 1; i < pts.length; i++) km += haversine(pts[i - 1], pts[i]) * 1.25;
+    kmEst = km > 0;
+  }
+  const byCat = {}; let cost = 0;
+  days.forEach((d) => d.costs.forEach((c) => { const a = parseNum(c.a); cost += a; byCat[c.cat] = (byCat[c.cat] || 0) + a; }));
+  const temps = days.filter((d) => hasNum(d.tmin) || hasNum(d.tmax)).map((d) => (hasNum(d.tmin) && hasNum(d.tmax) ? (parseNum(d.tmin) + parseNum(d.tmax)) / 2 : parseNum(hasNum(d.tmin) ? d.tmin : d.tmax)));
+  return {
+    nDays: n, nights: Math.max(0, n - 1), start, end, range: fmtRange(start, end), places, km: Math.round(km), kmEst,
+    cost, byCat, perDay: n ? cost / n : 0, photos: days.reduce((s, d) => s + d.photos.length, 0),
+    avgT: temps.length ? temps.reduce((a, b) => a + b, 0) / temps.length : null,
+    sunDays: days.filter((d) => d.weather === "sun" || d.weather === "partly").length,
+  };
+}
+
+/* ---------- Route aus Tagen und Fotos ---------- */
+function routeFromDays(t) {
+  const pts = [];
+  const push = (p, force, day = -1) => {
+    if (!p || !p.name) return;
+    const last = pts[pts.length - 1];
+    if (!force && last && (last.name === p.name || (hasGeo(last) && hasGeo(p) && haversine(last, p) < 1))) return;
+    pts.push({ id: uid(), name: p.name, lat: hasGeo(p) ? p.lat : null, lon: hasGeo(p) ? p.lon : null, day });
+  };
+  push(t.startPlace);
+  if (TEMPLATES[t.template].fixedPlace) push(t.destination);
+  else {
+    for (const [di, d] of t.days.entries()) {
+      let p = d.place;
+      if (p.name && !hasGeo(p)) {
+        const g = d.photos.find((x) => x.gps);
+        if (g) p = { name: p.name, lat: g.gps.lat, lon: g.gps.lon };
+      }
+      push(p, false, di);
+    }
+  }
+  if (t.roundTrip && t.startPlace.name) push(t.startPlace, pts.length > 1 && pts[pts.length - 1].name !== t.startPlace.name);
+  return pts;
+}
+
+function rebuildRoute(t) {
+  if (t.route.auto) t.route.points = routeFromDays(t);
+}
+
+/* ---------- Zusammenfassung vorschlagen ---------- */
+function suggestSummary(t) {
+  const st = tripStats(t), out = [];
+  const days = `${st.nDays} ${st.nDays === 1 ? "Tag" : "Tage"}`;
+  if (!st.nDays) return "";
+  if (TEMPLATES[t.template].fixedPlace) {
+    const dest = t.destination.name || st.places[0] || "unser Ziel";
+    out.push(`${st.nDays > 1 ? "Kurztrip" : "Ausflug"} nach ${dest}: ${days}${st.range ? " (" + st.range + ")" : ""}.`);
+  } else {
+    const start = t.startPlace.name || "", seq = [...new Set([start, ...st.places].filter(Boolean))];
+    let route = "";
+    const back = t.roundTrip && start ? " und zurück nach " + start : "";
+    if (seq.length >= 3) route = ` von ${seq[0]} über ${listDe(seq.slice(1, back ? undefined : -1))}${back ? "" : " nach " + seq[seq.length - 1]}${back}`;
+    else if (seq.length === 2) route = ` von ${seq[0]} nach ${seq[1]}${back}`;
+    else if (seq.length === 1) route = ` in ${seq[0]}`;
+    out.push(`Rundreise${route}: ${days}${st.range ? " (" + st.range + ")" : ""}.`);
+    const bits = [];
+    if (st.places.length) bits.push(`${st.places.length} ${st.places.length === 1 ? "Station" : "Stationen"}`);
+    if (st.km) bits.push(`${st.kmEst ? "etwa " : ""}${fmtNum(st.km)} km`);
+    if (bits.length) out.push("Unterwegs: " + bits.join(", ") + ".");
+  }
+  const hl = t.days.flatMap(dayHighlights).slice(0, 4);
+  if (hl.length) out.push("Highlights: " + listDe(hl) + ".");
+  if (st.cost > 0) out.push(`Gesamtkosten ${money(st.cost, t.currency)}, durchschnittlich ${money(st.perDay, t.currency)} pro Tag.`);
+  if (st.avgT != null) out.push(`Wetter: durchschnittlich ${fmtNum(st.avgT)} °C${st.sunDays ? ", an " + st.sunDays + " von " + st.nDays + " Tagen sonnig bis heiter" : ""}.`);
+  if (st.photos) out.push(`${st.photos} Fotos.`);
+  return out.join(" ");
+}
+
+function refreshDerived(t) {
+  rebuildRoute(t);
+  if (t.summaryAuto) t.summary = suggestSummary(t);
+}
+
+/* ---------- Beispielreisen ---------- */
+function demoTrip(kind) {
+  const P = (name, lat, lon) => ({ name, lat, lon });
+  const C = (l, cat, a) => ({ id: uid(), l, cat, a: String(a) });
+  if (kind === "kurztrip") {
+    const t = newTrip("kurztrip");
+    Object.assign(t, {
+      title: "Wochenende in Lissabon", subtitle: "Drei Tage Altstadt, Tram und Pastel de Nata", theme: "herbst", travelers: "Anna & Ben",
+      start: "2026-06-12", startPlace: P("Berlin", 52.52, 13.405), destination: P("Lissabon", 38.7223, -9.1393), roundTrip: true,
+    });
+    const mk = (i, o) => Object.assign(newDay(addDays("2026-06-12", i)), { place: P("Lissabon", 38.7223, -9.1393) }, o);
+    t.days = [
+      mk(0, { title: "Ankunft und Alfama", weather: "sun", tmin: "19", tmax: "27", lodging: "Hotel Bairro Alto", plan: "07:10 Flug ab Berlin\n10:15 Landung, mit der Metro in die Stadt\n13:00 Check-in im Hotel, Mittagessen\n15:00 Zu Fuß durch die Alfama\n17:30 Aussicht vom Miradouro das Portas do Sol\n20:30 Fado-Abend mit Sardinen vom Grill", text: "Der Fado ging unter die Haut. Nächstes Mal früher reservieren.", highlights: "Miradouro das Portas do Sol\nFado in der Alfama", costs: [C("Flug", "transport", 228), C("Metro", "transport", 9), C("Abendessen", "essen", 64)] }),
+      mk(1, { title: "Belém und Tram 28", weather: "partly", tmin: "20", tmax: "25", lodging: "Hotel Bairro Alto", plan: "09:00 Tram 15 nach Belém\n10:00 Torre de Belém und Hieronymus-Kloster\n12:00 Pastéis de Belém, natürlich\n14:30 Tram 28 durch enge Gassen\n19:30 Sonnenuntergang am Tejo\n21:00 Tapas im Bairro Alto", text: "Vor den Pastéis steht man 20 Minuten an, es lohnt sich.", highlights: "Pastéis de Belém\nTram 28\nSonnenuntergang am Tejo", costs: [C("Eintritte", "aktivitaeten", 36), C("Mittagessen", "essen", 28), C("Abendessen", "essen", 52)] }),
+      mk(2, { title: "Sintra und Heimflug", weather: "rain", tmin: "17", tmax: "21", lodging: "", plan: "08:30 Zug nach Sintra\n10:30 Palácio da Pena, im Nebel trotzdem schön\n14:00 Zurück nach Lissabon, Koffer holen\n17:00 Flughafen\n23:00 Landung in Berlin", text: "", highlights: "Palácio da Pena", costs: [C("Zug Sintra", "transport", 11), C("Eintritt Pena", "aktivitaeten", 28), C("Snacks", "essen", 18)] }),
+    ];
+    refreshDerived(t);
+    return t;
+  }
+  const t = newTrip("rundreise");
+  Object.assign(t, {
+    title: "Alpenrundreise 2026", subtitle: "Von München über Salzburg und das Salzkammergut nach Wien und zurück", theme: "meer", travelers: "Familie Mustermann",
+    currency: "EUR", start: "2026-05-14", startPlace: P("München", 48.1351, 11.582), roundTrip: true,
+  });
+  const mk = (i, o) => Object.assign(newDay(addDays("2026-05-14", i)), o);
+  t.days = [
+    mk(0, { place: P("Salzburg", 47.8095, 13.055), title: "Auf nach Österreich", km: "145", drive: "1:45", weather: "sun", tmin: "11", tmax: "21", lodging: "Altstadthotel Salzburg", text: "Abfahrt um 8 Uhr, kaum Verkehr auf der A8. Nach dem Check-in zu Fuß durch die Altstadt, Festung Hohensalzburg mit der Standseilbahn.\nAbends Mozartkugeln und Nockerl im Sternbräu.", highlights: "Festung Hohensalzburg\nSalzburger Nockerl", costs: [C("Maut Vignette", "transport", 12.8), C("Hotel", "unterkunft", 138), C("Abendessen", "essen", 71.5)] }),
+    mk(1, { place: P("Hallstatt", 47.5622, 13.6493), title: "Salzkammergut", from: "Salzburg", km: "75", drive: "1:15", weather: "partly", tmin: "9", tmax: "18", lodging: "Pension am See", text: "Über den Wolfgangsee nach Hallstatt. Am Vormittag war es noch ruhig im Ort, ab Mittag kamen die Reisebusse. Rundgang, dann mit der Seilbahn zum Skywalk.", highlights: "Skywalk Hallstatt\nFrühstück am Wolfgangsee", costs: [C("Parkplatz", "transport", 15), C("Seilbahn", "aktivitaeten", 62), C("Pension", "unterkunft", 124), C("Essen", "essen", 58)] }),
+    mk(2, { place: P("Wien", 48.2082, 16.3738), title: "Donau und Wachau", km: "290", drive: "3:30", weather: "cloud", tmin: "10", tmax: "16", lodging: "Apartment Neubau", text: "Entlang der Donau durch die Wachau, Stopp in Melk. Am Nachmittag in Wien angekommen, Spaziergang durch den Prater.", highlights: "Stift Melk\nRiesenrad im Prater", costs: [C("Stift Melk", "aktivitaeten", 38), C("Apartment (2 Nächte)", "unterkunft", 260), C("Essen", "essen", 64)] }),
+    mk(3, { place: P("Wien", 48.2082, 16.3738), title: "Wien zu Fuß", km: "", weather: "rain", tmin: "8", tmax: "13", lodging: "Apartment Neubau", text: "Regentag: Kunsthistorisches Museum, Kaffee im Café Central, am Abend Wiener Schnitzel.", highlights: "Kunsthistorisches Museum\nCafé Central", costs: [C("Museum", "aktivitaeten", 44), C("Café", "essen", 32), C("Abendessen", "essen", 88)] }),
+    mk(4, { place: P("München", 48.1351, 11.582), title: "Heimfahrt", from: "Wien", km: "435", drive: "4:15", weather: "sun", tmin: "10", tmax: "22", lodging: "", text: "Früh los, Mittagspause in Linz. Am späten Nachmittag wieder zu Hause.", highlights: "Linzer Torte", costs: [C("Diesel", "transport", 92), C("Mittagessen", "essen", 46)] }),
+  ];
+  refreshDerived(t);
+  return t;
+}
