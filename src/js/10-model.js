@@ -17,50 +17,124 @@ const weatherName = (id) => (WEATHER.find((w) => w.id === id) || {}).name || "";
 
 const blankPlace = () => ({ name: "", lat: null, lon: null });
 
-function newDay(date = "") {
+/* ---------- Kacheln ----------
+   Ein Tag hat Seiten, eine Seite eine Liste von Kacheln {id, mod, w, h, photo?, text?} (Beschreibung in 30-module.js). */
+const newTile = (mod, w = 1, h = 1, o = {}) => ({ id: uid(), mod, w, h, ...o });
+const newPage = (tiles = []) => ({ id: uid(), tiles });
+const tileOf = (mod, cols, o) => { const [w, h] = MODULES[mod].size(cols); return newTile(mod, w, h, o); };
+
+/* Standardseite eines Tages: Strecke, Wetter, Unterkunft, Ausgaben, Highlights, Tagesplan, Tagebuch */
+function defaultPages(cols) {
+  return [newPage(["strecke", "wetter", "unterkunft", "kosten", "highlights", "plan", "text"].map((m) => tileOf(m, cols)))];
+}
+
+/* Kachel an die letzte Seite hängen; ist dort kein Platz mehr, entsteht eine neue Seite */
+function addTile(d, tile, cols) {
+  let pg = d.pages[d.pages.length - 1];
+  if (!pg || packTiles([...pg.tiles, tile], cols, GRID_ROWS).rest.length) { pg = newPage(); d.pages.push(pg); }
+  pg.tiles.push(tile);
+}
+
+/* Fotokacheln entfernen, deren Foto nicht mehr zum Tag gehört (leere Fotokacheln bleiben) */
+function pruneTiles(d) {
+  const ids = new Set(d.photos.map((p) => p.id));
+  d.pages.forEach((pg) => { pg.tiles = pg.tiles.filter((x) => x.mod !== "foto" || !x.photo || ids.has(x.photo)); });
+}
+
+/* Ein Foto steht an einem Tag nur auf einer Kachel: Wird es einer Kachel zugewiesen, verschwindet es von der bisherigen (die bleibt leer). */
+function setTilePhoto(d, tile, photoId) {
+  if (photoId) d.pages.forEach((pg) => pg.tiles.forEach((x) => { if (x !== tile && x.photo === photoId) x.photo = ""; }));
+  tile.photo = photoId;
+}
+const photosInUse = (d, except, exceptPage) => new Set(d.pages.filter((p) => p !== exceptPage).flatMap((p) => p.tiles).filter((x) => x !== except && x.mod === "foto" && x.photo).map((x) => x.photo));
+
+/* Freie Plätze einer Seite mit Fotos füllen: Die Fläche der freien Zellen wird möglichst gleichmäßig auf die Fotos verteilt, die Form der Kachel
+   passt zum Seitenverhältnis des Fotos. Liefert die Fotos, für die kein Platz mehr war. */
+function fillFree(page, photos, cols) {
+  const left = [...photos], gap = 10, cw = (CW - gap * (cols - 1)) / cols, rh = (BOTTOM - 124 - gap * (GRID_ROWS - 1)) / GRID_ROWS;
+  while (left.length) {
+    const { placed, rest } = packTiles(page.tiles, cols, GRID_ROWS);
+    if (rest.length) break;
+    const used = new Set(); placed.forEach((q) => { for (let y = q.r; y < q.r + q.h; y++) for (let x = q.c; x < q.c + q.w; x++) used.add(y * cols + x); });
+    const isFree = (c, r, w, h) => { for (let y = r; y < r + h; y++) for (let x = c; x < c + w; x++) if (used.has(y * cols + x)) return false; return true; };
+    const freeCells = cols * GRID_ROWS - used.size; if (!freeCells) break;
+    const target = Math.max(1, Math.floor(freeCells / left.length)), v = photoView(left[0]), pa = v.w / v.h;
+    let best = null;
+    for (let r = 0; r < GRID_ROWS; r++) for (let c = 0; c < cols; c++) for (let h = 1; r + h <= GRID_ROWS; h++) for (let w = 1; c + w <= cols; w++) {
+      if (w * h > target || !isFree(c, r, w, h)) continue;
+      const score = w * h * 10 - Math.abs(Math.log((w * cw) / (h * rh) / pa));
+      if (!best || score > best.score) best = { w, h, score };
+    }
+    if (!best) break;
+    const p = left.shift(); page.tiles.push(newTile("foto", best.w, best.h, { photo: p.id }));
+  }
+  return left;
+}
+
+/* Neue Fotos: zuerst freie Plätze der vorhandenen Seiten füllen, übrige bekommen je eine Kachel (Querformat 2×2, Hochformat 1×2) auf der letzten oder einer neuen Seite */
+function addPhotoTiles(d, photos, cols) {
+  let left = photos;
+  for (const pg of d.pages) { if (!left.length) break; left = fillFree(pg, left, cols); }
+  for (const p of left) { const v = photoView(p), land = v.w >= v.h; addTile(d, newTile("foto", Math.min(land ? 2 : 1, cols), 2, { photo: p.id }), cols); }
+}
+
+/* Kacheln als Format kopieren (neue Kennungen); Notiztext und Fotos gehören zum Inhalt, nicht zum Format */
+const copyTiles = (tiles) => tiles.map((x) => ({ id: uid(), mod: x.mod, w: x.w, h: x.h, ...(x.mod === "notiz" ? { text: "" } : {}), ...(x.font ? { font: x.font } : {}) }));
+
+/* Seitenaufbau (Vorschlag oder übertragenes Format) auf eine Seite eines Tages anwenden.
+   Fotokacheln werden mit Fotos des Tages belegt: zuerst Fotos ohne Kachel und von dieser Seite, dann Fotos von anderen Seiten (die verschwinden dort,
+   ein Foto steht nur einmal). Fotokacheln ohne Foto entfallen, freie Plätze der Seite und Fotos ohne Kachel werden mit Fotos aufgefüllt bzw. hinten angehängt.
+   Liefert die Zahl der Fotos, die auf zusätzliche Seiten kamen. */
+function applyLayout(d, page, tiles, cols) {
+  const elsewhere = photosInUse(d, null, page);
+  const order = [...d.photos.filter((p) => !elsewhere.has(p.id)), ...d.photos.filter((p) => elsewhere.has(p.id))], fresh = copyTiles(tiles);
+  let k = 0;
+  fresh.forEach((x) => { if (x.mod === "foto") x.photo = order[k] ? order[k++].id : ""; });
+  page.tiles = fresh.filter((x) => x.mod !== "foto" || x.photo);
+  const taken = new Set(page.tiles.filter((x) => x.mod === "foto").map((x) => x.photo));
+  d.pages = d.pages.filter((p) => {
+    if (p === page) return true;
+    const n = p.tiles.length;
+    p.tiles = p.tiles.filter((x) => !(x.mod === "foto" && taken.has(x.photo)));
+    return p.tiles.length || !n; // Seiten, die dadurch leer wurden, entfallen
+  });
+  const shown = new Set(d.pages.flatMap((p) => p.tiles).filter((x) => x.mod === "foto").map((x) => x.photo));
+  const left = fillFree(page, d.photos.filter((p) => !shown.has(p.id)), cols);
+  addPhotoTiles(d, left, cols);
+  return left.length;
+}
+
+function newDay(date = "", cols = 4) {
   return {
     id: uid(), date, place: blankPlace(), from: "", km: "", drive: "", title: "", lodging: "",
     weather: "", tmin: "", tmax: "", wxAuto: null, wxExtra: "", text: "", plan: "",
-    highlights: "", costs: [], photos: [],
+    highlights: "", costs: [], photos: [], pages: defaultPages(cols),
   };
 }
 
-function newTrip(template = "reise") {
+function newTrip() {
   return {
-    format: 1, template: TEMPLATES[template] ? template : "reise", theme: "meer", title: "", subtitle: "", travelers: "", currency: "EUR", start: "",
+    format: 2, cols: 4, theme: "meer", title: "", subtitle: "", travelers: "", currency: "EUR", start: "",
     startPlace: blankPlace(), roundTrip: false,
     days: [], summary: "", summaryAuto: true,
     route: { auto: true, road: true, points: [], km: null, legs: [], mapSig: "" },
-    mapImg: "", mapSource: "", mapUser: false, coverPhoto: "", projData: true, embed: "original", capWeather: true, wxLine: false, capNum: false, capDate: false, capPlace: false, capGps: false, capNote: true, capMarks: true, capFile: false, hashes: false, dpi: "150", placeMode: "auto", stripN: "auto", photoStyle: "shadow", ruled: true, costPage: true,
+    mapImg: "", mapSource: "", mapUser: false, coverPhoto: "", projData: true, embed: "original", capWeather: true, wxLine: false, capNum: false, capDate: false, capPlace: false, capGps: false, capNote: true, capMarks: true, capFile: false, hashes: false, dpi: "150", placeMode: "auto", photoStyle: "shadow", ruled: true, costPage: true,
   };
-}
-
-/* Frühere Fassungen kannten die Vorlagen „Kurztrip“ und „Rundreise“ (Kurztrip mit einem Reiseziel für alle Tage).
-   Beides ist jetzt die Vorlage „Reise“; das Reiseziel wandert als Ort in die Tage ohne Ortsangabe. */
-function migrateTrip(t) {
-  if (!t || typeof t !== "object") return t;
-  const o = { ...t }, dest = o.destination;
-  o.template = TEMPLATES[o.template] ? o.template : "reise";
-  if (dest && typeof dest === "object" && typeof dest.name === "string" && dest.name && Array.isArray(o.days)) {
-    o.days = o.days.map((d) => (d && typeof d === "object" && !(d.place && d.place.name) ? { ...d, place: { name: dest.name, lat: dest.lat, lon: dest.lon } } : d));
-  }
-  delete o.destination;
-  return o;
 }
 
 /* Fehlende Felder ergänzen (beim Laden älterer oder fremder Dateien). */
 function normalizeTrip(t) {
-  t = migrateTrip(t);
-  const base = newTrip(t.template);
+  const base = newTrip();
   const out = { ...base, ...t };
   out.startPlace = { ...blankPlace(), ...(t.startPlace || {}) };
   out.route = { ...base.route, ...(t.route || {}) };
   if (!THEMES[out.theme]) out.theme = "meer";
   if (out.embed === "work") out.embed = "1600"; // frühere Bezeichnung
   out.days = (Array.isArray(t.days) ? t.days : []).map((d) => ({
-    ...newDay(), ...d, place: { ...blankPlace(), ...(d.place || {}) },
+    ...newDay("", out.cols), ...d, place: { ...blankPlace(), ...(d.place || {}) },
     costs: Array.isArray(d.costs) ? d.costs.map((c) => ({ id: uid(), l: "", cat: "sonstiges", a: "", ...c })) : [],
     photos: Array.isArray(d.photos) ? d.photos : [],
+    pages: Array.isArray(d.pages) ? d.pages : defaultPages(out.cols),
   }));
   return out;
 }

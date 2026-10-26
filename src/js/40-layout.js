@@ -31,63 +31,6 @@ class Pg {
   label(x, y, text, c, a) { this.text(x, y, String(text).toUpperCase(), { f: "B", s: 7.5, c: c || this.T.accent, ls: 1.4, a }); }
 }
 
-/* ---------- Text in Spalten fließen lassen ---------- */
-/* blocks: [{label, paras[]}]. Liefert die neue y-Position und die Blöcke, die nicht mehr passten. */
-function flow(pg, blocks, x, y, w, yMax, o) {
-  const { T, ruled } = o, lh = 16, s = 11;
-  const hasText = (b) => (b.items ? b.items.length > 0 : b.paras.some((p) => p.trim()));
-  const shows = (b) => hasText(b) || (ruled && !b.items); // leere Zeitleiste entfällt, ein leeres Tagebuch bekommt Schreiblinien
-  const multi = blocks.filter(shows).length > 1;
-  const rule = (yy) => pg.line(x, yy + lh - 2, x + w, yy + lh - 2, T.rule, 0.5);
-  for (let bi = 0; bi < blocks.length; bi++) {
-    const b = blocks[bi], has = hasText(b);
-    if (!shows(b)) continue;
-    if (y + 16 + lh * 2 > yMax) return { y, rest: blocks.slice(bi).filter(hasText) };
-    pg.label(x, y, b.label + (b.cont ? " · Fortsetzung" : ""));
-    y += 16;
-    if (!has) {
-      const n = multi ? 4 : Math.floor((yMax - y) / lh);
-      for (let k = 0; k < n && y + lh <= yMax; k++) { rule(y); y += lh; }
-      y += 8; continue;
-    }
-    if (b.items) {
-      /* Zeitleiste: Uhrzeit links, senkrechte Linie mit Punkten, Text rechts */
-      const tx = x + 62, tws = w - 62, top0 = y, at = pg.ops.length;
-      const vline = (y2) => pg.ops.splice(at, 0, { k: "line", x1: x + 50, y1: top0 + lh / 2, x2: x + 50, y2, c: T.accent2, sw: 1.2 });
-      for (let ii = 0; ii < b.items.length; ii++) {
-        const it = b.items[ii], lines = wrapAll(it.text || " ", "S", s, tws), need = lines.length * lh + 6;
-        if (y + need > yMax) {
-          vline(y - 6 - lh / 2);
-          return { y, rest: [{ label: b.label, kind: "timeline", items: b.items.slice(ii), cont: true }, ...blocks.slice(bi + 1).filter(hasText)] };
-        }
-        if (it.time) pg.text(x, y + (lh - 9.5) / 2, it.time, { f: "B", s: 9.5, c: T.accent });
-        pg.rect(x + 47.5, y + lh / 2 - 2.5, 5, 5, { fill: it.time ? T.accent : T.accent2, r: 2.5 });
-        lines.forEach((l, k) => pg.text(tx, y + k * lh + (lh - s) / 2, l, { f: "S", s }));
-        y += need;
-      }
-      vline(y - 6 - lh / 2);
-      y += 6; continue;
-    }
-    for (let pi = 0; pi < b.paras.length; pi++) {
-      const para = b.paras[pi];
-      if (!para.trim()) { y += lh * 0.5; continue; }
-      const lines = wrapAll(para, "S", s, w), avail = Math.floor((yMax - y) / lh);
-      const draw = (arr) => arr.forEach((l, k) => pg.text(x, y + k * lh + (lh - s) / 2, l, { f: "S", s }));
-      if (lines.length <= avail) { draw(lines); y += lines.length * lh; continue; }
-      let left;
-      if (avail >= 2) { draw(lines.slice(0, avail)); y += avail * lh; left = [lines.slice(avail).join(" "), ...b.paras.slice(pi + 1)]; }
-      else left = b.paras.slice(pi);
-      return { y, rest: [{ label: b.label, paras: left, cont: true }, ...blocks.slice(bi + 1).filter(hasText)] };
-    }
-    y += 10;
-  }
-  return { y, rest: [] };
-}
-
-function rulesTo(pg, x, y, w, yMax) {
-  for (; y + 16 <= yMax; y += 16) pg.line(x, y + 14, x + w, y + 14, pg.T.rule, 0.5);
-}
-
 /* ---------- Kopf für Folgeseiten (Fortsetzung, Fotos, Kosten) ---------- */
 function miniHeader(pg, kicker, title) {
   pg.label(MX, 40, kicker);
@@ -98,7 +41,7 @@ function miniHeader(pg, kicker, title) {
 
 /* ---------- Deckseite ---------- */
 function coverPage(t, st, T, warns) {
-  const tpl = TEMPLATES[t.template], pg = new Pg(T);
+  const pg = new Pg(T);
   const BAND = 290;
   const photo = !!t.coverPhoto;
   if (photo) pg.img(0, 0, PW, BAND, t.coverPhoto, t.coverW, t.coverH);
@@ -107,7 +50,7 @@ function coverPage(t, st, T, warns) {
     pg.icon("pin", PW - MX - 190, 62, 190, mix(T.accent, "#FFFFFF", 0.14), 0.9); /* Dekor */
   }
   const soft = mix(T.accent, "#FFFFFF", 0.78);
-  pg.text(MX, 44, "REISEPROTOKOLL  ·  " + tpl.label.toUpperCase(), { f: "B", s: 8, c: soft, ls: 1.8 });
+  pg.text(MX, 44, "REISEPROTOKOLL", { f: "B", s: 8, c: soft, ls: 1.8 });
   if (st.range) pg.text(PW - MX, 44, st.range, { f: "B", s: 9, c: T.onAccent, a: "r" });
 
   /* Titel so groß wie möglich (höchstens zwei Zeilen bei großer, drei bei kleiner Schrift) */
@@ -126,7 +69,7 @@ function coverPage(t, st, T, warns) {
   sub.forEach((l, k) => pg.text(MX, top + title.length * tl + 10 + k * 20, l, { f: "SI", s: 16, c: soft }));
 
   /* Kennzahlen */
-  const stats = (tpl.stats ? tpl.stats(t, st) : defaultStats(t, st)).slice(0, 4);
+  const stats = defaultStats(t, st).slice(0, 4);
   const gap = 12, cw = (CW - gap * (stats.length - 1)) / stats.length, sy = BAND + 22;
   stats.forEach((c, k) => {
     const x = MX + k * (cw + gap);
@@ -177,99 +120,45 @@ function defaultStats(t, st) {
   return list;
 }
 
-/* ---------- Tagesseite ---------- */
-function dayPages(t, i, T, warns) {
-  const tpl = TEMPLATES[t.template], d = t.days[i], out = [];
-  const pg = new Pg(T); out.push(pg);
-  const title = d.title.trim() || "Tag " + (i + 1);
-
+/* ---------- Tagesseiten ----------
+   Kopf (nur auf der ersten Seite des Tages) und darunter das Kachelraster. Jede Seite des Tages (day.pages) wird gepackt;
+   was nicht mehr passt, läuft auf eine zusätzliche Seite direkt dahinter. */
+function dayHeader(pg, t, i, T, title) {
+  const d = t.days[i];
   pg.rect(MX, 40, 56, 56, { fill: T.accent, r: 10 });
   pg.text(MX + 28, 50, "TAG", { f: "B", s: 6.5, c: mix(T.accent, "#FFFFFF", 0.75), a: "c", ls: 1.5 });
   pg.text(MX + 28, 60, String(i + 1), { f: "SB", s: i + 1 > 99 ? 20 : 26, c: T.onAccent, a: "c" });
   const hx = MX + 74, hw = CW - 74;
   pg.text(hx, 42, (fmtLong(d.date) || "Tag " + (i + 1)).toUpperCase(), { f: "B", s: 7.5, c: T.muted, ls: 1.2 });
   pg.text(hx, 56, fitT(title, "SB", 21, hw), { f: "SB", s: 21 });
-  const sub = tpl.dayHeader(t, i);
+  const sub = daySub(t, i);
   if (sub) pg.text(hx, 83, fitT(sub, "B", 10, hw), { f: "B", s: 10, c: T.accent });
   pg.line(MX, 110, PW - MX, 110, T.rule, 0.8);
+  return 124;
+}
 
-  /* Infokästen */
-  const bw = (CW - 20) / 3;
-  tpl.info(t, i).slice(0, 3).forEach((b, k) => {
-    const x = MX + k * (bw + 10), y = 122;
-    pg.rect(x, y, bw, 46, { fill: T.soft, r: 8 });
-    pg.label(x + 12, y + 8, b.label, T.muted);
-    pg.icon(b.ico, x + 11, y + 21, 17, T.accent, 1.5);
-    const v = (b.value || "").trim();
-    pg.text(x + 35, y + 25, fitT(v || "–", "R", 9.5, bw - 46), { s: 9.5, c: v ? T.ink : T.muted });
-  });
-
-  /* Wetterdetails (Wind, Niederschlag, Luftfeuchte …) als eigene Zeile unter den Infokästen */
-  let off = 0;
-  const wxd = dayWxDetail(d);
-  if (wxd) {
-    const wl = wrapMax(wxd, "R", 8.5, CW - 44, 3), bh = 12 + wl.lines.length * 11;
-    pg.rect(MX, 176, CW, bh, { fill: T.soft, r: 8 });
-    pg.icon(d.weather || "sun", MX + 11, 176 + (bh - 17) / 2, 17, T.accent, 1.5);
-    wl.lines.forEach((l, k) => pg.text(MX + 35, 176 + 6.5 + k * 11, l, { s: 8.5, c: T.ink }));
-    off = bh + 10;
-  }
-
-  /* Kopf der Textspalten */
-  const lw = 316, rx = MX + lw + 24, rw = PW - MX - rx;
-  let bodyTop = 188 + off;
-  const sp = tpl.strip ? tpl.strip(t, i) : null;
-  if (sp && (sp.from || sp.to)) { routeStrip(pg, sp, T, 182 + off); bodyTop = 236 + off; }
-  const blocks = tpl.sections(d);
-
-  /* Fotos auf der Tagesseite.
-     „automatisch“: Der Text wird zuerst gemessen, der Freiraum darunter gehört den Fotos (so viele wie mit gutem Format hineinpassen).
-     Feste Zahl (0–3): ein Streifen am Seitenende, dessen Höhe von der Zahl der Beschriftungszeilen abhängt. */
-  const style = t.photoStyle;
-  let shown = [], bodyBottom = BOTTOM - 4, place = () => {};
-  if (t.stripN === "auto") {
-    const dm = new Pg(T), r1 = flow(dm, blocks, MX, bodyTop, lw, BOTTOM - 4, { T, ruled: false });
-    const textEnd = Math.max(r1.rest.length ? BOTTOM : r1.y, rightColumn(dm, t, d, T, rx, bodyTop, rw, BOTTOM - 4, [], i));
-    const y0 = textEnd + 22, fit = d.photos.length && BOTTOM - y0 >= 130 ? fitPhotos(t, d.photos, MX, y0, CW, BOTTOM - y0) : null;
-    if (fit) {
-      shown = d.photos.slice(0, fit.n); bodyBottom = y0 - 16;
-      const top = Math.min(...fit.cells.map((c) => c.y)), bot = Math.max(...fit.cells.map((c) => c.y + c.h)), shift = Math.max(0, (BOTTOM - y0 - (bot - top)) / 2 - 4);
-      place = () => shown.forEach((p, k) => photoBlock(pg, p, fit.cells[k].x, fit.cells[k].y + shift, fit.cells[k].w, fit.cells[k].h, fit.Ls[k], T, 0, style));
+function dayPages(t, i, T, warns, st) {
+  const d = t.days[i], out = [], title = d.title.trim() || "Tag " + (i + 1), queue = d.pages.map((p) => ({ id: p.id, tiles: p.tiles })), gap = 10;
+  if (!queue.length) queue.push({ id: null, tiles: [] });
+  const colW = (CW - gap * (t.cols - 1)) / t.cols;
+  for (let k = 0; k < queue.length && k < 40; k++) {
+    const pg = new Pg(T); out.push(pg);
+    const top = k === 0 ? dayHeader(pg, t, i, T, title) : miniHeader(pg, `Tag ${i + 1} · Seite ${k + 1}`, title);
+    const rowH = (BOTTOM - top - gap * (GRID_ROWS - 1)) / GRID_ROWS, { placed, rest } = packTiles(queue[k].tiles, t.cols, GRID_ROWS);
+    if (rest.length) { queue.splice(k + 1, 0, { id: queue[k].id, tiles: rest, spill: true }); warns.push(`Tag ${i + 1}: ${rest.length} ${rest.length === 1 ? "Kachel passt" : "Kacheln passen"} nicht auf die Seite und ${rest.length === 1 ? "steht" : "stehen"} auf einer zusätzlichen Seite.`); }
+    /* Maße für die Bedienung in der Vorschau (82-preview.js), nicht Teil des PDFs */
+    pg.meta = { dayId: d.id, pageId: queue[k].id, pageIdx: d.pages.findIndex((p) => p.id === queue[k].id), spill: !!queue[k].spill, cols: t.cols, rows: GRID_ROWS, x0: MX, y0: top, colW, rowH, gap, tiles: [] };
+    for (const q of placed) {
+      const r = { x: MX + q.c * (colW + gap), y: top + q.r * (rowH + gap), w: q.w * colW + (q.w - 1) * gap, h: q.h * rowH + (q.h - 1) * gap };
+      const mt = { id: q.tile.id, mod: q.tile.mod, c: q.c, r: q.r, w: q.w, h: q.h, rx: r.x, ry: r.y, rw: r.w, rh: r.h }, n0 = pg.ops.length;
+      pg.meta.tiles.push(mt);
+      (MODULES[q.tile.mod] || MODULES.leer).draw(pg, { t, d, i, T, warns, st }, q.tile, r);
+      mt.empty = pg.ops.length === n0; // zeichnet nichts: in der Vorschau sichtbar machen, damit man die Kachel findet
     }
-  } else {
-    shown = d.photos.slice(0, +t.stripN);
-    const g = 10, sw = shown.length ? (CW - g * (shown.length - 1)) / shown.length : 0;
-    const lines = shown.map((p) => photoLines(t, p, sw, 8, warns, `Tag ${i + 1}`));
-    const stripH = shown.length ? 100 + Math.max(...lines.map(captionH)) : 0, stripY = BOTTOM - stripH;
-    if (shown.length) bodyBottom = stripY - 16;
-    place = () => shown.forEach((p, k) => photoBlock(pg, p, MX + k * (sw + g), stripY, sw, stripH, lines[k], T, 100, style));
-  }
-  place();
-
-  /* Text links, Highlights und Ausgaben rechts */
-  let r = flow(pg, blocks, MX, bodyTop, lw, bodyBottom, { T, ruled: t.ruled });
-  if (!r.rest.length && t.ruled) rulesTo(pg, MX, r.y, lw, bodyBottom);
-  rightColumn(pg, t, d, T, rx, bodyTop, rw, bodyBottom, warns, i);
-
-  /* Fortsetzungsseiten */
-  for (let n = 0; r.rest.length && n < 8; n++) {
-    const p2 = new Pg(T); out.push(p2);
-    const y0 = miniHeader(p2, `Tag ${i + 1} · Fortsetzung`, title);
-    r = flow(p2, r.rest, MX, y0, CW, BOTTOM, { T, ruled: false });
-  }
-  if (r.rest.length) warns.push(`Tag ${i + 1}: Der Text ist zu lang und wird abgeschnitten.`);
-
-  /* weitere Fotos: Aufteilung nach Anzahl, gleichmäßig auf Seiten verteilt */
-  const more = d.photos.slice(shown.length), per = more.length ? Math.ceil(more.length / Math.ceil(more.length / 6)) : 6;
-  for (let k = 0; k < more.length; k += per) {
-    const p3 = new Pg(T); out.push(p3);
-    const y0 = miniHeader(p3, `Tag ${i + 1} · Fotos`, title), chunk = more.slice(k, k + per);
-    galleryCells(chunk.length, MX, y0, CW, BOTTOM - y0).forEach((c, n) => photoBlock(p3, chunk[n], c.x, c.y, c.w, c.h, photoLines(t, chunk[n], c.w, 10, warns, `Tag ${i + 1}`), T, 0, style));
   }
   return out;
 }
 
-/* Rahmen für n Fotos (1–6) in einer Fläche; Höhen begrenzt, damit nichts überlang wird */
 /* ---------- Foto mit Markierungen und Beschriftung ----------
    Hat das Foto Markierungen, wird es ganz gezeigt (Rand bleibt frei), sonst füllt es den Rahmen. */
 const LH = 10.5;
@@ -288,6 +177,7 @@ function photoLines(t, p, w, maxLines, warns, where) {
   if (t.capNote && (p.note || "").trim()) add(p.note.trim(), "I", 8.5, "ink");
   if (t.capMarks) NUMS(p).forEach((m, k) => { if ((m.note || "").trim()) add(m.note.trim(), "R", 8, "muted", { n: k + 1, col: m.c }); });
   if (t.capFile && p.name) add("Datei: " + p.name, "R", 7.5, "muted");
+  if (maxLines <= 0) { if (L.length) warns.push(`${where}: Die Fotobeschriftung passt nicht unter das Foto und entfällt.`); return []; }
   if (L.length > maxLines) {
     L.length = maxLines;
     const last = L[maxLines - 1]; last.t = fitT(last.t + " …", last.f, last.s, w - (last.x || 0));
@@ -341,97 +231,6 @@ function drawMarks(pg, p, r, v) {
       g.fill.forEach((d) => path(d, halo ? { fill: col, fo: op, stroke: col, so: op, sw: g.sw * 1.2 } : { fill: col }));
     }
   }
-}
-
-function galleryCells(n, x, y, w, h, opt = {}) {
-  const g = 12, half = (w - g) / 2, cap = opt.cap || 300, out = [];
-  if (opt.side) { // Tagesseite: breite, flache Fläche
-    if (n === 3 && h >= 330) {
-      const top = Math.min(cap, (h - g) * 0.55), bot = Math.min(cap * 0.75, h - top - g);
-      return [{ x, y, w, h: top }, { x, y: y + top + g, w: half, h: bot }, { x: x + half + g, y: y + top + g, w: half, h: bot }];
-    }
-    const cols = n <= 3 ? n : n === 4 ? 2 : 3, rows = Math.ceil(n / cols), cw = (w - (cols - 1) * g) / cols, ch = Math.min(cap, (h - (rows - 1) * g) / rows);
-    for (let k = 0; k < n; k++) out.push({ x: x + (k % cols) * (cw + g), y: y + Math.floor(k / cols) * (ch + g), w: cw, h: ch });
-    return out;
-  }
-  if (n === 1) out.push({ x, y, w, h: Math.min(h, cap * 1.5) });
-  else if (n === 2) { const ch = Math.min(cap, (h - g) / 2); out.push({ x, y, w, h: ch }, { x, y: y + ch + g, w, h: ch }); }
-  else if (n === 3) {
-    const top = Math.min(cap, (h - g) * 0.55), bot = Math.min(cap * 0.75, h - top - g);
-    out.push({ x, y, w, h: top }, { x, y: y + top + g, w: half, h: bot }, { x: x + half + g, y: y + top + g, w: half, h: bot });
-  } else {
-    const nr = Math.ceil(n / 2), ch = Math.min(cap, (h - g * (nr - 1)) / nr);
-    for (let k = 0; k < n; k++) out.push({ x: x + (k % 2) * (half + g), y: y + Math.floor(k / 2) * (ch + g), w: half, h: ch });
-  }
-  return out;
-}
-
-/* So viele Fotos wie mit gutem Format in die freie Fläche passen (mindestens 95 pt Bildhöhe je Foto) */
-function fitPhotos(t, photos, x, y, w, h) {
-  for (let n = Math.min(photos.length, 6); n >= 1; n--) {
-    const cells = galleryCells(n, x, y, w, h, { cap: 360, side: true });
-    if (n === 1) { // ein einzelnes Foto behält sein Seitenverhältnis (nicht zugeschnitten), mittig
-      const v = photoView(photos[0]), c = cells[0], cw = Math.min(w, (c.h - 22) * (v.w / v.h));
-      cells[0] = { x: x + (w - cw) / 2, y: c.y, w: cw, h: c.h };
-    }
-    const Ls = cells.map((c, k) => photoLines(t, photos[k], c.w, 5, [], ""));
-    if (cells.every((c, k) => c.h - captionH(Ls[k]) >= 95 && c.y + c.h <= y + h + 0.5)) return { n, cells, Ls };
-  }
-  return null;
-}
-
-/* Streckenleiste: Start – Ziel mit Kilometern in der Mitte (nur wenn Kilometer oder Fahrzeit eingetragen sind) */
-function routeStrip(pg, sp, T, y) {
-  const ly = y + 30;
-  if (sp.from) pg.text(MX, y, fitT(sp.from, "B", 10.5, CW / 2 - 40), { f: "B", s: 10.5 });
-  if (sp.to) pg.text(PW - MX, y, fitT(sp.to, "B", 10.5, CW / 2 - 40), { f: "B", s: 10.5, a: "r" });
-  pg.line(MX + 8, ly, PW - MX - 8, ly, T.accent2, 1.4);
-  pg.rect(MX, ly - 5, 10, 10, { fill: T.paper, stroke: T.accent, sw: 2, r: 5 });
-  pg.rect(PW - MX - 10, ly - 5, 10, 10, { fill: T.accent, r: 5 });
-  if (sp.mid) {
-    const w = tw(sp.mid, "B", 9) + 36;
-    pg.rect(PW / 2 - w / 2, ly - 11, w, 22, { fill: T.paper, stroke: T.accent2, sw: 1, r: 11 });
-    pg.icon("car", PW / 2 - w / 2 + 9, ly - 8, 15, T.accent, 1.6);
-    pg.text(PW / 2 - w / 2 + 28, ly - 4.5, sp.mid, { f: "B", s: 9, c: T.ink });
-  }
-}
-
-function rightColumn(pg, t, d, T, x, y, w, yMax, warns, i) {
-  const hl = dayHighlights(d), costs = d.costs.filter((c) => c.l.trim() || parseNum(c.a));
-  const rows = 14, costH = costs.length ? 16 + Math.min(costs.length, 9) * rows + 26 : 0;
-  if (hl.length) {
-    pg.label(x, y, "Highlights"); y += 16;
-    const limit = yMax - costH - (costH ? 14 : 0);
-    for (const h of hl) {
-      const lines = wrapMax(h, "R", 9.5, w - 13, 3).lines, need = lines.length * 13 + 4;
-      if (y + need > limit) { warns.push(`Tag ${i + 1}: Nicht alle Highlights passen auf die Seite.`); break; }
-      pg.rect(x, y + 4.5, 4, 4, { fill: T.accent2, r: 2 });
-      lines.forEach((l, k) => pg.text(x + 13, y + k * 13 + 1.5, l, { s: 9.5 }));
-      y += need;
-    }
-    y += 12;
-  }
-  if (costs.length) {
-    pg.label(x, y, "Ausgaben"); y += 17;
-    const max = 9, list = costs.length > max ? costs.slice(0, max - 1) : costs;
-    for (const c of list) {
-      const a = money(parseNum(c.a), t.currency), aw = tw(a, "R", 9);
-      pg.text(x, y, fitT(c.l || "–", "R", 9, w - aw - 8), { s: 9 });
-      pg.text(x + w, y, a, { s: 9, a: "r" });
-      y += rows;
-    }
-    if (costs.length > max) {
-      const rest = costs.slice(max - 1);
-      pg.text(x, y, `+ ${rest.length} weitere`, { s: 9, c: T.muted });
-      pg.text(x + w, y, money(rest.reduce((s, c) => s + parseNum(c.a), 0), t.currency), { s: 9, a: "r", c: T.muted });
-      y += rows;
-    }
-    pg.line(x, y + 2, x + w, y + 2, T.rule, 0.8);
-    pg.text(x, y + 8, "Summe", { f: "B", s: 9.5 });
-    pg.text(x + w, y + 8, money(dayCosts(d), t.currency), { f: "B", s: 9.5, a: "r", c: T.accent });
-    y += 22;
-  }
-  return y;
 }
 
 /* ---------- Kostenübersicht ---------- */
@@ -509,7 +308,7 @@ const fmtSize = (b) => (b >= 1048576 ? fmtNum(b / 1048576, 1) + " MB" : Math.max
 function layoutTrip(t) {
   const T = THEMES[t.theme] || THEMES.meer, st = tripStats(t), warns = [], pages = [];
   pages.push(coverPage(t, st, T, warns));
-  t.days.forEach((_, i) => pages.push(...dayPages(t, i, T, warns)));
+  t.days.forEach((_, i) => pages.push(...dayPages(t, i, T, warns, st)));
   if (t.costPage) pages.push(...costPages(t, st, T));
   pages.push(...hashPages(t, T));
   const N = pages.length;

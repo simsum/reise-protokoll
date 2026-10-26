@@ -125,19 +125,58 @@ blockOsm = false; blockEsri = false; blockDe = false; stripeDe = true;
 ok((await regen()) === "esri", "Sperrkachel mit Status 200 (gelb-schwarz) wird am Bild erkannt");
 stripeDe = false;
 
-console.log("Eine Vorlage für alle Reisen");
+console.log("Module statt Vorlagen");
 await page.evaluate(() => loadTrip(demoTrip("rundreise")));
 await page.click('[data-tab="trip"]');
-ok((await page.evaluate(() => S.trip.template)) === "reise" && (await page.locator('[data-act="tpl"]').count()) === 0, "nur noch die Vorlage „Reise“ (keine Auswahl)");
-ok(await page.evaluate(() => { const t = S.trip, tpl = TEMPLATES.reise; return tpl.strip(t, 0) !== null && tpl.strip(t, 3) === null; }), "Streckenleiste nur an Tagen mit Kilometern (Tag 4 ohne km: keine)");
+ok(await page.evaluate(() => typeof TEMPLATES === "undefined" && S.trip.days.every((d) => d.pages.length === 1 && d.pages[0].tiles.length === 7)), "keine Vorlagen mehr: jeder Tag hat eine Standardseite mit 7 Kacheln");
+ok(await page.evaluate(() => { const t = S.trip; return routeInfo(t, 0) !== null && routeInfo(t, 3) === null; }), "Strecke nur an Tagen mit Kilometern (Tag 4 ohne km: keine)");
 await page.evaluate(() => { const t = S.trip; t.days[1].plan = ""; t.days[1].highlights = ""; t.days[2].plan = "09:00 Frühstück\n12:00 Stift Melk"; changed(); });
 await page.waitForTimeout(400);
 const dayText = (n) => page.locator("#pages .sheet").nth(n).innerText();
 ok(!(await dayText(2)).includes("HIGHLIGHTS") && !(await dayText(2)).includes("TAGESPLAN"), "ohne Eintrag: keine Highlights, kein Tagesplan");
 ok((await dayText(1)).includes("HIGHLIGHTS") && (await dayText(3)).includes("TAGESPLAN") && (await dayText(3)).includes("Stift Melk"), "mit Eintrag: Highlights und Tagesplan erscheinen");
-const mig = await page.evaluate(() => { const t = normalizeTrip({ template: "kurztrip", destination: { name: "Rom", lat: 41.9, lon: 12.5 }, days: [{ date: "2026-05-01" }, { date: "2026-05-02", place: { name: "Tivoli" } }] }); return [t.template, t.days[0].place.name, t.days[0].place.lat, t.days[1].place.name, "destination" in t]; });
-ok(mig.join() === "reise,Rom,41.9,Tivoli,false", "alte Kurztrip-Daten: Reiseziel wird zum Ort der Tage");
 ok(await page.evaluate(() => { const t = newTrip(); t.days = [newDay("2026-05-01"), newDay("2026-05-02")]; t.days[0].place = { name: "Rom", lat: null, lon: null }; return dayPlaceName(t, t.days[1]) === "Rom" && tripStats(t).places.length === 1; }), "Tag ohne Ortsangabe übernimmt den Ort des Vortags (mehrere Tage am selben Ort)");
+
+console.log("Kacheln");
+{
+  const r = await page.evaluate(() => {
+    const a = packTiles([newTile("foto", 2, 2), newTile("wetter"), newTile("wetter"), newTile("karte", 4, 1)], 4, 6);
+    const b = packTiles([newTile("karte", 4, 6), newTile("wetter")], 4, 6);
+    return { pos: a.placed.map((q) => q.c + ":" + q.r).join(), restB: b.rest.length, clamp: packTiles([newTile("karte", 9, 9)], 3, 6).placed[0].w };
+  });
+  ok(r.pos === "0:0,2:0,3:0,0:2" && r.restB === 1 && r.clamp === 3, `Raster: Kacheln rücken auf freie Plätze, Überlauf bleibt übrig, Breite wird begrenzt (${r.pos})`);
+  const base = await page.evaluate(() => layoutTrip(S.trip).pages.length);
+  ok(await page.evaluate(() => { const d = S.trip.days[0]; addTile(d, newTile("notiz", 4, 1, { text: "Panorama" }), 4); return d.pages.length === 2; }), "Kachel ohne Platz auf der Seite: es entsteht eine neue Seite");
+  await page.evaluate(() => changed()); await page.waitForTimeout(400);
+  ok((await page.evaluate(() => layoutTrip(S.trip).pages.length)) === base + 1 && (await dayText(1)).length > 0 && (await page.locator("#pages .sheet").nth(2).innerText()).includes("Panorama"), "zusätzliche Seite im PDF-Modell und in der Vorschau");
+  await page.evaluate(() => { const d = S.trip.days[0]; d.pages.pop(); d.pages[0].tiles[0].h = 6; changed(); });
+  ok((await page.evaluate(() => layoutTrip(S.trip).pages.length)) === base + 1, "zu große Kachel: Rest läuft automatisch auf eine weitere Seite");
+  await page.evaluate(() => { const d = S.trip.days[0]; d.pages[0].tiles[0].h = 1; setCols(3); });
+  ok(await page.evaluate(() => S.trip.cols === 3 && S.trip.days[0].pages[0].tiles[0].w === 3 && S.trip.days[0].pages[0].tiles[0].mod === "strecke"), "3 statt 4 Kacheln: ganz breite Kachel bleibt ganz breit");
+  ok((await page.evaluate(() => layoutTrip(S.trip).pages.length)) >= base, "Raster mit 3 Spalten: Layout bleibt gültig (nicht passende Kacheln laufen auf weitere Seiten)");
+  await page.evaluate(() => { setCols(4); });
+  ok(await page.evaluate(() => { const d = S.trip.days[0], pk = packTiles(d.pages[0].tiles, 4, 6); return pk.rest.length === 0; }), "Standardseite füllt das 4×6-Raster ohne Überlauf");
+  /* Bedienung: Kachel hinzufügen, Größe wählen, verschieben, löschen */
+  await page.click('[data-tab="days"]');
+  await page.evaluate(() => { S.open.add(S.trip.days[1].id); renderPanel(); });
+  const day1 = await page.evaluate(() => S.trip.days[1].id);
+  const before = await page.evaluate(() => S.trip.days[1].pages[0].tiles.length);
+  await page.selectOption(`[data-addtile][data-day="${day1}"]`, "notiz");
+  ok((await page.evaluate(() => S.trip.days[1].pages[0].tiles.length)) === before + 1, "Kachel über die Auswahl hinzugefügt");
+  await page.locator(`[data-act="tileSize"][data-day="${day1}"][data-w="2"][data-h="2"]`).last().click();
+  ok(await page.evaluate(() => { const x = S.trip.days[1].pages[0].tiles.at(-1); return x.mod === "notiz" && x.w === 2 && x.h === 2; }), "Größe 2×2 per Knopf");
+  await page.locator(`[data-act="tileSize"][data-day="${day1}"]`).last().click();
+  ok(await page.evaluate(() => { const x = S.trip.days[1].pages[0].tiles.at(-1); return x.w === 4 && x.h === 1; }), "Knopf „Ganze Breite“");
+  await page.locator(`details.day[data-day="${day1}"] select[data-k$=".w"]`).last().selectOption("3");
+  ok(await page.evaluate(() => S.trip.days[1].pages[0].tiles.at(-1).w === 3), "Breite per Auswahl (Zahl, kein Text)");
+  await page.locator(`[data-act="tileUp"][data-day="${day1}"]`).last().click();
+  ok(await page.evaluate(() => S.trip.days[1].pages[0].tiles.at(-2).mod === "notiz"), "Kachel nach oben verschoben");
+  await page.locator(`[data-act="delTile"][data-day="${day1}"]`).nth(-2).click();
+  ok((await page.evaluate(() => S.trip.days[1].pages[0].tiles.length)) === before, "Kachel gelöscht");
+  await page.locator(`details.day[data-day="${day1}"] select[data-k$=".mod"]`).first().selectOption("karte");
+  ok(await page.evaluate(() => S.trip.days[1].pages[0].tiles[0].mod === "karte"), "Modul einer Kachel gewechselt");
+  await page.evaluate(() => { const d = S.trip.days[1]; d.pages[0].tiles[0].mod = "strecke"; changed(); });
+}
 
 await page.evaluate(() => loadTrip(demoTrip("kurztrip")));
 await page.waitForTimeout(400);
@@ -161,11 +200,12 @@ console.log("Seiten und Texte");
 await page.evaluate(() => { const t = S.trip; t.days[0].text = "Lorem ipsum dolor sit amet ".repeat(120); changed(); });
 await page.waitForTimeout(500);
 n = await page.locator("#pages .sheet").count();
-ok(n >= 6, `langer Text erzeugt Folgeseite: ${n} Seiten`);
+ok(n === 5 && /Tagebuch ist für die Kachel zu lang/.test(await page.locator("#warn").getAttribute("title")), `langer Text: Schrift wird kleiner, dann gekürzt mit Hinweis (${n} Seiten)`);
+ok(await page.evaluate(() => { const t = S.trip, st = tripStats(t), w = []; const pg = new Pg(THEMES.meer); const r = { x: 0, y: 0, w: 120, h: 300 }; t.days[0].text = "kurz"; MODULES.text.draw(pg, { t, d: t.days[0], i: 0, T: THEMES.meer, warns: w, st }, {}, r); return w.length === 0 && pg.ops.some((o) => o.k === "t" && o.s === 11); }), "kurzer Text bleibt in Normalgröße ohne Hinweis");
 
 console.log("Fotos");
 await page.evaluate(async () => {
-  loadTrip(demoTrip("rundreise")); S.trip.stripN = 3;
+  loadTrip(demoTrip("rundreise"));
   const mk = async (i) => {
     const cv = document.createElement("canvas"); cv.width = 1200; cv.height = i % 2 ? 900 : 800;
     const g = cv.getContext("2d"); g.fillStyle = `hsl(${i * 47},45%,60%)`; g.fillRect(0, 0, cv.width, cv.height);

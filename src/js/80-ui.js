@@ -24,9 +24,8 @@ const placeFld = (label, key, p) => `<div class="f pp" data-pp="${key}"><span>${
 
 /* ---------- Reiter „Reise“ ---------- */
 function panelTrip() {
-  const t = S.trip, tpl = TEMPLATES[t.template];
-  return `${Object.keys(TEMPLATES).length > 1 ? `<h3>Vorlage</h3><div class="tpls">${Object.values(TEMPLATES).map((x) => `<button class="tpl ${x.id === t.template ? "on" : ""}" data-act="tpl" data-id="${x.id}"><b>${esc(x.name)}</b><small>${esc(x.desc)}</small></button>`).join("")}</div>` : ""}
-  <h3>Reise</h3>
+  const t = S.trip;
+  return `<h3>Reise</h3>
   ${fld("Titel", "title", t.title, { ph: "z. B. Alpenrundreise 2026" })}
   ${fld("Untertitel", "subtitle", t.subtitle, { ph: "optional" })}
   ${fld("Reisende", "travelers", t.travelers, { ph: "z. B. Anna & Ben" })}
@@ -37,6 +36,7 @@ function panelTrip() {
   <div class="btnrow"><label class="drop" style="padding:5px 10px;margin:0;display:inline-block">${t.coverPhoto ? "Titelfoto ändern …" : "Titelfoto wählen …"}<input type="file" accept="image/*" hidden id="coverFile"></label>${t.coverPhoto ? `<button data-act="delCover">Titelfoto entfernen</button>` : ""}</div>
   <div class="themes">${Object.entries(THEMES).map(([id, th]) => `<button class="theme ${id === t.theme ? "on" : ""}" data-act="theme" data-id="${id}"><i style="background:${th.accent}"></i>${esc(th.name)}</button>`).join("")}</div>
   <h3>Seiten</h3>
+  ${selFld("Kacheln pro Reihe (Raster der Tagesseiten)", "cols", String(t.cols), [["3", "3 Kacheln nebeneinander"], ["4", "4 Kacheln nebeneinander"]])}
   ${chk("Linien zum Handschreiben in freien Textbereichen", "ruled", t.ruled)}
   ${chk("Kostenübersicht am Ende", "costPage", t.costPage)}
   <h3>Fotos: Beschriftung unter den Bildern</h3>
@@ -49,7 +49,6 @@ function panelTrip() {
   ${chk("Notizen zu nummerierten Markierungen", "capMarks", t.capMarks)}
   ${chk("Dateiname", "capFile", t.capFile)}
   <h3>Fotos auf den Seiten</h3>
-  ${selFld("Fotos auf der Tagesseite (weitere kommen auf Fotoseiten)", "stripN", String(t.stripN), [["auto", "Automatisch: Freiraum unter dem Text nutzen"], ["0", "Keine, nur Fotoseiten"], ["1", "1 Foto"], ["2", "2 Fotos"], ["3", "3 Fotos"]])}
   ${selFld("Aussehen der Fotos", "photoStyle", t.photoStyle, [["shadow", "Schatten und abgerundete Ecken"], ["frame", "Weißer Rand mit Schatten"], ["plain", "Schlicht mit dünnem Rand"]])}
   ${selFld("Bildauflösung auf der Seite", "dpi", t.dpi, [["110", "110 dpi – klein, für den Bildschirm"], ["150", "150 dpi – Standard"], ["220", "220 dpi – guter Druck"], ["300", "300 dpi – sehr scharf, großes PDF"]])}
   <h3>Originale & Qualität</h3>
@@ -72,6 +71,7 @@ function embedEstimate(t) {
 }
 
 /* ---------- Reiter „Tage“ ---------- */
+const DAY_ORDER = ["place", "from", "km", "drive", "title", "weather", "lodging", "plan", "text", "highlights", "costs", "photos"];
 const DAY_FIELDS = {
   place: (d) => placeFld("Ort / Ziel des Tages", `d:${d.id}.place`, d.place),
   from: (d) => fld("Start (leer = vorheriger Ort)", `d:${d.id}.from`, d.from),
@@ -101,16 +101,50 @@ function daySummary(i) {
   return `Tag ${i + 1}${d.date ? ` <small>${esc(fmtDate(d.date, { weekday: "short", day: "numeric", month: "short" }))}</small>` : ""}${d.title || name ? ` · ${esc(d.title || name)}` : ""}`;
 }
 
+/* ---------- Seitenaufbau eines Tages: Seiten, Kacheln, Module, Größen ---------- */
+const SIZES = [[1, 1], [2, 1], [1, 2], [2, 2]];
+function tileEditor(d) {
+  const t = S.trip;
+  return `<h3>Seiten und Kacheln</h3><small>Jede Seite ist ein Raster aus ${t.cols} × ${GRID_ROWS} Kacheln. Die Kacheln werden der Reihe nach auf freie Plätze gesetzt, was nicht mehr passt, kommt auf eine weitere Seite.</small>
+  ${d.pages.map((pg, pi) => pageEditor(d, pg, pi)).join("")}
+  <div class="btnrow"><button data-act="addPage" data-day="${d.id}">+ Seite</button><button data-act="resetPages" data-day="${d.id}" title="Ersetzt den Seitenaufbau dieses Tages durch den Standard (Fotokacheln bleiben nicht erhalten)">Standardaufbau</button></div>`;
+}
+function pageEditor(d, pg, pi) {
+  const t = S.trip, cols = t.cols, { placed, rest } = packTiles(pg.tiles, cols, GRID_ROWS), over = new Set(rest.map((x) => x.id));
+  const mini = `<div class="mini" style="grid-template-columns:repeat(${cols},1fr);grid-template-rows:repeat(${GRID_ROWS},1fr)">${placed.map((q) => `<i style="grid-column:${q.c + 1}/span ${q.w};grid-row:${q.r + 1}/span ${q.h}">${pg.tiles.indexOf(q.tile) + 1}</i>`).join("")}</div>`;
+  const add = `<select data-addtile="${pg.id}" data-day="${d.id}"><option value="">+ Kachel hinzufügen …</option>${Object.entries(MODULES).map(([id, m]) => `<option value="${id}">${esc(m.name)}</option>`).join("")}</select>`;
+  return `<div class="page"><div class="phead">${mini}<div><b>Seite ${pi + 1}</b>${rest.length ? `<div class="note">${rest.length} Kacheln passen nicht und kommen auf eine zusätzliche Seite.</div>` : ""}
+    <div class="btnrow">${add}<button class="ico" data-act="pageUp" data-day="${d.id}" data-page="${pg.id}" title="Seite früher">↑</button><button class="ico" data-act="pageDown" data-day="${d.id}" data-page="${pg.id}" title="Seite später">↓</button><button class="ico" data-act="delPage" data-day="${d.id}" data-page="${pg.id}" title="Seite löschen">×</button></div></div></div>
+    ${pg.tiles.map((x, k) => tileRow(d, pg, x, k, over.has(x.id))).join("")}</div>`;
+}
+function tileRow(d, pg, x, k, over) {
+  const t = S.trip, base = `d:${d.id}.pages.${pg.id}.tiles.${x.id}`, ids = `data-day="${d.id}" data-page="${pg.id}" data-id="${x.id}"`;
+  const w = clamp(x.w, 1, t.cols), h = clamp(x.h, 1, GRID_ROWS);
+  const nums = (n, v) => Array.from({ length: n }, (_, j) => `<option value="${j + 1}" ${j + 1 === v ? "selected" : ""}>${j + 1}</option>`).join("");
+  const size = ([a, b]) => `<button data-act="tileSize" ${ids} data-w="${a}" data-h="${b}" aria-pressed="${w === Math.min(a, t.cols) && h === b}">${a}×${b}</button>`;
+  let extra = "";
+  const inUse = photosInUse(d, x);
+  if (x.mod === "foto") extra = `<select data-k="${base}.photo"><option value="">– Foto wählen –</option>${d.photos.map((p, n) => `<option value="${p.id}" ${p.id === x.photo ? "selected" : ""}>${n + 1}: ${esc(p.name)}${inUse.has(p.id) ? " (steht schon auf einer Kachel, wird verschoben)" : ""}</option>`).join("")}</select>`;
+  if (x.mod === "notiz") extra = `<select data-k="${base}.font" title="Schrift">${Object.entries(FAMILIES).map(([id, f]) => `<option value="${id}" ${(x.font || "serif") === id ? "selected" : ""}>${esc(f.name)}</option>`).join("")}</select>
+    <textarea data-k="${base}.text" rows="4" placeholder="Freier Text. Markdown: **fett**, *kursiv*, # Überschrift, - Liste">${esc(x.text || "")}</textarea>`;
+  return `<div class="tile ${over ? "over" : ""}"><div class="th"><b>${k + 1}</b>
+    <select data-k="${base}.mod">${Object.entries(MODULES).map(([id, m]) => `<option value="${id}" ${id === x.mod ? "selected" : ""}>${esc(m.name)}</option>`).join("")}</select>
+    <label>B <select data-k="${base}.w">${nums(t.cols, w)}</select></label><label>H <select data-k="${base}.h">${nums(GRID_ROWS, h)}</select></label></div>
+    <div class="btnrow">${SIZES.map(size).join("")}<button data-act="tileSize" ${ids} data-w="${t.cols}" data-h="1" aria-pressed="${w === t.cols && h === 1}">Ganze Breite</button>
+    <button class="ico" data-act="tileUp" ${ids} title="Früher">↑</button><button class="ico" data-act="tileDown" ${ids} title="Später">↓</button><button class="ico" data-act="delTile" ${ids} title="Kachel entfernen">×</button></div>${extra}</div>`;
+}
+
 function panelDays() {
-  const t = S.trip, tpl = TEMPLATES[t.template];
+  const t = S.trip;
   const startDefault = t.days.length ? addDays(t.days[t.days.length - 1].date || t.start || isoOf(new Date()), 1) : t.start;
   return `<label class="drop" id="dropAll">Fotos hierher ziehen oder klicken: sie werden nach Aufnahmedatum den Tagen zugeordnet (fehlende Tage entstehen dabei)<input type="file" accept="image/*" multiple hidden id="photoAll"></label>
   <div class="btnrow"><button data-act="addDay">+ Tag hinzufügen</button>
-    <span class="row" style="gap:4px">ab <input type="date" id="genStart" value="${esc(startDefault || "")}" style="border:1px solid var(--line);border-radius:8px;padding:5px"> <input type="number" id="genN" min="1" max="60" value="${tpl.defaultDays}" style="width:60px;border:1px solid var(--line);border-radius:8px;padding:5px"> Tage <button data-act="genDays">anlegen</button></span>
+    <span class="row" style="gap:4px">ab <input type="date" id="genStart" value="${esc(startDefault || "")}" style="border:1px solid var(--line);border-radius:8px;padding:5px"> <input type="number" id="genN" min="1" max="60" value="5" style="width:60px;border:1px solid var(--line);border-radius:8px;padding:5px"> Tage <button data-act="genDays">anlegen</button></span>
     <button data-act="sortDays" title="Nach Datum sortieren">Sortieren</button>${countDuplicates() ? `<button data-act="dedupe" title="Dasselbe Foto kommt mehrfach vor">${countDuplicates()} doppelte Fotos entfernen</button>` : ""}</div>
   ${t.days.map((d, i) => `<details class="day" data-day="${d.id}" ${S.open.has(d.id) ? "open" : ""}><summary><span class="dsum">${daySummary(i)}</span></summary><div class="body">
     ${fld("Datum", `d:${d.id}.date`, d.date, { type: "date" })}
-    ${tpl.dayFields.map((k) => DAY_FIELDS[k](d)).join("")}
+    ${DAY_ORDER.map((k) => DAY_FIELDS[k](d)).join("")}
+    ${tileEditor(d)}
     <div class="btnrow"><button data-act="dayUp" data-day="${d.id}">↑ Nach oben</button><button data-act="dayDown" data-day="${d.id}">↓ Nach unten</button><button data-act="delDay" data-day="${d.id}">Tag löschen</button></div>
   </div></details>`).join("") || "<p><small>Noch keine Tage. Mit „Tag hinzufügen“ oder „anlegen“ beginnen.</small></p>"}`;
 }
@@ -165,10 +199,12 @@ let prevTimer, saveTimer;
 function schedulePreview() { clearTimeout(prevTimer); prevTimer = setTimeout(renderPreview, 220); }
 function renderPreview() {
   const { pages, warns } = layoutTrip(S.trip);
-  $("#pages").innerHTML = pages.map((pg) => `<div class="sheet" style="aspect-ratio:${pg.W}/${pg.H}">${pageHtml(pg)}</div>`).join("");
+  S.pages = pages;
+  $("#pages").innerHTML = pages.map((pg, i) => `<div class="sheet" data-pi="${i}" style="aspect-ratio:${pg.W}/${pg.H}">${pageHtml(pg)}${tileOverlay(pg)}</div>`).join("");
   $("#pageCount").textContent = `${pages.length} ${pages.length === 1 ? "Seite" : "Seiten"}`;
   $("#warn").textContent = warns.length ? "⚠ " + warns[0] + (warns.length > 1 ? ` (+${warns.length - 1})` : "") : "";
   $("#warn").title = warns.join("\n");
+  syncSelection();
 }
 
 function scheduleSave() { clearTimeout(saveTimer); saveTimer = setTimeout(() => idbSet("trip", S.trip).catch(() => {}), 600); }
@@ -188,6 +224,7 @@ function softChanged() {
 /* Nach jeder Änderung: Abgeleitetes aktualisieren, Vorschau und Autosave anstoßen. */
 function changed(key) {
   const t = S.trip;
+  trackLayout();
   if (key && key.startsWith("route.points")) t.route.auto = false;
   if (key === "summary") t.summaryAuto = false;
   refreshDerived(t);
@@ -202,10 +239,12 @@ document.addEventListener("input", (e) => {
   const el = e.target, key = el.dataset && el.dataset.k;
   if (!key) return;
   const r = getRef(key); if (!r) return;
+  if (key === "cols") { setCols(+el.value); changed(key); return; }
   r.obj[r.prop] = el.type === "checkbox" ? el.checked : el.value;
+  if (/\.tiles\.[^.]+\.[wh]$/.test(key)) r.obj[r.prop] = +el.value;
+  if (/\.tiles\.[^.]+\.photo$/.test(key)) { const dd = dayOf(key.split(".")[0].slice(2)); if (dd) setTilePhoto(dd, r.obj, el.value); }
   if (/^d:[^.]+\.(weather|tmin|tmax)$/.test(key)) { const wd = dayOf(key.split(".")[0].slice(2)); if (wd) wd.wxAuto = false; }
   if (key === "capWeather" && el.checked) { wxState = "unknown"; queueAllWeather(); }
-  if (key === "stripN") r.obj[r.prop] = el.value === "auto" ? "auto" : +el.value;
   if (key === "placeMode") reresolvePlaces();
   if (/^d:[^.]+\.photos\.[^.]+\.place$/.test(key)) { r.obj.placeSrc = el.value ? "manual" : ""; if (!el.value) queuePlace(r.obj); }
   if (/^d:[^.]+\.photos\.[^.]+\.weather$/.test(key)) { r.obj.weatherSrc = el.value ? "manual" : ""; if (!el.value) { r.obj.wx = null; r.obj.wxTried = false; queueWeather(r.obj); } }
@@ -219,6 +258,12 @@ document.addEventListener("input", (e) => {
   if (key === "route.road" || key === "currency") { if (key === "currency") schedulePreview(); }
   changed(key);
 });
+/* Anzahl Kacheln pro Reihe ändern: ganz breite Kacheln bleiben ganz breit */
+function setCols(n) {
+  const t = S.trip, old = t.cols;
+  t.days.forEach((d) => d.pages.forEach((pg) => pg.tiles.forEach((x) => { x.w = x.w >= old ? n : Math.min(x.w, n); })));
+  t.cols = n;
+}
 function t_resetRoute() { S.trip.route.auto = true; rebuildRoute(S.trip); renderPanel(); }
 
 document.addEventListener("toggle", (e) => {
@@ -228,6 +273,11 @@ document.addEventListener("toggle", (e) => {
 
 document.addEventListener("change", (e) => {
   const el = e.target;
+  if (el.matches("[data-addtile]")) {
+    const d = dayOf(el.dataset.day), pg = d && d.pages.find((x) => x.id === el.dataset.addtile);
+    if (pg && el.value) { pg.tiles.push(tileOf(el.value, S.trip.cols)); S.open.add(d.id); changed(); renderPanel(); }
+    return;
+  }
   if (el.matches("[data-photos]")) addPhotosToDay(el.dataset.photos, [...el.files]);
   else if (el.id === "photoAll" || el.id === "photoGlobal") { addPhotos([...el.files]); el.value = ""; }
   else if (el.id === "mapFile") useOwnMap(el.files[0]);
@@ -236,7 +286,7 @@ document.addEventListener("change", (e) => {
   else if (el.id === "demo") { if (el.value) loadTrip(demoTrip(el.value)); el.value = ""; }
   else if (el.id === "zoom") document.documentElement.style.setProperty("--z", el.value / 100);
   else if (el.dataset.k === "start" || el.dataset.k === "roundTrip" || el.dataset.k === "ruled" || el.dataset.k === "costPage") { /* nur Vorschau */ }
-  if (el.dataset && el.dataset.k && /\.(weather|cat|date)$/.test(el.dataset.k)) renderPanel();
+  if (el.dataset && el.dataset.k && /\.(weather|cat|date|mod|w|h|photo)$/.test(el.dataset.k)) renderPanel();
 });
 
 document.addEventListener("click", async (e) => {
@@ -245,14 +295,10 @@ document.addEventListener("click", async (e) => {
   if (b.dataset.tab) { S.tab = b.dataset.tab; renderPanel(); return; }
   const t = S.trip, id = b.dataset.id, dayId = b.dataset.day;
   switch (b.dataset.act) {
-    case "tpl": {
-      t.template = id;
-      changed(); renderPanel(); break;
-    }
     case "theme": t.theme = id; changed(); renderPanel(); break;
     case "resetWx": { const d = dayOf(dayId); if (d) { wxState = "unknown"; resetDayWeather(d); toast("Wetter wird aus den Fotodaten ermittelt …"); } break; }
     case "addDay": {
-      const last = t.days[t.days.length - 1], d = newDay(last && last.date ? addDays(last.date, 1) : t.start || "");
+      const last = t.days[t.days.length - 1], d = newDay(last && last.date ? addDays(last.date, 1) : t.start || "", t.cols);
       const prev = t.days[t.days.length - 1]; if (prev && prev.place.name) d.place = { ...prev.place };
       t.days.push(d); S.open.add(d.id); changed(); renderPanel(); break;
     }
@@ -262,7 +308,7 @@ document.addEventListener("click", async (e) => {
       for (let k = 0; k < n; k++) {
         const date = addDays(start, k);
         if (t.days.some((d) => d.date === date)) continue;
-        t.days.push(newDay(date));
+        t.days.push(newDay(date, t.cols));
       }
       t.days.sort(byDate); if (!t.start) t.start = start;
       changed(); renderPanel(); break;
@@ -277,7 +323,14 @@ document.addEventListener("click", async (e) => {
     }
     case "addCost": dayOf(dayId).costs.push({ id: uid(), l: "", cat: "sonstiges", a: "" }); S.open.add(dayId); renderPanel(); break;
     case "delCost": { const d = dayOf(dayId); d.costs = d.costs.filter((c) => c.id !== id); changed(); renderPanel(); break; }
-    case "delPhoto": { const d = dayOf(dayId); d.photos = d.photos.filter((p) => p.id !== id); changed(); renderPanel(); break; }
+    case "delPhoto": { const d = dayOf(dayId); d.photos = d.photos.filter((p) => p.id !== id); pruneTiles(d); changed(); renderPanel(); break; }
+    case "addPage": { const d = dayOf(dayId); d.pages.push(newPage()); S.open.add(dayId); changed(); renderPanel(); break; }
+    case "resetPages": { const d = dayOf(dayId); if (confirm("Den Seitenaufbau dieses Tages auf den Standard zurücksetzen?")) { d.pages = defaultPages(t.cols); changed(); renderPanel(); } break; }
+    case "delPage": { const d = dayOf(dayId), pg = d.pages.find((x) => x.id === b.dataset.page); if (pg && (!pg.tiles.length || confirm("Diese Seite mit allen Kacheln löschen?"))) { d.pages = d.pages.filter((x) => x !== pg); changed(); renderPanel(); } break; }
+    case "pageUp": case "pageDown": { const d = dayOf(dayId); moveIn(d.pages, d.pages.findIndex((x) => x.id === b.dataset.page), b.dataset.act === "pageUp" ? -1 : 1); changed(); renderPanel(); break; }
+    case "tileUp": case "tileDown": { const d = dayOf(dayId), pg = d.pages.find((x) => x.id === b.dataset.page); moveIn(pg.tiles, pg.tiles.findIndex((x) => x.id === id), b.dataset.act === "tileUp" ? -1 : 1); changed(); renderPanel(); break; }
+    case "delTile": { const d = dayOf(dayId), pg = d.pages.find((x) => x.id === b.dataset.page); pg.tiles = pg.tiles.filter((x) => x.id !== id); changed(); renderPanel(); break; }
+    case "tileSize": { const d = dayOf(dayId), x = d.pages.find((q) => q.id === b.dataset.page).tiles.find((q) => q.id === id); x.w = Math.min(+b.dataset.w, t.cols); x.h = +b.dataset.h; changed(); renderPanel(); break; }
     case "search": doSearch(b.dataset.key, b.closest(".pp")); break;
     case "pick": pickPlace(b); break;
     case "ptUp": case "ptDown": {
@@ -291,7 +344,7 @@ document.addEventListener("click", async (e) => {
     case "delMap": t.mapImg = ""; t.mapUser = false; changed(); renderPanel(); break;
     case "applyLegs": applyLegs(); break;
     case "resum": t.summary = suggestSummary(t); t.summaryAuto = true; changed(); renderPanel(); break;
-    case "new": if (confirm("Alle Eingaben verwerfen und neu beginnen?")) loadTrip(newTrip(t.template), true); break;
+    case "new": if (confirm("Alle Eingaben verwerfen und neu beginnen?")) loadTrip(newTrip(), true); break;
     case "open": $("#openFile").click(); break;
     case "addPhotos": $("#photoGlobal").click(); break;
     case "photoMark": { const p = dayOf(dayId).photos.find((x) => x.id === id); if (p) openEditor(p); break; }
@@ -315,6 +368,8 @@ document.addEventListener("drop", (e) => {
   if (pdf) openProject(pdf); else addPhotos(files);
 });
 
+/* Element einer Liste um eine Stelle verschieben */
+function moveIn(list, i, dir) { const j = i + dir; if (i >= 0 && j >= 0 && j < list.length) [list[i], list[j]] = [list[j], list[i]]; }
 const byDate = (a, b) => (a.date || "9999").localeCompare(b.date || "9999");
 
 /* ---------- Ortssuche ---------- */
@@ -370,7 +425,7 @@ const dupNote = (n) => (n ? ` ${n} schon vorhandene${n === 1 ? "s Foto" : " Foto
 /* bereits vorhandene Doppelte entfernen (das jeweils zuerst eingefügte bleibt) */
 function removeDuplicates() {
   const seen = new Set(); let n = 0;
-  S.trip.days.forEach((d) => { d.photos = d.photos.filter((p) => { const k = photoKey(p); if (seen.has(k)) { n++; return false; } seen.add(k); return true; }); });
+  S.trip.days.forEach((d) => { d.photos = d.photos.filter((p) => { const k = photoKey(p); if (seen.has(k)) { n++; return false; } seen.add(k); return true; }); pruneTiles(d); });
   return n;
 }
 const countDuplicates = () => { const seen = new Set(); let n = 0; S.trip.days.forEach((d) => d.photos.forEach((p) => { const k = photoKey(p); if (seen.has(k)) n++; else seen.add(k); })); return n; };
@@ -381,6 +436,7 @@ async function addPhotosToDay(dayId, files) {
   const d = dayOf(dayId); if (!d) return;
   const read = await readPhotos(files.filter(isImageFile)), { bad } = read, { list, dup } = dropDuplicates(read.list);
   d.photos.push(...list); d.photos.sort(photoSort);
+  addPhotoTiles(d, [...list].sort(photoSort), S.trip.cols);
   S.open.add(dayId); changed(); renderPanel(); queueAllWeather(); queueAllPlaces();
   toast((bad ? `${list.length} Fotos hinzugefügt, ${bad} nicht lesbar.` : `${list.length} Fotos hinzugefügt.`) + dupNote(dup));
 }
@@ -392,15 +448,16 @@ async function addPhotos(files) {
   const read = await readPhotos(imgs), { bad } = read, { list, dup } = dropDuplicates(read.list);
   if (!list.length) { toast(dup ? "Alle diese Fotos sind schon im Projekt." : "Die Fotos konnten nicht gelesen werden."); return; }
   list.sort(photoSort);
-  const made = [], touched = new Set();
+  const made = [], touched = new Set(), added = new Map();
   for (const p of list) {
     let d = p.day ? t.days.find((x) => x.date === p.day) : t.days[t.days.length - 1];
     if (!d) {
       d = newDay(p.day);
       t.days.push(d); t.days.sort(byDate); made.push(d);
     }
-    d.photos.push(p); touched.add(d);
+    d.photos.push(p); touched.add(d); added.set(d, [...(added.get(d) || []), p]);
   }
+  added.forEach((ps, d) => addPhotoTiles(d, ps, t.cols));
   touched.forEach((d) => d.photos.sort(photoSort));
   const first = made.length ? made.slice().sort(byDate)[0] : null;
   if (!t.start && first && first.date) t.start = first.date;
@@ -606,7 +663,8 @@ function loadTrip(t, fresh) {
   S.trip = normalizeTrip(t); S.open = new Set(); S.newPoint = blankPlace();
   if (!fresh && S.trip.days[0]) S.open.add(S.trip.days[0].id);
   refreshDerived(S.trip);
-  S.tab = "trip";
+  S.tab = "trip"; S.sel = null; if (S.brush) endBrush();
+  resetUndo();
   renderPanel(); renderPreview(); scheduleSave();
   queueAllWeather(); queueAllPlaces();
 }

@@ -4,7 +4,9 @@ const FONT_CSS = {
   R: "font-family:Helvetica,Arial,'Liberation Sans',sans-serif", B: "font-family:Helvetica,Arial,'Liberation Sans',sans-serif;font-weight:700",
   I: "font-family:Helvetica,Arial,'Liberation Sans',sans-serif;font-style:italic", BI: "font-family:Helvetica,Arial,'Liberation Sans',sans-serif;font-weight:700;font-style:italic",
   S: "font-family:'Times New Roman',Times,'Liberation Serif',serif", SB: "font-family:'Times New Roman',Times,'Liberation Serif',serif;font-weight:700",
-  SI: "font-family:'Times New Roman',Times,'Liberation Serif',serif;font-style:italic", C: "font-family:'Courier New',Courier,'Liberation Mono',monospace",
+  SI: "font-family:'Times New Roman',Times,'Liberation Serif',serif;font-style:italic", SBI: "font-family:'Times New Roman',Times,'Liberation Serif',serif;font-weight:700;font-style:italic",
+  C: "font-family:'Courier New',Courier,'Liberation Mono',monospace", CB: "font-family:'Courier New',Courier,'Liberation Mono',monospace;font-weight:700",
+  CI: "font-family:'Courier New',Courier,'Liberation Mono',monospace;font-style:italic", CBI: "font-family:'Courier New',Courier,'Liberation Mono',monospace;font-weight:700;font-style:italic",
 };
 
 const rgba = (hex, a) => `rgba(${hexRgb(hex).join(",")},${a})`;

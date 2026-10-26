@@ -6,7 +6,7 @@
    Ein solches PDF lässt sich wieder öffnen und weiterbearbeiten. Alles, was aus einem PDF gelesen wird,
    ist unsicher und läuft vor jeder Verwendung durch cleanTrip(). */
 const PROJECT_FILE = "reise-protokoll-projekt.json", MAP_FILE = "karte.jpg", COVER_FILE = "titelfoto.jpg";
-const FORMAT = 1;
+const FORMAT = 2;
 
 /* ---------- Prüfen unsicherer Daten ---------- */
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
@@ -42,18 +42,28 @@ function cleanPhotoMeta(g, seen) {
     place: clipStr(g.place, 500), placeSrc: oneOf(g.placeSrc, ["", "osm", "offline", "manual"], ""), sha: typeof g.sha === "string" && /^[0-9a-f]{64}$/.test(g.sha) ? g.sha : "",
   };
 }
+function cleanTile(x, cols, seen) {
+  x = x && typeof x === "object" ? x : {};
+  const o = { id: cleanId(x.id, seen), mod: oneOf(x.mod, Object.keys(MODULES), "leer"), w: clamp(Math.round(x.w) || 1, 1, cols), h: clamp(Math.round(x.h) || 1, 1, GRID_ROWS) };
+  if (typeof x.photo === "string" && /^[A-Za-z0-9_-]{1,24}$/.test(x.photo)) o.photo = x.photo;
+  if (typeof x.text === "string") o.text = clipStr(x.text, 4000);
+  if (Object.keys(FAMILIES).includes(x.font)) o.font = x.font;
+  return o;
+}
+const cleanPage = (pg, cols, seen) => ({ id: cleanId(pg && pg.id, seen), tiles: (pg && Array.isArray(pg.tiles) ? pg.tiles : []).slice(0, 60).map((x) => cleanTile(x, cols, seen)) });
+
 function cleanTrip(j) {
   if (!j || typeof j !== "object" || j.app !== "Reise-Protokoll" || !j.trip || typeof j.trip !== "object") return null;
-  const t = migrateTrip(j.trip), base = newTrip(oneOf(t.template, Object.keys(TEMPLATES), "reise")), seen = new Set(), photoIds = new Set();
+  const t = j.trip, cols = oneOf(+t.cols, [3, 4], 4), base = newTrip(), seen = new Set(), photoIds = new Set();
   const r = t.route && typeof t.route === "object" ? t.route : {};
   const out = {
-    ...base, theme: oneOf(t.theme, Object.keys(THEMES), "meer"), title: clipStr(t.title, 200), subtitle: clipStr(t.subtitle, 300), travelers: clipStr(t.travelers, 300),
+    ...base, cols, theme: oneOf(t.theme, Object.keys(THEMES), "meer"), title: clipStr(t.title, 200), subtitle: clipStr(t.subtitle, 300), travelers: clipStr(t.travelers, 300),
     currency: typeof t.currency === "string" && /^[A-Z]{3}$/.test(t.currency) ? t.currency : "EUR", start: cleanIso(t.start),
     startPlace: cleanPlace(t.startPlace), roundTrip: !!t.roundTrip,
     summary: clipStr(t.summary, 4000), summaryAuto: t.summaryAuto !== false, mapUser: !!t.mapUser, ruled: t.ruled !== false, costPage: t.costPage !== false,
     projData: t.projData !== false, capWeather: t.capWeather !== false, wxLine: !!t.wxLine,
     capNum: !!t.capNum, capDate: !!t.capDate, capPlace: !!t.capPlace, capGps: !!t.capGps, capNote: t.capNote !== false, capMarks: t.capMarks !== false, capFile: !!t.capFile, hashes: !!t.hashes,
-    dpi: oneOf(t.dpi, ["110", "150", "220", "300"], "150"), placeMode: oneOf(t.placeMode, ["auto", "offline", "off"], "auto"), stripN: t.stripN === "auto" ? "auto" : oneOf(+t.stripN, [0, 1, 2, 3], "auto"), photoStyle: oneOf(t.photoStyle, ["shadow", "frame", "plain"], "shadow"), embed: oneOf(t.embed === "work" ? "1600" : t.embed, ["original", "3200", "2400", "1600"], "original"),
+    dpi: oneOf(t.dpi, ["110", "150", "220", "300"], "150"), placeMode: oneOf(t.placeMode, ["auto", "offline", "off"], "auto"), photoStyle: oneOf(t.photoStyle, ["shadow", "frame", "plain"], "shadow"), embed: oneOf(t.embed === "work" ? "1600" : t.embed, ["original", "3200", "2400", "1600"], "original"),
     mapSource: oneOf(t.mapSource, ["", "osm", "osmde", "esri"], ""), mapW: num(t.mapW, 1, 20000, 0), mapH: num(t.mapH, 1, 20000, 0), coverW: num(t.coverW, 1, 20000, 0), coverH: num(t.coverH, 1, 20000, 0),
     hasMap: !!t.hasMap, hasCover: !!t.hasCover,
     route: {
@@ -69,9 +79,11 @@ function cleanTrip(j) {
         text: clipStr(d.text, 20000), plan: clipStr(d.plan, 8000), highlights: clipStr(d.highlights, 4000),
         costs: (Array.isArray(d.costs) ? d.costs : []).slice(0, 200).map((c) => ({ id: cleanId(c && c.id, seen), l: clipStr(c && c.l, 200), cat: oneOf(c && c.cat, CATS.map((k) => k.id), "sonstiges"), a: clipStr(c && c.a, 20) })),
         photos: (Array.isArray(d.photos) ? d.photos : []).slice(0, 500).map((g) => cleanPhotoMeta(g, photoIds)),
+        pages: Array.isArray(d.pages) ? d.pages.slice(0, 40).map((pg) => cleanPage(pg, cols, seen)) : defaultPages(cols),
       };
     }),
   };
+  out.days.forEach((d) => { const used = new Set(); d.pages.forEach((pg) => pg.tiles.forEach((x) => { if (x.photo) { if (used.has(x.photo)) delete x.photo; else used.add(x.photo); } })); }); // ein Foto nur einmal pro Tag
   out.route.points.forEach((p) => { p.lat = Number.isFinite(p.lat) ? p.lat : null; p.lon = Number.isFinite(p.lon) ? p.lon : null; });
   return out;
 }

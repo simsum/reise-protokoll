@@ -31,7 +31,10 @@
     <section id="view">
       <div class="viewbar">
         <span id="pageCount"></span>
+        <button id="undoBtn" class="ico" title="Seitenaufbau rückgängig (Strg+Z)" disabled>↶</button><button id="redoBtn" class="ico" title="Wiederholen (Strg+Y)" disabled>↷</button>
         <span id="warn"></span>
+        <span class="tip">Kacheln: klicken, ziehen, Doppelklick · Strg+Z</span>
+        <span id="brushbar" hidden>🖌 Format übertragen: Zielseiten anklicken <button id="brushAll">Auf alle Tage</button> <button id="brushEnd">Fertig</button></span>
         <div class="grow"></div>
         <label>Zoom <select id="zoom"><option value="55">55 %</option><option value="75">75 %</option><option value="100" selected>100 %</option><option value="130">130 %</option></select></label>
       </div>
@@ -66,6 +69,7 @@
     <div class="ed-notes" id="edNotes" hidden></div>
   </div>
 </div>
+<div id="tb" hidden></div>
 <div id="toast" hidden></div>
 
 <script type="text/plain" id="orte-data">__ORTE_B64__</script>

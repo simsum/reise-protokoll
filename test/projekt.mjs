@@ -60,6 +60,7 @@ await page.evaluate(() => {
   const t = S.trip, p = t.days[0].photos[0];
   t.title = "Projekttest <b>fett</b>"; t.summaryAuto = false; t.summary = "Eigene Zusammenfassung";
   t.days[0].place = { name: "Teststadt", lat: 48.1, lon: 11.5 }; t.days[0].text = "Tagebuch eins";
+  setCols(3); addTile(t.days[0], newTile("notiz", 2, 2, { text: "Notiz" }), 3);
   p.note = "Schöner Blick"; p.marks = [{ t: "circle", x: 400, y: 300, r: 90, c: "#E3242B" }, { t: "num", x: 700, y: 400, r: 40, c: "#FFC400", note: "Hier lang" }, { t: "arrow", x: 200, y: 200, x2: 320, y2: 120, c: "#1F6FEB" }];
   changed();
 });
@@ -106,10 +107,12 @@ await page.setInputFiles("#openFile", join(out, "projekt.pdf"));
 await page.waitForFunction(() => S.trip.title.startsWith("Projekttest"), null, { timeout: 60000 });
 const re = await page.evaluate(() => {
   const t = S.trip, p = t.days[0].photos[0], q = t.days[0].photos[1];
-  return { tpl: t.template, days: t.days.length, photos: t.days.map((d) => d.photos.length), summary: t.summary, sumAuto: t.summaryAuto, place: t.days[0].place, text: t.days[0].text,
+  return { cols: t.cols, tiles: t.days[0].pages.map((pg) => pg.tiles.map((x) => x.mod + x.w + "x" + x.h).join()).join("|"), days: t.days.length, photos: t.days.map((d) => d.photos.length), summary: t.summary, sumAuto: t.summaryAuto, place: t.days[0].place, text: t.days[0].text,
     note: p.note, marks: p.marks.length, markNote: p.marks.find((m) => m.t === "num").note, qrot: q.rot, qcrop: q.crop, qnote: q.note, cover: !!t.coverPhoto, theme: t.theme, embed: t.embed };
 });
-ok(re.tpl === "reise" && re.days === 3 && re.photos.join() === "2,2,1", "Vorlage, Tage und Foto-Anzahl wiederhergestellt");
+ok(re.days === 3 && re.photos.join() === "2,2,1", "Tage und Foto-Anzahl wiederhergestellt");
+ok(re.cols === 3 && re.tiles.startsWith("strecke3x1,wetter1x1,") && re.tiles.includes("|foto") && re.tiles.includes("notiz2x2"), "Raster, Seiten und Kacheln (Größen) wiederhergestellt: " + re.tiles);
+ok(await page.evaluate(() => { const d = S.trip.days[0], ph = d.pages.flatMap((pg) => pg.tiles).filter((x) => x.mod === "foto"); return ph.length === 2 && ph.every((x) => d.photos.some((p) => p.id === x.photo)); }), "Fotokacheln zeigen weiterhin auf ihre Fotos");
 ok(re.summary === "Eigene Zusammenfassung" && re.sumAuto === false, "Zusammenfassung (von Hand) bleibt erhalten");
 ok(re.place.name === "Teststadt" && re.text === "Tagebuch eins", "Ort mit Position und Tagebuchtext");
 ok(re.note === "Schöner Blick" && re.marks === 3 && re.markNote === "Hier lang", "Bildunterschrift, Markierungen und Notiz");
@@ -128,10 +131,10 @@ const evil = await page.evaluate(async () => {
   const bad = {
     app: "Reise-Protokoll", format: 1,
     trip: {
-      template: "gibtsnicht", theme: "<script>", title: "T".repeat(5000), currency: "<img>", start: "morgen", roundTrip: "ja",
+      cols: 9, theme: "<script>", title: "T".repeat(5000), currency: "<img>", start: "morgen", roundTrip: "ja",
       startPlace: { name: "x", lat: 999, lon: "abc" },
       route: { points: [{ id: "../../x", name: "P", lat: 1, lon: 2 }, "str", null], km: -5, legs: "nein" },
-      days: [{ id: "__proto__", date: "31.02.2026", place: { name: "<img src=x onerror=alert(1)>", lat: 91 }, weather: "hagel", text: 42, costs: [{ l: "a", cat: "böse", a: "<x>" }, 7],
+      days: [{ id: "__proto__", pages: [{ id: "p", tiles: [{ id: "t1", mod: "<b>", w: 99, h: -4, photo: "../x", text: 5 }, { id: "t1", mod: "foto", w: 2.4, h: 9, photo: "ok_1", text: "Hallo" }, "x", null] }, "kaputt", { tiles: "nein" }], date: "31.02.2026", place: { name: "<img src=x onerror=alert(1)>", lat: 91 }, weather: "hagel", text: 42, costs: [{ l: "a", cat: "böse", a: "<x>" }, 7],
         photos: [{ id: "a", att: "../../etc", marks: [{ t: "num", x: 1, y: 1, r: -4, c: "red" }, { t: "circle", x: 1, y: 1, r: 5, c: "#abcdef" }, { t: "evil" }], rot: 9, crop: { x: -1, y: 0, w: 5, h: 5 }, gps: { lat: 1000, lon: 0 }, src: "javascript:alert(1)", day: "2026-13-45" }] }]
         .concat(Array.from({ length: 600 }, () => ({}))),
     },
@@ -141,11 +144,12 @@ const evil = await page.evaluate(async () => {
   const { pages } = layoutTrip(newTrip("rundreise"));
   const bytes = await buildPdf(pages, { title: "x" }, [{ name: PROJECT_FILE, bytes: new TextEncoder().encode(JSON.stringify(bad)), mime: "application/json" }]);
   const r = await readProjectPdf(new File([bytes], "boese.pdf", { type: "application/pdf" }));
-  return { tpl: t.template, theme: t.theme, title: t.title.length, cur: t.currency, start: t.start, round: t.roundTrip, sp: t.startPlace, pts: t.route.points.length, ptId: t.route.points[0].id, km: t.route.km, legs: t.route.legs.length,
+  return { tiles: t.days[0].pages.map((p) => p.tiles.map((x) => [x.id, x.mod, x.w, x.h, x.photo, x.text].join("/")).join(";")), cols: t.cols, theme: t.theme, title: t.title.length, cur: t.currency, start: t.start, round: t.roundTrip, sp: t.startPlace, pts: t.route.points.length, ptId: t.route.points[0].id, km: t.route.km, legs: t.route.legs.length,
     days: t.days.length, day0: { id: t.days[0].id, date: t.days[0].date, name: t.days[0].place.name, lat: t.days[0].place.lat, weather: t.days[0].weather, text: t.days[0].text, costs: t.days[0].costs.length, cat: t.days[0].costs[0].cat },
     photo: { att: p.att, marks: p.marks.length, rot: p.rot, crop: p.crop, gps: p.gps, src: p.src, day: p.day }, viaPdf: r.trip.days.length, viaPdfTitle: r.trip.title.length };
 });
-ok(evil.tpl === "reise" && evil.theme === "meer" && evil.title === 200 && evil.cur === "EUR" && evil.start === "" && evil.round === true, "Vorlage, Design, Titel, Währung, Datum geprüft");
+ok(evil.cols === 4 && evil.theme === "meer" && evil.title === 200 && evil.cur === "EUR" && evil.start === "" && evil.round === true, "Raster, Design, Titel, Währung, Datum geprüft");
+ok(evil.tiles.length === 3 && evil.tiles[0].split(";").length === 4 && /\/leer\/4\/1\/\/$/.test(evil.tiles[0].split(";")[0]) && /\/foto\/2\/6\/ok_1\/Hallo$/.test(evil.tiles[0].split(";")[1]) && evil.tiles[0].split(";")[0].split("/")[0] !== evil.tiles[0].split(";")[1].split("/")[0], "Kacheln geprüft: unbekanntes Modul, Größen, Foto-Kennung, Text, doppelte Kennungen")
 ok(evil.sp.lat === null && evil.sp.lon === null, "ungültige Koordinaten verworfen");
 ok(evil.pts === 1 && evil.ptId !== "../../x" && evil.km === null && evil.legs === 0, "Route bereinigt");
 ok(evil.days === 400 && evil.day0.id !== "__proto__" && evil.day0.date === "" && evil.day0.lat === null && evil.day0.weather === "" && evil.day0.text === "" && evil.day0.cat === "sonstiges", "Tage: höchstens 400, Felder geprüft");

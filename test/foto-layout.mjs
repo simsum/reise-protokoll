@@ -1,4 +1,4 @@
-// Test: Fotos nutzen den Freiraum der Tagesseite; Foto-Stile (Schatten, Rahmen, schlicht) in Vorschau und PDF.
+// Test: Fotos in Kacheln (Foto-Seiten, Größen, Panorama); Foto-Stile (Schatten, Rahmen, schlicht) in Vorschau und PDF.
 import { chromium } from "playwright";
 import { readFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -42,10 +42,10 @@ await page.evaluate(async () => {
     d.text = count === 3 && S.trip.days.length === 5 ? "Sehr langer Text. ".repeat(160) : "Kurzer Tagebucheintrag über einen schönen Tag mit wenig Text.";
     d.highlights = "Aussicht\nEssen"; d.costs = [{ id: uid(), l: "Eintritt", cat: "aktivitaeten", a: "12" }];
     for (let k = 0; k < count; k++) d.photos.push(await readOne(await mk(++n, k % 3 === 2)));
-    S.trip.days.push(d);
+    addPhotoTiles(d, d.photos, S.trip.cols); S.trip.days.push(d);
   }
   async function readOne(f) { return makePhoto(f); }
-  S.trip.photoStyle = "shadow"; S.trip.stripN = "auto"; changed();
+  S.trip.photoStyle = "shadow"; changed();
 });
 await page.waitForTimeout(600);
 
@@ -54,19 +54,34 @@ const info = await page.evaluate(() => {
   return { pages: pages.length, perDay: t.days.map((d, i) => pages.filter((pg) => pg.ops.some((o) => o.k === "img" && d.photos.some((p) => p.id === o.pid))).length), imgs: pages.map((pg) => pg.ops.filter((o) => o.k === "img").length) };
 });
 console.log("   Bilder je Seite:", info.imgs.join(","));
-ok(info.imgs.slice(1, 6).join() === "1,2,3,4,6", "automatisch: alle Fotos von 1, 2, 3, 4 und 6 Fotos stehen bei wenig Text auf der Tagesseite");
-ok(info.imgs[6] === 0 && info.imgs.some((n, i) => i > 6 && n === 3), `viel Text: kein Platz auf der Tagesseite, die 3 Fotos kommen auf eine Fotoseite (${info.pages} Seiten)`);
+ok(info.imgs.slice(1, 13).join() === "0,1,0,2,0,3,0,4,0,6,0,3", "jedes Foto bekommt eine Kachel: Standardseite ohne Foto, dahinter eine Fotoseite mit allen Fotos des Tages");
+ok(await page.evaluate(() => { const t = S.trip, { warns } = layoutTrip(t); return warns.some((w) => /Tagebuch ist für die Kachel zu lang/.test(w)); }), "sehr langer Text: Hinweis statt Folgeseite");
+
+console.log("Größen");
+const sz = await page.evaluate(() => {
+  const t = S.trip, d = t.days[0], photoTile = d.pages[1].tiles[0], out = {};
+  const wOf = () => layoutTrip(t).pages[2].ops.find((o) => o.k === "img");
+  photoTile.w = 4; photoTile.h = 1; out.pano = wOf();
+  photoTile.w = 1; photoTile.h = 1; out.klein = wOf();
+  photoTile.w = 2; photoTile.h = 2; out.gross = wOf();
+  out.cw = CW;
+  return out;
+});
+ok(Math.abs(sz.pano.w - sz.cw) < 0.5 && sz.pano.h < 110, `Panorama 4×1: ganze Breite (${sz.pano.w.toFixed(0)} × ${sz.pano.h.toFixed(0)} pt)`);
+ok(sz.klein.w < 125 && sz.gross.w > sz.klein.w * 1.9 && sz.gross.h > sz.klein.h * 1.8, `1×1 ist kleiner als 2×2 (${sz.klein.w.toFixed(0)} × ${sz.klein.h.toFixed(0)} gegen ${sz.gross.w.toFixed(0)} × ${sz.gross.h.toFixed(0)})`);
+ok(await page.evaluate(() => { const t = S.trip, x = t.days[0].pages[1].tiles[0]; x.photo = ""; const w = layoutTrip(t).warns.some((q) => /Fotokachel hat noch kein Foto/.test(q)); x.photo = t.days[0].photos[0].id; x.w = 2; x.h = 2; return w; }), "Fotokachel ohne Foto: Hinweis");
 
 console.log("Stile");
 for (const st of ["shadow", "frame", "plain"]) {
   await page.evaluate((st) => { S.trip.photoStyle = st; changed(); }, st);
   await page.waitForTimeout(300);
-  const c = await page.evaluate(() => { const ops = layoutTrip(S.trip).pages[1].ops; return { shadow: ops.filter((o) => o.k === "rect" && o.fo != null).length, round: ops.filter((o) => o.k === "img" && o.r > 0).length, white: ops.filter((o) => o.k === "rect" && o.fill === "#FFFFFF").length }; });
+  const c = await page.evaluate(() => { const ops = layoutTrip(S.trip).pages[2].ops; return { shadow: ops.filter((o) => o.k === "rect" && o.fo != null).length, round: ops.filter((o) => o.k === "img" && o.r > 0).length, white: ops.filter((o) => o.k === "rect" && o.fill === "#FFFFFF").length }; });
   ok(st === "shadow" ? c.shadow >= 7 && c.round === 1 : st === "frame" ? c.shadow >= 7 && c.white === 1 && c.round === 0 : c.shadow === 0 && c.round === 0, `${st}: ${JSON.stringify(c)}`);
 }
 await page.evaluate(() => { S.trip.photoStyle = "shadow"; changed(); });
 await page.waitForTimeout(400);
 await page.locator("#pages .sheet").nth(4).screenshot({ path: join(out, "layout-4.png") });
+await page.locator("#pages .sheet").nth(1).screenshot({ path: join(out, "layout-tag.png") });
 
 console.log("PDF");
 const [dl] = await Promise.all([page.waitForEvent("download"), page.click("#pdfBtn")]);

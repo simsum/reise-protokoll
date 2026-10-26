@@ -113,7 +113,7 @@ ok(shas.every(([a, b]) => a && a === b), "SHA-256 jedes Originals berechnet");
 const pdf1 = await download();
 const doc1 = await PDFDocument.load(pdf1);
 const sizeOrig = pdf1.length;
-ok(doc1.getPageCount() === 3, `Prüfsummen-Seite angehängt: ${doc1.getPageCount()} Seiten (Deckseite, Tag, Prüfsummen)`);
+ok(doc1.getPageCount() === 4, `Prüfsummen-Seite angehängt: ${doc1.getPageCount()} Seiten (Deckseite, Tag, Fotoseite, Prüfsummen)`);
 const pdfText = await page.evaluate(() => layoutTrip(S.trip).pages.at(-1).ops.filter((o) => o.k === "t").map((o) => o.text).join("\n"));
 ok(shas.every(([a]) => pdfText.includes(a)) && pdfText.includes("Prüfsummen der Originalfotos"), "Prüfsummen stehen auf der Seite");
 
