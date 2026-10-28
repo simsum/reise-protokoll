@@ -54,6 +54,8 @@ function buildToolbar() {
     <button class="ico" data-tb="prev" title="In der Reihenfolge nach vorn" ${idx <= 0 ? "disabled" : ""}>◀</button><button class="ico" data-tb="next" title="In der Reihenfolge nach hinten" ${idx >= c.pg.tiles.length - 1 ? "disabled" : ""}>▶</button>
     <button class="ico" data-tb="del" title="Kachel entfernen">✕</button></div>
     ${fixed ? `<div class="tbrow"><small>feste Größe 1×1</small></div>` : `<div class="tbrow">${SIZES.map(sz).join("")}<button data-tb="size" data-w="${t.cols}" data-h="1" aria-pressed="${w === t.cols && h === 1}">Ganze Breite</button><small>${w}×${h}</small></div>`}
+    ${tile.mod === "punktkarte" ? `<div class="tbrow"><button data-tb="pm">${tile.pt ? "Position ändern …" : "Position wählen …"}</button></div>` : ""}
+    ${tile.mod === "wikipedia" ? `<div class="tbrow"><button data-tb="wp">${tile.wp ? "Wikipedia bearbeiten …" : "Wikipedia suchen …"}</button></div>` : ""}
     ${tile.mod === "wettersymbol" ? `<div class="tbrow"><select data-tb="sym" title="Symbol"><option value="auto" ${!tile.sym || tile.sym === "auto" ? "selected" : ""}>Wetter des Tages (automatisch)</option>${SYMBOLS.map((q) => `<option value="${q.id}" ${tile.sym === q.id ? "selected" : ""}>${esc(q.name)}</option>`).join("")}</select></div>` : ""}
     ${tile.mod === "notiz" ? `<div class="tbrow"><select data-tb="font" title="Schrift">${Object.entries(FAMILIES).map(([id, f]) => `<option value="${id}" ${(tile.font || "serif") === id ? "selected" : ""}>${esc(f.name)}</option>`).join("")}</select>
       <button data-tb="md" data-md="b" title="Fett (**Text**)"><b>B</b></button><button data-tb="md" data-md="i" title="Kursiv (*Text*)"><i>I</i></button><button data-tb="md" data-md="h" title="Überschrift (## )">H</button><button data-tb="md" data-md="ul" title="Aufzählung (- )">•</button><button data-tb="md" data-md="ol" title="Nummerierung (1. )">1.</button><button data-tb="md" data-md="q" title="Zitat (> )">❝</button><button data-tb="md" data-md="hr" title="Trennlinie (---)">―</button></div>
@@ -163,6 +165,8 @@ function bindPreviewTiles() {
     const b = e.target.closest("button[data-tb]"); if (!b) return;
     const c = selCtx(), t = S.trip;
     if (b.dataset.tb === "cancel") { ia = null; hideToolbar(); return; }
+    if (b.dataset.tb === "pm") { const c1 = selCtx(); if (c1) openPointMap(c1.tile, c1.d); return; }
+    if (b.dataset.tb === "wp") { const c0 = selCtx(); if (c0) openWikipedia(c0.tile, c0.d); return; }
     if (b.dataset.tb === "md") { mdApply($('#tb [data-tb="text"]'), b.dataset.md); return; }
     if (!c) return;
     if (b.dataset.tb === "size") { c.tile.w = Math.min(+b.dataset.w, t.cols); c.tile.h = +b.dataset.h; }
@@ -174,7 +178,7 @@ function bindPreviewTiles() {
     const el = e.target, c = selCtx();
     if (el.dataset.tb === "add") { addFromMenu(el.value); return; }
     if (!c) return;
-    if (el.dataset.tb === "mod") setTileMod(c.tile, el.value);
+    if (el.dataset.tb === "mod") { setTileMod(c.tile, el.value); if (el.value === "wikipedia" && !c.tile.wp) { tileChanged(); openWikipedia(c.tile, c.d); return; } if (el.value === "punktkarte" && !c.tile.pt) { tileChanged(); openPointMap(c.tile, c.d); return; } }
     if (el.dataset.tb === "sym") c.tile.sym = el.value;
     if (el.dataset.tb === "photo") setTilePhoto(c.d, c.tile, el.value);
     if (el.dataset.tb === "font") c.tile.font = el.value;
@@ -185,7 +189,7 @@ function bindPreviewTiles() {
     c.tile.text = e.target.value; changed();
   });
   document.addEventListener("keydown", (e) => {
-    if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName || "") || !$("#editor").hidden) return;
+    if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName || "") || !$("#editor").hidden || !$("#wp").hidden || !$("#pm").hidden) return;
     if (e.key === "Escape" && S.brush) { endBrush(); return; }
     if (e.key === "Escape" && (S.sel || ia)) select(null);
     if ((e.key === "Delete" || e.key === "Backspace") && S.sel) { const c = selCtx(); if (c) { e.preventDefault(); c.pg.tiles = c.pg.tiles.filter((x) => x !== c.tile); S.sel = null; tileChanged(); } }
@@ -236,12 +240,16 @@ function addFromMenu(mod) {
   pg.tiles.splice(insertIndex(pg.tiles, m, a.cell.r * m.cols + a.cell.c, null), 0, tile);
   S.sel = { dayId: d.id, pageId: pg.id, tileId: tile.id }; ia = null;
   tileChanged();
+  if (mod === "wikipedia") openWikipedia(tile, d);
+  if (mod === "punktkarte") openPointMap(tile, d);
 }
 
 /* ---------- Doppelklick auf eine Kachel: dorthin springen, wo man sie bearbeitet ---------- */
 const TILE_FIELD = { text: "text", plan: "plan", highlights: "highlights", wetter: "weather", unterkunft: "lodging", strecke: "km", kosten: "costs" };
 function editTile(d, tile) {
   if (tile.mod === "foto") { const p = d.photos.find((x) => x.id === tile.photo); if (p) openEditor(p); else { const sel = $('#tb [data-tb="photo"]'); if (sel) sel.focus(); } return; }
+  if (tile.mod === "wikipedia") { openWikipedia(tile, d); return; }
+  if (tile.mod === "punktkarte") { openPointMap(tile, d); return; }
   if (tile.mod === "notiz") { const ta = $('#tb [data-tb="text"]'); if (ta) ta.focus(); return; }
   if (tile.mod === "karte") { S.tab = "map"; renderPanel(); return; }
   if (tile.mod === "kennzahlen") { S.tab = "sum"; renderPanel(); return; }

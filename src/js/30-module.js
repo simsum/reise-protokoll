@@ -66,12 +66,15 @@ function packTiles(tiles, cols, rows) {
 const sizeRange = (hi, lo) => { const a = []; for (let s = hi; s >= lo - 1e-9; s -= 0.5) a.push(s); return a; };
 const card = (pg, r) => pg.rect(r.x, r.y, r.w, r.h, { fill: pg.T.soft, r: 8 });
 
-/* Rahmen und Schatten wie bei Fotos (Einstellung „Aussehen der Fotos“) */
-function framed(pg, t, x, y, w, h) {
-  const sh = t.photoStyle === "shadow";
-  if (sh) pg.shadow(x, y, w, h, 6);
-  return sh ? 6 : 0;
+/* Grafische Kacheln (Foto, Karten, Wettersymbol) sehen aus wie Fotos (Einstellung „Aussehen der Fotos“): Schatten mit abgerundeten Ecken, weißer Rand
+   mit Schatten oder schlicht mit dünnem Rand. Liefert den Innenraum {x, y, w, h}, rad (Eckenradius) und plain (dünnen Rand danach zeichnen). */
+function frameFor(pg, t, T, x, y, w, h) {
+  const st = t.photoStyle, pad = st === "frame" ? 5 : 0, rad = st === "shadow" ? 5 : 0;
+  if (st === "shadow") pg.shadow(x, y, w, h, rad);
+  if (st === "frame") { pg.shadow(x, y, w, h, 1.5); pg.rect(x, y, w, h, { fill: "#FFFFFF", stroke: T.rule, sw: 0.4, r: 1.5 }); }
+  return { x: x + pad, y: y + pad, w: w - 2 * pad, h: h - 2 * pad, rad, plain: !st || st === "plain" };
 }
+const plainEdge = (pg, f, T) => { if (f.plain) pg.rect(f.x, f.y, f.w, f.h, { stroke: T.rule, sw: 0.5 }); };
 
 /* Streckenleiste: Start – Ziel mit Kilometern in der Mitte */
 function routeStrip(pg, sp, T, x, y, w) {
@@ -149,6 +152,14 @@ function drawCamp(pg, c, r, v) {
   });
 }
 
+/* Nadel (Spitze liegt auf (x, y)) mit Schatten, in Schemafarben */
+function drawPin(pg, x, y, s, T) {
+  const P = (d, o) => pg.ops.push({ k: "path", x: x - s / 2, y: y - s, w: s, h: s, vw: 100, vh: 100, d, fill: o.fill || null, stroke: o.stroke || null, sw: o.sw || 0, fo: o.fo, so: o.so });
+  pg.rect(x - s * 0.22, y - s * 0.04, s * 0.44, s * 0.08, { fill: "#000000", fo: 0.22, r: s * 0.04 });
+  P("M50 100C50 100 16 64 16 38a34 34 0 1 1 68 0c0 26-34 62-34 62z", { fill: T.accent2, stroke: "#FFFFFF", sw: 5 });
+  P("M50 26a12 12 0 1 0 0.01 0z", { fill: "#FFFFFF" });
+}
+
 /* ---------- Die Module ---------- */
 const MODULES = {
   leer: { name: "Leer (Platzhalter)", size: () => [1, 1], draw() {} },
@@ -159,10 +170,11 @@ const MODULES = {
     draw(pg, c, tile, r) {
       const id = tile.sym && tile.sym !== "auto" ? tile.sym : c.d.weather;
       if (!id) return;
-      const s = Math.min(r.w, r.h), sz = s * 0.8, T = c.T;
-      card(pg, r);
-      pg.rect(r.x + (r.w - s * 0.9) / 2, r.y + (r.h - s * 0.9) / 2, s * 0.9, s * 0.9, { fill: "#FFFFFF", fo: 0.6, r: s * 0.45 });
-      drawSymbol(pg, id, r.x + (r.w - sz) / 2, r.y + (r.h - sz) / 2, sz, T);
+      const T = c.T, f = frameFor(pg, c.t, T, r.x, r.y, r.w, r.h), s = Math.min(f.w, f.h), sz = s * 0.8;
+      pg.rect(f.x, f.y, f.w, f.h, { fill: T.soft, r: f.rad });
+      plainEdge(pg, f, T);
+      pg.rect(f.x + (f.w - s * 0.9) / 2, f.y + (f.h - s * 0.9) / 2, s * 0.9, s * 0.9, { fill: "#FFFFFF", fo: 0.6, r: s * 0.45 });
+      drawSymbol(pg, id, f.x + (f.w - sz) / 2, f.y + (f.h - sz) / 2, sz, T);
     },
   },
 
@@ -272,6 +284,16 @@ const MODULES = {
     },
   },
 
+  /* Auszug aus der Wikipedia mit Kennzahlen (Fenster in 86-wikidialog.js, Zeichnen in 79-wikipedia.js) */
+  wikipedia: {
+    name: "Wikipedia-Auszug", size: () => [2, 2],
+    draw(pg, c, tile, r) {
+      const wp = tile.wp;
+      if (!wp || !(wp.title || (wp.text && wp.text.trim()) || (wp.facts || []).some((f) => f.on))) return;
+      wikiDraw(pg, c.T, wp, r, c.warns, c.i);
+    },
+  },
+
   highlights: {
     name: "Highlights", size: () => [2, 1],
     draw(pg, c, tile, r) {
@@ -324,18 +346,50 @@ const MODULES = {
   },
 
   karte: {
-    name: "Karte", size: () => [2, 2],
+    name: "Karte (Strecke)", size: () => [2, 2],
     draw(pg, c, tile, r) {
       const { t, i, T, warns } = c;
       if (t.mapImg) {
-        const rad = framed(pg, t, r.x, r.y, r.w, r.h);
-        pg.img(r.x, r.y, r.w, r.h, t.mapImg, t.mapW, t.mapH, undefined, rad);
-        if (!rad) pg.rect(r.x, r.y, r.w, r.h, { stroke: T.rule, sw: 0.8 });
+        const f = frameFor(pg, t, T, r.x, r.y, r.w, r.h);
+        pg.img(f.x, f.y, f.w, f.h, t.mapImg, t.mapW, t.mapH, undefined, f.rad);
+        plainEdge(pg, f, T);
       } else {
         pg.rect(r.x, r.y, r.w, r.h, { fill: T.soft, r: 8 });
         pg.icon("pin", r.x + r.w / 2 - 12, r.y + r.h / 2 - 20, 24, T.muted, 1.4);
         pg.text(r.x + r.w / 2, r.y + r.h / 2 + 10, fitT("Karte noch nicht erzeugt", "R", 8.5, r.w - 12), { s: 8.5, c: T.muted, a: "c" });
         warns.push(`Tag ${i + 1}: Eine Kartenkachel hat noch keine Karte (Reiter „Karte“).`);
+      }
+    },
+  },
+
+  /* Karte um eine selbst gewählte Position (Fenster in 87-mapdialog.js): Bild aus OSM-Kacheln in tile.ptImg, Nadel, Beschriftung und Quelle als Vektoren */
+  punktkarte: {
+    name: "Karte (Punkt)", size: () => [2, 2],
+    draw(pg, c, tile, r) {
+      const pt = tile.pt, { t, i, T, warns } = c;
+      if (!pt) return;
+      if (!tile.ptImg) {
+        pg.rect(r.x, r.y, r.w, r.h, { fill: T.soft, r: 8 });
+        pg.icon("pin", r.x + r.w / 2 - 12, r.y + r.h / 2 - 20, 24, T.muted, 1.4);
+        pg.text(r.x + r.w / 2, r.y + r.h / 2 + 10, fitT("Kartenbild fehlt, Position neu übernehmen", "R", 8, r.w - 12), { s: 8, c: T.muted, a: "c" });
+        warns.push(`Tag ${i + 1}: Einer Punktkarte fehlt das Kartenbild (Position im Fenster neu übernehmen).`);
+        return;
+      }
+      const f = frameFor(pg, t, T, r.x, r.y, r.w, r.h);
+      pg.img(f.x, f.y, f.w, f.h, tile.ptImg, tile.ptW, tile.ptH, undefined, f.rad);
+      plainEdge(pg, f, T);
+      if (tile.ptW && tile.ptW < f.w * 1.6) warns.push(`Tag ${i + 1}: Eine Punktkarte ist für eine kleinere Kachel erzeugt und wirkt unscharf (Position im Fenster neu übernehmen).`);
+      drawPin(pg, f.x + f.w / 2, f.y + f.h / 2, clamp(Math.min(f.w, f.h) * 0.2, 18, 34), T);
+      const cs = 5.6, cr = pt.credit ? Math.min(f.w * 0.6, tw(pt.credit, "R", cs) + 8) : 0;
+      if (cr) {
+        pg.rect(f.x + f.w - cr - 3, f.y + f.h - 12, cr, 9.5, { fill: "#FFFFFF", fo: 0.85, r: 3 });
+        pg.text(f.x + f.w - cr + 1, f.y + f.h - 10.6, fitT(pt.credit, "R", cs, cr - 8), { s: cs, c: "#333333" });
+      }
+      const nm = (pt.name || "").trim(), room = f.w - cr - 22;
+      if (nm && room >= 30) {
+        const lw = Math.min(room, tw(nm, "SB", 8.5) + 14);
+        pg.rect(f.x + 5, f.y + f.h - 20, lw, 15, { fill: "#FFFFFF", fo: 0.92, r: 7.5 });
+        pg.text(f.x + 12, f.y + f.h - 16.2, fitT(nm, "SB", 8.5, lw - 14), { f: "SB", s: 8.5, c: T.ink });
       }
     },
   },

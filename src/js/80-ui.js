@@ -61,6 +61,24 @@ function panelTrip() {
   ${chk("Wetter aus den Fotodaten ermitteln (Koordinaten und Aufnahmedatum gehen dafür an DWD/Bright Sky bzw. Open-Meteo)", "capWeather", t.capWeather)}`;
 }
 
+/* Voraussichtliche Größe des PDFs (Schätzung, wie im Foto-Protokoll): Bilder auf den Seiten nach dpi (JPEG, etwa 0,25 Byte je Pixel, höchstens so groß wie das Original),
+   eingebettete Fotos (Originale oder verkleinert), Karte und Titelfoto als Anhang, Projektdaten, Seiten */
+function pdfEstimate(t, pages) {
+  const dpi = +t.dpi || 150, photos = t.days.flatMap((d) => d.photos), byId = new Map(photos.map((p) => [p.id, p])), seen = new Set();
+  let img = 0;
+  for (const pg of pages) for (const o of pg.ops) {
+    if (o.k !== "img") continue;
+    const p = o.pid && byId.get(o.pid);
+    if (p) { const e = (o.w * dpi / 72) * (o.h * dpi / 72) * 0.25; img += Math.min(e, p.file ? p.file.size : p.size || e); }
+    else if (o.src && !seen.has(o.src)) { seen.add(o.src); img += o.src.length * 0.75; }
+  }
+  const orig = photos.reduce((s, p) => s + (p.file ? p.file.size : p.size || p.src.length * 0.75), 0), per = { 3200: 1.2, 2400: 0.7, 1600: 0.3 }[t.embed];
+  const embedded = t.projData ? (t.embed === "original" ? orig : Math.min(orig, (per || 0.7) * 1048576 * photos.length)) : 0;
+  const extra = t.projData ? (t.mapImg ? t.mapImg.length * 0.75 : 0) + (t.coverPhoto ? t.coverPhoto.length * 0.75 : 0) + t.days.flatMap((d) => d.pages.flatMap((pg) => pg.tiles)).reduce((s, x) => s + (x.ptImg ? x.ptImg.length * 0.75 : 0), 0) + 30000 : 0;
+  const base = 8000 + pages.length * 2500;
+  return { total: img + embedded + extra + base, img, embedded, extra, base };
+}
+
 function embedEstimate(t) {
   const ph = t.days.flatMap((d) => d.photos);
   if (!ph.length) return "Noch keine Fotos.";
@@ -129,6 +147,8 @@ function tileRow(d, pg, x, k, over) {
   if (x.mod === "foto") extra = `<select data-k="${base}.photo"><option value="">– Foto wählen –</option>${d.photos.map((p, n) => `<option value="${p.id}" ${p.id === x.photo ? "selected" : ""}>${n + 1}: ${esc(p.name)}${inUse.has(p.id) ? " (steht schon auf einer Kachel, wird verschoben)" : ""}</option>`).join("")}</select>`;
   if (x.mod === "notiz") extra = `<select data-k="${base}.font" title="Schrift">${Object.entries(FAMILIES).map(([id, f]) => `<option value="${id}" ${(x.font || "serif") === id ? "selected" : ""}>${esc(f.name)}</option>`).join("")}</select>
     <textarea data-k="${base}.text" rows="4" placeholder="Freier Text. Markdown: **fett**, *kursiv*, # Überschrift, - Liste">${esc(x.text || "")}</textarea>`;
+  if (x.mod === "punktkarte") extra = `<div class="btnrow"><button data-act="pmOpen" ${ids}>${x.pt ? "Position ändern …" : "Position wählen …"}</button></div>${x.pt ? `<small>${esc(x.pt.name || "ohne Beschriftung")} · ${x.pt.lat.toFixed(4)}, ${x.pt.lon.toFixed(4)} · Zoom ${x.pt.zoom}</small>` : ""}`;
+  if (x.mod === "wikipedia") extra = `<div class="btnrow"><button data-act="wpOpen" ${ids}>${x.wp ? "Wikipedia-Eintrag bearbeiten …" : "Wikipedia-Eintrag suchen …"}</button></div>${x.wp ? `<small>${esc(x.wp.title)}${x.wp.facts && x.wp.facts.some((f) => f.on) ? " · " + x.wp.facts.filter((f) => f.on).length + " Kennzahlen" : ""}</small>` : ""}`;
   if (x.mod === "wettersymbol") extra = `<select data-k="${base}.sym" title="Symbol"><option value="auto" ${!x.sym || x.sym === "auto" ? "selected" : ""}>Wetter des Tages (automatisch)</option>${SYMBOLS.map((q) => `<option value="${q.id}" ${x.sym === q.id ? "selected" : ""}>${esc(q.name)}</option>`).join("")}</select>`;
   return `<div class="tile ${over ? "over" : ""}"><div class="th"><b>${k + 1}</b>
     <select data-k="${base}.mod">${Object.entries(MODULES).map(([id, m]) => `<option value="${id}" ${id === x.mod ? "selected" : ""}>${esc(m.name)}</option>`).join("")}</select>
@@ -215,7 +235,9 @@ function renderPreview() {
   const { pages, warns } = layoutTrip(S.trip);
   S.pages = pages;
   $("#pages").innerHTML = pages.map((pg, i) => `<div class="sheet" data-pi="${i}" style="aspect-ratio:${pg.W}/${pg.H}">${pageHtml(pg)}${tileOverlay(pg)}</div>`).join("");
-  $("#pageCount").textContent = `${pages.length} ${pages.length === 1 ? "Seite" : "Seiten"}`;
+  const est = pdfEstimate(S.trip, pages);
+  $("#pageCount").textContent = `${pages.length} ${pages.length === 1 ? "Seite" : "Seiten"} · PDF ca. ${fmtSize(est.total)}`;
+  $("#pageCount").title = `Voraussichtliche Größe des PDFs:\nBilder auf den Seiten (${S.trip.dpi} dpi): ${fmtSize(est.img)}\n${S.trip.projData ? `Eingebettete Fotos (${S.trip.embed === "original" ? "Originale" : "verkleinert auf " + S.trip.embed + " px"}): ${fmtSize(est.embedded)}\nKarte, Titelfoto und Projektdaten: ${fmtSize(est.extra)}` : "Ohne Bearbeitungsdaten und eingebettete Fotos"}\nSeiten und Grundgerüst: ${fmtSize(est.base)}`;
   $("#warn").textContent = warns.length ? "⚠ " + warns[0] + (warns.length > 1 ? ` (+${warns.length - 1})` : "") : "";
   $("#warn").title = warns.join("\n");
   syncSelection();
@@ -290,7 +312,7 @@ document.addEventListener("change", (e) => {
   const el = e.target;
   if (el.matches("[data-addtile]")) {
     const d = dayOf(el.dataset.day), pg = d && d.pages.find((x) => x.id === el.dataset.addtile);
-    if (pg && el.value) { pg.tiles.push(tileOf(el.value, S.trip.cols)); S.open.add(d.id); changed(); renderPanel(); }
+    if (pg && el.value) { const nt = tileOf(el.value, S.trip.cols); pg.tiles.push(nt); S.open.add(d.id); changed(); renderPanel(); if (el.value === "wikipedia") openWikipedia(nt, d); if (el.value === "punktkarte") openPointMap(nt, d); }
     return;
   }
   if (el.matches("[data-photos]")) addPhotosToDay(el.dataset.photos, [...el.files]);
@@ -339,6 +361,8 @@ document.addEventListener("click", async (e) => {
     case "addCost": dayOf(dayId).costs.push({ id: uid(), l: "", cat: "sonstiges", a: "" }); S.open.add(dayId); renderPanel(); break;
     case "delCost": { const d = dayOf(dayId); d.costs = d.costs.filter((c) => c.id !== id); changed(); renderPanel(); break; }
     case "delPhoto": { const d = dayOf(dayId); d.photos = d.photos.filter((p) => p.id !== id); pruneTiles(d); changed(); renderPanel(); break; }
+    case "pmOpen": { const d = dayOf(dayId), pg = d.pages.find((q) => q.id === b.dataset.page), tl = pg && pg.tiles.find((q) => q.id === id); if (tl) openPointMap(tl, d); break; }
+    case "wpOpen": { const d = dayOf(dayId), pg = d.pages.find((q) => q.id === b.dataset.page), tl = pg && pg.tiles.find((q) => q.id === id); if (tl) openWikipedia(tl, d); break; }
     case "addPage": { const d = dayOf(dayId); d.pages.push(newPage()); S.open.add(dayId); changed(); renderPanel(); break; }
     case "resetPages": { const d = dayOf(dayId); if (confirm("Den Seitenaufbau dieses Tages auf den Standard zurücksetzen?")) { d.pages = defaultPages(t.cols); changed(); renderPanel(); } break; }
     case "delPage": { const d = dayOf(dayId), pg = d.pages.find((x) => x.id === b.dataset.page); if (pg && (!pg.tiles.length || confirm("Diese Seite mit allen Kacheln löschen?"))) { d.pages = d.pages.filter((x) => x !== pg); changed(); renderPanel(); } break; }

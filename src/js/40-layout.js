@@ -8,7 +8,7 @@
      line  {x1,y1,x2,y2,c,sw}                  Linie
      t     {x,y,text,s,f,c,a,ls}               Text; y = Oberkante, a = l|c|r, ls = Buchstabenabstand
      path  {x,y,w,h,vw,vh,d,fill,stroke,sw}    SVG-Pfad im Raster vw×vh (Symbole)
-     link  {x,y,w,h,url}                       klickbarer Bereich (nur feste, im Code stehende Adressen)
+     link  {x,y,w,h,url}                       klickbarer Bereich (nur feste oder streng geprüfte Adressen: Projektseite, Wikipedia-Artikel)
      img   {x,y,w,h,src,iw,ih,pid,r}           Bild, füllt den Rahmen (zugeschnitten, Ecken r); pid = Foto-ID (Büroklammer im PDF)         */
 const PW = 595.28, PH = 841.89, MX = 40, CW = PW - 2 * MX, BOTTOM = 790;
 const PROJECT_URL = "https://github.com/simsum/reise-protokoll", PROJECT_LABEL = "Reise-Protokoll · github.com/simsum/reise-protokoll";

@@ -48,6 +48,16 @@ function cleanTile(x, cols, seen) {
   if (typeof x.photo === "string" && /^[A-Za-z0-9_-]{1,24}$/.test(x.photo)) o.photo = x.photo;
   if (typeof x.text === "string") o.text = clipStr(x.text, 4000);
   if (Object.keys(FAMILIES).includes(x.font)) o.font = x.font;
+  if (x.wp && typeof x.wp === "object") {
+    const w = x.wp;
+    o.wp = { title: clipStr(w.title, 200), url: validWpUrl(w.url) ? w.url : "", text: clipStr(w.text, 4000), date: cleanIso(w.date), wd: !!w.wd,
+      facts: (Array.isArray(w.facts) ? w.facts : []).map((f) => ({ l: clipStr(f && f.l, 40), v: clipStr(f && f.v, 80), on: !!(f && f.on) })).filter((f) => f.l || f.v).slice(0, 12) };
+  }
+  if (x.pt && typeof x.pt === "object" && isNum(x.pt.lat) && isNum(x.pt.lon) && Math.abs(x.pt.lat) <= 90 && Math.abs(x.pt.lon) <= 180) {
+    o.pt = { lat: x.pt.lat, lon: x.pt.lon, zoom: clamp(Math.round(isNum(x.pt.zoom) ? x.pt.zoom : 15), 1, 18), name: clipStr(x.pt.name, 120), credit: clipStr(x.pt.credit, 120) };
+    o.ptW = num(x.ptW, 1, 6000, 0); o.ptH = num(x.ptH, 1, 6000, 0);
+    if (x.hasImg === true && typeof x.id === "string" && /^[A-Za-z0-9_-]{1,24}$/.test(x.id)) { o.hasImg = true; o.ptKey = x.id; }
+  }
   if (x.sym === "auto" || SYMBOLS.some((q) => q.id === x.sym)) o.sym = x.sym;
   const fx = MODULES[o.mod] && MODULES[o.mod].fixed; if (fx) { o.w = fx[0]; o.h = fx[1]; }
   return o;
@@ -97,8 +107,11 @@ function jsonOfTrip(t, attOf, shrunkOf) {
   const o = JSON.parse(JSON.stringify(t, function (k, v) {
     if (k === "mapImg" || k === "coverPhoto") return undefined;
     if ((k === "src" || k === "vsrc" || k === "file") && typeof this.bw === "number") return undefined;
+    if (k === "ptImg") return undefined; // Kartenbilder der Punktkarten stehen als Anhänge im PDF
     return v;
   }));
+  const withImg = new Set(t.days.flatMap((d) => d.pages.flatMap((pg) => pg.tiles)).filter((x) => x.ptImg && /^[A-Za-z0-9_-]{1,24}$/.test(x.id)).map((x) => x.id));
+  o.days.forEach((d) => d.pages.forEach((pg) => pg.tiles.forEach((x) => { if (withImg.has(x.id)) x.hasImg = true; })));
   o.days.forEach((d) => d.photos.forEach((p) => { p.att = attOf.get(p.id) || null; p.shrunk = !!shrunkOf.get(p.id); }));
   o.hasMap = !!t.mapImg; o.hasCover = !!t.coverPhoto;
   return { app: "Reise-Protokoll", format: FORMAT, created: new Date().toISOString(), trip: o };
@@ -128,6 +141,9 @@ async function collectAttachments(t, onProgress) {
     attOf.set(p.id, nr); shrunkOf.set(p.id, shrunk);
     list.push({ name: `${nr} ${name}`, bytes, mime, desc, rel, pid: p.id });
     if (onProgress) onProgress(n, photos.length);
+  }
+  for (const x of t.days.flatMap((d) => d.pages.flatMap((pg) => pg.tiles))) {
+    if (x.ptImg && /^[A-Za-z0-9_-]{1,24}$/.test(x.id)) list.push({ name: `kachelkarte-${x.id}.jpg`, bytes: bytesOfDataUrl(x.ptImg), mime: "image/jpeg", desc: "Punktkarte: " + ((x.pt && x.pt.name) || "Position"), rel: "Data" });
   }
   if (t.mapImg) list.push({ name: MAP_FILE, bytes: bytesOfDataUrl(t.mapImg), mime: "image/jpeg", desc: "Karte der Deckseite", rel: "Data" });
   if (t.coverPhoto) list.push({ name: COVER_FILE, bytes: bytesOfDataUrl(t.coverPhoto), mime: "image/jpeg", desc: "Titelfoto der Deckseite", rel: "Data" });
@@ -180,6 +196,10 @@ async function readProjectPdf(file, onProgress) {
   if (!t.coverPhoto) t.coverW = t.coverH = 0;
   delete t.hasMap; delete t.hasCover;
 
+  for (const x of t.days.flatMap((d) => d.pages.flatMap((pg) => pg.tiles))) {
+    if (x.hasImg && x.ptKey) x.ptImg = await asUrl(`kachelkarte-${x.ptKey}.jpg`);
+    delete x.hasImg; delete x.ptKey;
+  }
   const metas = t.days.flatMap((d) => d.photos), total = metas.length;
   let done = 0, missing = 0, unreadable = 0;
   for (const d of t.days) {

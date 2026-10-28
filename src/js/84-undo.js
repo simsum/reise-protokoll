@@ -40,7 +40,7 @@ function bindUndo() {
   $("#undoBtn").addEventListener("click", undoLayout);
   $("#redoBtn").addEventListener("click", redoLayout);
   document.addEventListener("keydown", (e) => {
-    if (!(e.ctrlKey || e.metaKey) || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName || "") || !$("#editor").hidden) return;
+    if (!(e.ctrlKey || e.metaKey) || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName || "") || !$("#editor").hidden || !$("#wp").hidden || !$("#pm").hidden) return;
     const k = e.key.toLowerCase();
     if (k === "z" && !e.shiftKey) { e.preventDefault(); undoLayout(); }
     else if (k === "y" || (k === "z" && e.shiftKey)) { e.preventDefault(); redoLayout(); }

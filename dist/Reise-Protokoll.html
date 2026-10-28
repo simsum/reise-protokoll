@@ -196,11 +196,36 @@ body.brush .sheet { outline: 2px dashed color-mix(in srgb, var(--ui) 55%, transp
 .tl.fixed .hd { display: none !important; }
 .camp { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; margin: -4px 0 10px; }
 .camp .f { grid-column: 1 / -1; }
+
+/* Wikipedia-Fenster */
+.wpd { width: min(1040px, 100%); }
+.wpd .row input { flex: 1; border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; }
+.wphits { display: grid; gap: 4px; }
+.wphits button { text-align: left; padding: 6px 10px; }
+.wpgrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 380px); gap: 16px; align-items: start; }
+@media (max-width: 820px) { .wpgrid { grid-template-columns: 1fr; } }
+.wpprev .sheet { width: 100%; margin-top: 6px; }
+.wpd .fact { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.2fr) auto; gap: 4px; margin-bottom: 4px; align-items: center; }
+.wpd .fact input[type=text], .wpd .fact input:not([type]) { border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; min-width: 0; }
+.wpd #wpLen button, .wpd #wpSizes button { padding: 3px 9px; font-size: 12px; }
+.wpd #wpSizes button[aria-pressed="true"] { background: var(--ui); border-color: var(--ui); color: #fff; }
+.warnline { color: var(--warn); font-size: 12px; }
+.wpnear select { padding: 6px 8px; }
+.wpnear select:first-child { flex: 1; min-width: 0; }
+
+/* Fenster Karte (Punkt) */
+.pmmap { position: relative; overflow: hidden; width: 100%; margin-top: 6px; border: 1px solid var(--line); border-radius: 8px; touch-action: none; cursor: grab; background: #eef2f4; user-select: none; }
+.pmmap.drag { cursor: grabbing; }
+.pmmap canvas { display: block; width: 100%; height: auto; }
+.pmpin { position: absolute; left: 50%; top: 50%; width: 34px; height: 34px; transform: translate(-50%, -100%); pointer-events: none; filter: drop-shadow(0 2px 2px rgba(0,0,0,.3)); }
+#pm .btnrow b { min-width: 2ch; text-align: center; }
+#pm .btnrow button { padding: 3px 10px; }
+#pm #pmSizes button[aria-pressed="true"] { background: var(--ui); border-color: var(--ui); color: #fff; }
 </style>
 
 <div id="app">
   <header class="top">
-    <div class="brand"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s6.5-5.7 6.5-11a6.5 6.5 0 1 0-13 0C5.5 15.3 12 21 12 21z"/><circle cx="12" cy="10" r="2.4"/></svg> Reise-Protokoll <span class="ver">v0.14.1</span></div>
+    <div class="brand"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s6.5-5.7 6.5-11a6.5 6.5 0 1 0-13 0C5.5 15.3 12 21 12 21z"/><circle cx="12" cy="10" r="2.4"/></svg> Reise-Protokoll <span class="ver">v0.18.1</span></div>
     <div class="grow"></div>
     <select id="demo" title="Beispielreise laden">
       <option value="">Beispiel laden …</option>
@@ -263,6 +288,45 @@ body.brush .sheet { outline: 2px dashed color-mix(in srgb, var(--ui) 55%, transp
     <p class="hint" id="edHint">Auf die Stelle klicken, die markiert werden soll. Ziehen bestimmt die Größe von Kreis und Nummer bzw. Richtung und Länge des Pfeils. Zu jeder Nummer kannst du unten eine Notiz schreiben.</p>
     <div class="ed-stage"><div class="ed-img" id="edImg"><img alt="" id="edPic"><svg id="edSvg"></svg></div></div>
     <div class="ed-notes" id="edNotes" hidden></div>
+  </div>
+</div>
+<div class="modal" id="wp" hidden role="dialog" aria-modal="true" aria-labelledby="wpHead">
+  <div class="ed wpd">
+    <div class="ed-bar"><b id="wpHead">Wikipedia-Auszug</b><span class="grow"></span><span id="wpWarn" class="warnline"></span><button type="button" id="wpCancel">Abbrechen</button><button type="button" class="primary" id="wpOk" disabled>Übernehmen</button></div>
+    <div class="row"><input id="wpQ" type="search" placeholder="Suchbegriff, z. B. München oder Hofbräuhaus" aria-label="Suchbegriff"><button type="button" id="wpGo">Suchen</button></div>
+    <div class="row wpnear"><select id="wpNear" aria-label="Umgebung von"></select><select id="wpRad" aria-label="Radius"><option value="1">1 km</option><option value="3" selected>3 km</option><option value="5">5 km</option><option value="10">10 km</option></select><button type="button" id="wpNearGo" title="Sehenswertes im Umkreis, beliebteste Artikel zuerst">In der Nähe suchen</button></div>
+    <div class="row"><small id="wpStatus" role="status"></small><button type="button" class="ghost" id="wpSort" hidden></button></div>
+    <div id="wpHits" class="wphits"></div>
+    <div id="wpEd" hidden>
+      <div class="wpgrid">
+        <div class="wpform">
+          <label class="f"><span>Überschrift</span><input id="wpTit"></label>
+          <label class="f"><span>Text (frei änderbar)</span><textarea id="wpTxt" rows="8"></textarea></label>
+          <div class="btnrow" id="wpLen"><small>Text kürzen auf</small><button type="button" data-n="1">1 Satz</button><button type="button" data-n="2">2</button><button type="button" data-n="3">3</button><button type="button" data-n="4">4</button><button type="button" data-n="6">6</button><button type="button" data-n="0" title="ganzer Einleitungstext">alles</button></div>
+          <div class="f"><span>Kennzahlen (Haken = auf der Kachel anzeigen)</span><div id="wpFacts"></div><button type="button" id="wpAddFact">+ Kennzahl</button></div>
+          <div class="f"><span>Größe der Kachel</span><div class="btnrow" id="wpSizes"></div></div>
+        </div>
+        <div class="wpprev"><small>Vorschau in echter Größe</small><div class="sheet" id="wpSheet"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal" id="pm" hidden role="dialog" aria-modal="true" aria-labelledby="pmHead">
+  <div class="ed wpd">
+    <div class="ed-bar"><b id="pmHead">Karte (Punkt)</b><span class="grow"></span><button type="button" id="pmCancel">Abbrechen</button><button type="button" class="primary" id="pmOk">Übernehmen</button></div>
+    <div class="row"><input id="pmQ" type="search" placeholder="Ort oder Adresse suchen" aria-label="Suchbegriff"><button type="button" id="pmGo">Suchen</button></div>
+    <div class="row wpnear"><select id="pmPos" aria-label="Position übernehmen von"></select><button type="button" id="pmPosGo">Position übernehmen</button></div>
+    <small id="pmStatus" role="status"></small>
+    <div id="pmHits" class="wphits"></div>
+    <div class="wpgrid">
+      <div class="wpform">
+        <label class="f"><span>Beschriftung (steht auf der Karte, kann leer bleiben)</span><input id="pmName"></label>
+        <div class="f"><span>Zoom</span><div class="btnrow"><button type="button" id="pmZm" aria-label="Herauszoomen">−</button><b id="pmZ">15</b><button type="button" id="pmZp" aria-label="Hineinzoomen">+</button><small>klein = Land, groß = Straße</small></div></div>
+        <div class="f"><span>Größe der Kachel</span><div class="btnrow" id="pmSizes"></div></div>
+        <small>Die Karte mit Maus oder Finger verschieben, mit dem Mausrad oder +/− zoomen. Die Nadel in der Mitte zeigt die Position.</small>
+      </div>
+      <div class="wpprev"><div class="pmmap" id="pmMap"><canvas id="pmCv" width="2" height="2"></canvas><svg class="pmpin" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 100C50 100 16 64 16 38a34 34 0 1 1 68 0c0 26-34 62-34 62z" fill="#E0A458" stroke="#fff" stroke-width="5"/><circle cx="50" cy="38" r="12" fill="#fff"/></svg></div><small id="pmCoord"></small></div>
+    </div>
   </div>
 </div>
 <div id="tb" hidden></div>
@@ -739,12 +803,15 @@ function packTiles(tiles, cols, rows) {
 const sizeRange = (hi, lo) => { const a = []; for (let s = hi; s >= lo - 1e-9; s -= 0.5) a.push(s); return a; };
 const card = (pg, r) => pg.rect(r.x, r.y, r.w, r.h, { fill: pg.T.soft, r: 8 });
 
-/* Rahmen und Schatten wie bei Fotos (Einstellung „Aussehen der Fotos“) */
-function framed(pg, t, x, y, w, h) {
-  const sh = t.photoStyle === "shadow";
-  if (sh) pg.shadow(x, y, w, h, 6);
-  return sh ? 6 : 0;
+/* Grafische Kacheln (Foto, Karten, Wettersymbol) sehen aus wie Fotos (Einstellung „Aussehen der Fotos“): Schatten mit abgerundeten Ecken, weißer Rand
+   mit Schatten oder schlicht mit dünnem Rand. Liefert den Innenraum {x, y, w, h}, rad (Eckenradius) und plain (dünnen Rand danach zeichnen). */
+function frameFor(pg, t, T, x, y, w, h) {
+  const st = t.photoStyle, pad = st === "frame" ? 5 : 0, rad = st === "shadow" ? 5 : 0;
+  if (st === "shadow") pg.shadow(x, y, w, h, rad);
+  if (st === "frame") { pg.shadow(x, y, w, h, 1.5); pg.rect(x, y, w, h, { fill: "#FFFFFF", stroke: T.rule, sw: 0.4, r: 1.5 }); }
+  return { x: x + pad, y: y + pad, w: w - 2 * pad, h: h - 2 * pad, rad, plain: !st || st === "plain" };
 }
+const plainEdge = (pg, f, T) => { if (f.plain) pg.rect(f.x, f.y, f.w, f.h, { stroke: T.rule, sw: 0.5 }); };
 
 /* Streckenleiste: Start – Ziel mit Kilometern in der Mitte */
 function routeStrip(pg, sp, T, x, y, w) {
@@ -822,6 +889,14 @@ function drawCamp(pg, c, r, v) {
   });
 }
 
+/* Nadel (Spitze liegt auf (x, y)) mit Schatten, in Schemafarben */
+function drawPin(pg, x, y, s, T) {
+  const P = (d, o) => pg.ops.push({ k: "path", x: x - s / 2, y: y - s, w: s, h: s, vw: 100, vh: 100, d, fill: o.fill || null, stroke: o.stroke || null, sw: o.sw || 0, fo: o.fo, so: o.so });
+  pg.rect(x - s * 0.22, y - s * 0.04, s * 0.44, s * 0.08, { fill: "#000000", fo: 0.22, r: s * 0.04 });
+  P("M50 100C50 100 16 64 16 38a34 34 0 1 1 68 0c0 26-34 62-34 62z", { fill: T.accent2, stroke: "#FFFFFF", sw: 5 });
+  P("M50 26a12 12 0 1 0 0.01 0z", { fill: "#FFFFFF" });
+}
+
 /* ---------- Die Module ---------- */
 const MODULES = {
   leer: { name: "Leer (Platzhalter)", size: () => [1, 1], draw() {} },
@@ -832,10 +907,11 @@ const MODULES = {
     draw(pg, c, tile, r) {
       const id = tile.sym && tile.sym !== "auto" ? tile.sym : c.d.weather;
       if (!id) return;
-      const s = Math.min(r.w, r.h), sz = s * 0.8, T = c.T;
-      card(pg, r);
-      pg.rect(r.x + (r.w - s * 0.9) / 2, r.y + (r.h - s * 0.9) / 2, s * 0.9, s * 0.9, { fill: "#FFFFFF", fo: 0.6, r: s * 0.45 });
-      drawSymbol(pg, id, r.x + (r.w - sz) / 2, r.y + (r.h - sz) / 2, sz, T);
+      const T = c.T, f = frameFor(pg, c.t, T, r.x, r.y, r.w, r.h), s = Math.min(f.w, f.h), sz = s * 0.8;
+      pg.rect(f.x, f.y, f.w, f.h, { fill: T.soft, r: f.rad });
+      plainEdge(pg, f, T);
+      pg.rect(f.x + (f.w - s * 0.9) / 2, f.y + (f.h - s * 0.9) / 2, s * 0.9, s * 0.9, { fill: "#FFFFFF", fo: 0.6, r: s * 0.45 });
+      drawSymbol(pg, id, f.x + (f.w - sz) / 2, f.y + (f.h - sz) / 2, sz, T);
     },
   },
 
@@ -945,6 +1021,16 @@ const MODULES = {
     },
   },
 
+  /* Auszug aus der Wikipedia mit Kennzahlen (Fenster in 86-wikidialog.js, Zeichnen in 79-wikipedia.js) */
+  wikipedia: {
+    name: "Wikipedia-Auszug", size: () => [2, 2],
+    draw(pg, c, tile, r) {
+      const wp = tile.wp;
+      if (!wp || !(wp.title || (wp.text && wp.text.trim()) || (wp.facts || []).some((f) => f.on))) return;
+      wikiDraw(pg, c.T, wp, r, c.warns, c.i);
+    },
+  },
+
   highlights: {
     name: "Highlights", size: () => [2, 1],
     draw(pg, c, tile, r) {
@@ -997,18 +1083,50 @@ const MODULES = {
   },
 
   karte: {
-    name: "Karte", size: () => [2, 2],
+    name: "Karte (Strecke)", size: () => [2, 2],
     draw(pg, c, tile, r) {
       const { t, i, T, warns } = c;
       if (t.mapImg) {
-        const rad = framed(pg, t, r.x, r.y, r.w, r.h);
-        pg.img(r.x, r.y, r.w, r.h, t.mapImg, t.mapW, t.mapH, undefined, rad);
-        if (!rad) pg.rect(r.x, r.y, r.w, r.h, { stroke: T.rule, sw: 0.8 });
+        const f = frameFor(pg, t, T, r.x, r.y, r.w, r.h);
+        pg.img(f.x, f.y, f.w, f.h, t.mapImg, t.mapW, t.mapH, undefined, f.rad);
+        plainEdge(pg, f, T);
       } else {
         pg.rect(r.x, r.y, r.w, r.h, { fill: T.soft, r: 8 });
         pg.icon("pin", r.x + r.w / 2 - 12, r.y + r.h / 2 - 20, 24, T.muted, 1.4);
         pg.text(r.x + r.w / 2, r.y + r.h / 2 + 10, fitT("Karte noch nicht erzeugt", "R", 8.5, r.w - 12), { s: 8.5, c: T.muted, a: "c" });
         warns.push(`Tag ${i + 1}: Eine Kartenkachel hat noch keine Karte (Reiter „Karte“).`);
+      }
+    },
+  },
+
+  /* Karte um eine selbst gewählte Position (Fenster in 87-mapdialog.js): Bild aus OSM-Kacheln in tile.ptImg, Nadel, Beschriftung und Quelle als Vektoren */
+  punktkarte: {
+    name: "Karte (Punkt)", size: () => [2, 2],
+    draw(pg, c, tile, r) {
+      const pt = tile.pt, { t, i, T, warns } = c;
+      if (!pt) return;
+      if (!tile.ptImg) {
+        pg.rect(r.x, r.y, r.w, r.h, { fill: T.soft, r: 8 });
+        pg.icon("pin", r.x + r.w / 2 - 12, r.y + r.h / 2 - 20, 24, T.muted, 1.4);
+        pg.text(r.x + r.w / 2, r.y + r.h / 2 + 10, fitT("Kartenbild fehlt, Position neu übernehmen", "R", 8, r.w - 12), { s: 8, c: T.muted, a: "c" });
+        warns.push(`Tag ${i + 1}: Einer Punktkarte fehlt das Kartenbild (Position im Fenster neu übernehmen).`);
+        return;
+      }
+      const f = frameFor(pg, t, T, r.x, r.y, r.w, r.h);
+      pg.img(f.x, f.y, f.w, f.h, tile.ptImg, tile.ptW, tile.ptH, undefined, f.rad);
+      plainEdge(pg, f, T);
+      if (tile.ptW && tile.ptW < f.w * 1.6) warns.push(`Tag ${i + 1}: Eine Punktkarte ist für eine kleinere Kachel erzeugt und wirkt unscharf (Position im Fenster neu übernehmen).`);
+      drawPin(pg, f.x + f.w / 2, f.y + f.h / 2, clamp(Math.min(f.w, f.h) * 0.2, 18, 34), T);
+      const cs = 5.6, cr = pt.credit ? Math.min(f.w * 0.6, tw(pt.credit, "R", cs) + 8) : 0;
+      if (cr) {
+        pg.rect(f.x + f.w - cr - 3, f.y + f.h - 12, cr, 9.5, { fill: "#FFFFFF", fo: 0.85, r: 3 });
+        pg.text(f.x + f.w - cr + 1, f.y + f.h - 10.6, fitT(pt.credit, "R", cs, cr - 8), { s: cs, c: "#333333" });
+      }
+      const nm = (pt.name || "").trim(), room = f.w - cr - 22;
+      if (nm && room >= 30) {
+        const lw = Math.min(room, tw(nm, "SB", 8.5) + 14);
+        pg.rect(f.x + 5, f.y + f.h - 20, lw, 15, { fill: "#FFFFFF", fo: 0.92, r: 7.5 });
+        pg.text(f.x + 12, f.y + f.h - 16.2, fitT(nm, "SB", 8.5, lw - 14), { f: "SB", s: 8.5, c: T.ink });
       }
     },
   },
@@ -1377,7 +1495,7 @@ function drawSymbol(pg, id, x, y, s, T) {
      line  {x1,y1,x2,y2,c,sw}                  Linie
      t     {x,y,text,s,f,c,a,ls}               Text; y = Oberkante, a = l|c|r, ls = Buchstabenabstand
      path  {x,y,w,h,vw,vh,d,fill,stroke,sw}    SVG-Pfad im Raster vw×vh (Symbole)
-     link  {x,y,w,h,url}                       klickbarer Bereich (nur feste, im Code stehende Adressen)
+     link  {x,y,w,h,url}                       klickbarer Bereich (nur feste oder streng geprüfte Adressen: Projektseite, Wikipedia-Artikel)
      img   {x,y,w,h,src,iw,ih,pid,r}           Bild, füllt den Rahmen (zugeschnitten, Ecken r); pid = Foto-ID (Büroklammer im PDF)         */
 const PW = 595.28, PH = 841.89, MX = 40, CW = PW - 2 * MX, BOTTOM = 790;
 const PROJECT_URL = "https://github.com/simsum/reise-protokoll", PROJECT_LABEL = "Reise-Protokoll · github.com/simsum/reise-protokoll";
@@ -2017,6 +2135,44 @@ function drawSchemaGrid(g, T) {
   for (let y = 0; y < MAP_H; y += 103) { g.beginPath(); g.moveTo(0, y); g.lineTo(MAP_W, y); g.stroke(); }
 }
 
+/* ---------- Karte um einen Punkt (Kachel „Karte (Punkt)“) ----------
+   Ausschnitt um (lat, lon) in die Leinwand cv malen. Maßstab: 1 pt der Kachel = 1 Bildpunkt der Ansicht, die Leinwand hat 2 Pixel je pt; geladen
+   werden Kacheln der Stufe zoom + 1 (Pixel 1:1, scharf). Nadel, Beschriftung und Quellenangabe zeichnet die Kachel als Vektoren darüber. */
+const mapInv = (x, y, z) => {
+  const n = TILE * 2 ** z, lon = x / n * 360 - 180, lat = Math.atan(Math.sinh(Math.PI * (1 - 2 * y / n))) * 180 / Math.PI;
+  return { lat, lon };
+};
+const pmCache = new Map(); let pmLast = "";
+function pmTile(src, z, x, y) {
+  const k = `${src.id}|${z}|${x}|${y}`;
+  if (!pmCache.has(k)) {
+    if (pmCache.size > 240) pmCache.clear();
+    pmCache.set(k, loadTile(src, z, x, y).then((im) => { if (!im) pmCache.delete(k); return im; }));
+  }
+  return pmCache.get(k);
+}
+/* Liefert {source, credit, blocked, mode}; ohne Kacheln entsteht eine Schemakarte (Raster) */
+async function paintPointMap(cv, lat, lon, zoom, T, { noTiles = false } = {}) {
+  const W = cv.width, H = cv.height, Z = clamp(Math.round(zoom), 1, 18) + 1, c = mapProj(lat, lon, Z), ox = c.x - W / 2, oy = c.y - H / 2, g = cv.getContext("2d"), nT = 2 ** Z;
+  g.fillStyle = mix(T.soft, "#FFFFFF", 0.4); g.fillRect(0, 0, W, H);
+  const coords = [];
+  for (let ty = Math.floor(oy / TILE); ty <= Math.floor((oy + H) / TILE); ty++) for (let tx = Math.floor(ox / TILE); tx <= Math.floor((ox + W) / TILE); tx++) if (ty >= 0 && ty < nT) coords.push({ tx, ty, wx: ((tx % nT) + nT) % nT });
+  let source = null, blocked = false;
+  const order = tileSources().slice().sort((a, b) => (b.id === pmLast) - (a.id === pmLast));
+  for (const src of noTiles ? [] : order) {
+    const tiles = await Promise.all(coords.map((co) => pmTile(src, Z, co.wx, co.ty).then((im) => ({ im, ...co }))));
+    const ok = tiles.filter((x) => x.im);
+    if (ok.length >= Math.max(1, tiles.length * 0.7)) { for (const { im, tx, ty } of ok) g.drawImage(im, Math.round(tx * TILE - ox), Math.round(ty * TILE - oy)); source = src; pmLast = src.id; break; }
+    blocked = true;
+  }
+  if (!source) {
+    g.strokeStyle = mix(T.rule, "#FFFFFF", 0.3); g.lineWidth = 2;
+    for (let x = 0; x < W; x += 103) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); }
+    for (let y = 0; y < H; y += 103) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
+  }
+  return { source: source ? source.id : "", credit: source ? source.credit : "Schemakarte (ohne Kartenhintergrund)", blocked, mode: source ? "osm" : "schema" };
+}
+
 /* ===== 70-photos.js ===== */
 /* ---------- Fotos ----------
    Ein Foto hat die Originaldatei (`file`, bleibt unverändert) und eine Arbeitskopie `src`
@@ -2371,6 +2527,16 @@ function cleanTile(x, cols, seen) {
   if (typeof x.photo === "string" && /^[A-Za-z0-9_-]{1,24}$/.test(x.photo)) o.photo = x.photo;
   if (typeof x.text === "string") o.text = clipStr(x.text, 4000);
   if (Object.keys(FAMILIES).includes(x.font)) o.font = x.font;
+  if (x.wp && typeof x.wp === "object") {
+    const w = x.wp;
+    o.wp = { title: clipStr(w.title, 200), url: validWpUrl(w.url) ? w.url : "", text: clipStr(w.text, 4000), date: cleanIso(w.date), wd: !!w.wd,
+      facts: (Array.isArray(w.facts) ? w.facts : []).map((f) => ({ l: clipStr(f && f.l, 40), v: clipStr(f && f.v, 80), on: !!(f && f.on) })).filter((f) => f.l || f.v).slice(0, 12) };
+  }
+  if (x.pt && typeof x.pt === "object" && isNum(x.pt.lat) && isNum(x.pt.lon) && Math.abs(x.pt.lat) <= 90 && Math.abs(x.pt.lon) <= 180) {
+    o.pt = { lat: x.pt.lat, lon: x.pt.lon, zoom: clamp(Math.round(isNum(x.pt.zoom) ? x.pt.zoom : 15), 1, 18), name: clipStr(x.pt.name, 120), credit: clipStr(x.pt.credit, 120) };
+    o.ptW = num(x.ptW, 1, 6000, 0); o.ptH = num(x.ptH, 1, 6000, 0);
+    if (x.hasImg === true && typeof x.id === "string" && /^[A-Za-z0-9_-]{1,24}$/.test(x.id)) { o.hasImg = true; o.ptKey = x.id; }
+  }
   if (x.sym === "auto" || SYMBOLS.some((q) => q.id === x.sym)) o.sym = x.sym;
   const fx = MODULES[o.mod] && MODULES[o.mod].fixed; if (fx) { o.w = fx[0]; o.h = fx[1]; }
   return o;
@@ -2420,8 +2586,11 @@ function jsonOfTrip(t, attOf, shrunkOf) {
   const o = JSON.parse(JSON.stringify(t, function (k, v) {
     if (k === "mapImg" || k === "coverPhoto") return undefined;
     if ((k === "src" || k === "vsrc" || k === "file") && typeof this.bw === "number") return undefined;
+    if (k === "ptImg") return undefined; // Kartenbilder der Punktkarten stehen als Anhänge im PDF
     return v;
   }));
+  const withImg = new Set(t.days.flatMap((d) => d.pages.flatMap((pg) => pg.tiles)).filter((x) => x.ptImg && /^[A-Za-z0-9_-]{1,24}$/.test(x.id)).map((x) => x.id));
+  o.days.forEach((d) => d.pages.forEach((pg) => pg.tiles.forEach((x) => { if (withImg.has(x.id)) x.hasImg = true; })));
   o.days.forEach((d) => d.photos.forEach((p) => { p.att = attOf.get(p.id) || null; p.shrunk = !!shrunkOf.get(p.id); }));
   o.hasMap = !!t.mapImg; o.hasCover = !!t.coverPhoto;
   return { app: "Reise-Protokoll", format: FORMAT, created: new Date().toISOString(), trip: o };
@@ -2451,6 +2620,9 @@ async function collectAttachments(t, onProgress) {
     attOf.set(p.id, nr); shrunkOf.set(p.id, shrunk);
     list.push({ name: `${nr} ${name}`, bytes, mime, desc, rel, pid: p.id });
     if (onProgress) onProgress(n, photos.length);
+  }
+  for (const x of t.days.flatMap((d) => d.pages.flatMap((pg) => pg.tiles))) {
+    if (x.ptImg && /^[A-Za-z0-9_-]{1,24}$/.test(x.id)) list.push({ name: `kachelkarte-${x.id}.jpg`, bytes: bytesOfDataUrl(x.ptImg), mime: "image/jpeg", desc: "Punktkarte: " + ((x.pt && x.pt.name) || "Position"), rel: "Data" });
   }
   if (t.mapImg) list.push({ name: MAP_FILE, bytes: bytesOfDataUrl(t.mapImg), mime: "image/jpeg", desc: "Karte der Deckseite", rel: "Data" });
   if (t.coverPhoto) list.push({ name: COVER_FILE, bytes: bytesOfDataUrl(t.coverPhoto), mime: "image/jpeg", desc: "Titelfoto der Deckseite", rel: "Data" });
@@ -2503,6 +2675,10 @@ async function readProjectPdf(file, onProgress) {
   if (!t.coverPhoto) t.coverW = t.coverH = 0;
   delete t.hasMap; delete t.hasCover;
 
+  for (const x of t.days.flatMap((d) => d.pages.flatMap((pg) => pg.tiles))) {
+    if (x.hasImg && x.ptKey) x.ptImg = await asUrl(`kachelkarte-${x.ptKey}.jpg`);
+    delete x.hasImg; delete x.ptKey;
+  }
   const metas = t.days.flatMap((d) => d.photos), total = metas.length;
   let done = 0, missing = 0, unreadable = 0;
   for (const d of t.days) {
@@ -2780,6 +2956,224 @@ function resetDayWeather(d) {
   d.photos.forEach(queueWeather);
 }
 
+/* ===== 79-wikipedia.js ===== */
+/* ---------- Wikipedia-Auszug mit Kennzahlen (Kachel „Wikipedia-Auszug“) ----------
+   Suche und Einleitungstext kommen von der deutschen Wikipedia (MediaWiki-API), Kennzahlen (Einwohner, Fläche, Gründung …) aus Wikidata.
+   Beide Dienste sind für Browser freigegeben (CORS). Ins Netz geht nur der Suchbegriff bzw. die Kennung des Artikels, nie Fotos oder Reisedaten.
+   Der Auszug wird in der Kachel gespeichert (tile.wp), liegt also im Projekt-PDF und funktioniert danach offline.
+   Lizenz: Wikipedia-Text CC BY-SA 4.0, Wikidata CC0. Die Quellenzeile steht immer auf der Kachel. */
+const WP_HOST = "de.wikipedia.org";
+const WP_URL_RE = /^https:\/\/de\.wikipedia\.org\/wiki\/[A-Za-z0-9_%().,'!~*:;@&=+$-]+$/;
+const validWpUrl = (u) => typeof u === "string" && u.length < 400 && WP_URL_RE.test(u); // nur geprüfte Artikeladressen werden im PDF verlinkt
+
+/* Wikimedia meldet bei Last „cirrussearch-too-busy-error“ (Suche und Umkreissuche): dann zweimal nach kurzer Pause erneut versuchen */
+async function wpJson(url, tries = 3) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  const j = await r.json();
+  if (j && j.error) {
+    if (/too-busy/.test(j.error.code) && tries > 1) { await new Promise((res) => setTimeout(res, 1300)); return wpJson(url, tries - 1); }
+    throw new Error(j.error.code || "Fehler");
+  }
+  return j;
+}
+const wpErrText = (e) => (/too-busy/.test((e && e.message) || "") ? "Wikipedia ist gerade überlastet. Bitte in einem Moment noch einmal versuchen." : "Wikipedia ist nicht erreichbar (kein Internet oder gesperrt).");
+const wpApi = (p) => `https://${WP_HOST}/w/api.php?` + new URLSearchParams({ ...p, format: "json", formatversion: "2", origin: "*" });
+
+/* Suche: Titel, Kurzbeschreibung, Wikidata-Kennung (sortiert nach Treffergüte) */
+async function wpSearch(q) {
+  q = String(q || "").trim();
+  if (!q) return [];
+  const j = await wpJson(wpApi({ action: "query", generator: "search", gsrsearch: q, gsrlimit: "8", prop: "description|pageprops", ppprop: "wikibase_item" }));
+  return ((j.query && j.query.pages) || []).slice().sort((a, b) => (a.index || 0) - (b.index || 0))
+    .map((p) => ({ title: p.title, desc: p.description || "", qid: (p.pageprops && p.pageprops.wikibase_item) || "" }));
+}
+
+/* Artikel: Einleitungstext (reiner Text), Kurzbeschreibung, Adresse, Wikidata-Kennung */
+async function wpArticle(title) {
+  const j = await wpJson(wpApi({ action: "query", prop: "extracts|pageprops|info|description", exintro: "1", explaintext: "1", redirects: "1", inprop: "url", ppprop: "wikibase_item", titles: title }));
+  const p = ((j.query && j.query.pages) || [])[0];
+  if (!p || p.missing) throw new Error("Artikel nicht gefunden");
+  return { title: p.title, text: p.extract || "", desc: p.description || "", url: p.canonicalurl || p.fullurl || "", qid: (p.pageprops && p.pageprops.wikibase_item) || "" };
+}
+
+/* In der Nähe: Artikel mit Koordinaten im Umkreis (höchstens 10 km, 100 Treffer), dazu Kurzbeschreibung und Seitenaufrufe der letzten 30 Tage als Maß für
+   die Beliebtheit (Sehenswürdigkeiten stehen so vor Straßen und Behörden). onPartial(items) wird zuerst mit der Entfernungsliste, dann mit jeder Ergänzung aufgerufen. */
+async function wpNearby(lat, lon, radiusM, onPartial) {
+  const g = await wpJson(wpApi({ action: "query", list: "geosearch", gscoord: `${lat}|${lon}`, gsradius: String(clamp(Math.round(radiusM), 10, 10000)), gslimit: "100" }));
+  const items = ((g.query && g.query.geosearch) || []).map((x) => ({ title: x.title, dist: x.dist, desc: "", qid: "", views: null }));
+  if (!items.length) return items;
+  if (onPartial) onPartial(items);
+  const byTitle = new Map(items.map((i) => [i.title, i]));
+  /* je 50 Titel (Grenze der API), die Blöcke laufen gleichzeitig; die Seitenaufrufe kommen in mehreren Runden (Fortsetzung) */
+  const enrich = async (chunk) => {
+    const base = { action: "query", titles: chunk.map((i) => i.title).join("|"), prop: "description|pageprops|pageviews", ppprop: "wikibase_item", pvipdays: "30" };
+    let params = base;
+    try {
+      for (let n = 0; n < 12; n++) {
+        const j = await wpJson(wpApi(params));
+        for (const p of (j.query && j.query.pages) || []) {
+          const it = byTitle.get(p.title); if (!it) continue;
+          if (p.description) it.desc = p.description;
+          if (p.pageprops && p.pageprops.wikibase_item) it.qid = p.pageprops.wikibase_item;
+          if (p.pageviews) it.views = Object.values(p.pageviews).reduce((a, b) => a + (b || 0), 0);
+        }
+        if (onPartial) onPartial(items);
+        if (!j.continue) break;
+        params = { ...base, ...j.continue };
+      }
+    } catch (e) { /* ohne Beliebtheit: Liste bleibt nach Entfernung sortiert */ }
+  };
+  const chunks = []; for (let k = 0; k < items.length; k += 50) chunks.push(items.slice(k, k + 50));
+  await Promise.all(chunks.map(enrich));
+  return items;
+}
+const wpDist = (m) => (m >= 1000 ? (m / 1000).toLocaleString("de-DE", { maximumFractionDigits: 1 }) + " km" : Math.round(m) + " m");
+/* Sortierung: "views" = beliebteste zuerst (ohne Zahl hinten), "dist" = nächste zuerst */
+const wpSortNear = (items, by) => items.slice().sort((a, b) => (by === "views" && (b.views ?? -1) !== (a.views ?? -1) ? (b.views ?? -1) - (a.views ?? -1) : a.dist - b.dist));
+
+/* ---------- Text aufbereiten ---------- */
+/* Aussprache in eckigen Klammern, Einzelnachweise und Klammern mit Zeichen, die das PDF nicht kennt (Lautschrift, andere Schriften), entfallen */
+function wpTidy(text) {
+  let t = String(text || "").replace(/\u00a0/g, " ").replace(/[ \t]+/g, " ");
+  t = t.replace(/\s*\[[^\]]*\]/g, "");
+  t = t.replace(/\s*\(([^()]*)\)/g, (m, g) => (FM.ready && /\?/.test(clean(g)) && !/\?/.test(g) ? "" : m));
+  t = t.replace(/\(\s*[,;:]\s*/g, "(").replace(/\s*[,;:]\s*\)/g, ")").replace(/\(\s*\)/g, "").replace(/ {2,}/g, " ").replace(/\s+([,.;:])/g, "$1"); // Reste nach dem Entfernen
+  return t.split("\n").map((l) => l.trim()).filter(Boolean).join("\n");
+}
+
+const WP_ABBR = ["z. B.", "u. a.", "d. h.", "v. Chr.", "n. Chr.", "u. Ä.", "o. Ä.", "s. o.", "s. u.", "i. d. R.", "bzw.", "ca.", "Nr.", "St.", "Dr.", "Prof.", "usw.", "vgl.", "Jh.", "Mio.", "Mrd.", "geb.", "gest.", "evtl.", "ggf.", "etc.", "Hl.", "Abb.", "Bd.", "Hrsg.", "engl.", "lat.", "frz.", "ital.", "österr.", "Chr.", "Str.", "Tel.", "Inc.", "Co.", "Mt.", "Ltd."];
+function wpSentences(par) {
+  let s = String(par);
+  for (const a of WP_ABBR) s = s.split(a).join(a.replace(/\./g, "\u0001"));
+  s = s.replace(/\b(\d{1,2})\.(?=\s)/g, "$1\u0001"); // Ordnungszahlen („am 14. Juni“)
+  return s.split(/(?<=[.!?])\s+(?=[A-ZÄÖÜ„"(\[0-9])/).map((x) => x.replace(/\u0001/g, "."));
+}
+/* die ersten n Sätze (n = 0: alles); Absätze bleiben erhalten */
+function wpCut(text, n) {
+  if (!n) return text;
+  const out = []; let left = n;
+  for (const par of String(text).split("\n")) {
+    if (!par.trim()) continue;
+    const take = wpSentences(par).slice(0, left);
+    out.push(take.join(" ")); left -= take.length;
+    if (left <= 0) break;
+  }
+  return out.join("\n");
+}
+
+/* ---------- Kennzahlen aus Wikidata ---------- */
+const WD_SPECS = [
+  { p: "P1082", key: "pop", kind: "pop" }, { p: "P2046", key: "area", kind: "area" }, { p: "P571", key: "inc", kind: "time" }, { p: "P1249", key: "first", kind: "time" },
+  { p: "P2044", key: "elev", kind: "len" }, { p: "P2048", key: "height", kind: "len" }, { p: "P1619", key: "open", kind: "time" },
+  { p: "P84", key: "arch", kind: "item" }, { p: "P1435", key: "prot", kind: "item" }, { p: "P17", key: "country", kind: "item" }, { p: "P131", key: "region", kind: "item" },
+];
+const WD_LABEL = { pop: "Einwohner", area: "Fläche", inc: "Baujahr", first: "Erste Erwähnung", elev: "Höhe ü. NN", height: "Höhe", open: "Eröffnung", arch: "Architekt", prot: "Schutzstatus", country: "Land", region: "Region" };
+const WD_MONTHS = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
+const WD_AREA = { Q712226: 1, Q25343: 1e-6, Q35852: 0.01 }, WD_LEN = { Q11573: 1, Q174728: 0.01, Q828224: 1000, Q253276: 1609.344 }; // Einheit → km² bzw. m
+const wdUnit = (u) => String(u || "").split("/").pop();
+
+function wdTime(v) {
+  const m = /^([+-])(\d+)-(\d\d)-(\d\d)T/.exec((v && v.time) || ""); if (!m) return "";
+  const y = +m[2], era = m[1] === "-" ? " v. Chr." : "", p = v.precision || 9;
+  if (p >= 11) return `${m[4]}.${m[3]}.${y}${era}`;
+  if (p === 10) return `${WD_MONTHS[+m[3] - 1] || ""} ${y}${era}`.trim();
+  if (p === 9) return `${y}${era}`;
+  if (p === 8) return `${Math.floor(y / 10) * 10}er${era}`;
+  if (p === 7) return `${Math.ceil(y / 100)}. Jh.${era}`;
+  if (p === 6) return `${Math.ceil(y / 1000)}. Jt.${era}`;
+  return `${y}${era}`;
+}
+const wdNum = (n, d) => n.toLocaleString("de-DE", { maximumFractionDigits: d });
+function wdQty(v, kind) {
+  const n = parseFloat(v && v.amount); if (!Number.isFinite(n)) return "";
+  const u = wdUnit(v.unit);
+  if (kind === "pop") return wdNum(Math.round(n), 0);
+  if (kind === "area") { const f = WD_AREA[u]; if (!f) return ""; const km = n * f; return wdNum(km, km >= 1000 ? 0 : km >= 10 ? 1 : 2) + " km²"; }
+  if (kind === "len") { const f = WD_LEN[u]; if (!f) return ""; const m = n * f; return wdNum(m, m >= 100 ? 0 : 1) + " m"; }
+  return "";
+}
+const wdQualTime = (c) => { const q = c.qualifiers && c.qualifiers.P585 && c.qualifiers.P585[0] && c.qualifiers.P585[0].datavalue; return q && q.value && q.value.time ? q.value.time : ""; };
+
+/* Aussagen auswählen: bevorzugte, sonst ohne Enddatum (nicht Historisches); bei Einwohnern und Fläche die mit dem neuesten Stand */
+function wdPick(arr, kind) {
+  const ok = (arr || []).filter((c) => c.rank !== "deprecated" && c.mainsnak && c.mainsnak.snaktype === "value" && c.mainsnak.datavalue);
+  if (!ok.length) return [];
+  const pref = ok.filter((c) => c.rank === "preferred");
+  let list = pref.length ? pref : ok.filter((c) => !(c.qualifiers && c.qualifiers.P582));
+  if (!list.length) list = ok;
+  if (kind === "pop" || kind === "area") list = list.slice().sort((a, b) => wdQualTime(b).localeCompare(wdQualTime(a)));
+  return kind === "item" ? list.slice(0, 2) : list.slice(0, 1);
+}
+
+/* Liefert [{k, l, v}] in sinnvoller Reihenfolge (Einwohner, Fläche, Gründung …) */
+async function wdFacts(qid) {
+  const url = (p) => "https://www.wikidata.org/w/api.php?" + new URLSearchParams({ ...p, format: "json", origin: "*" });
+  const j = await wpJson(url({ action: "wbgetentities", ids: qid, props: "claims" }));
+  const claims = (j.entities && j.entities[qid] && j.entities[qid].claims) || {};
+  const picked = WD_SPECS.map((s) => ({ s, list: wdPick(claims[s.p], s.kind) })).filter((x) => x.list.length);
+  const ids = [...new Set(picked.filter((x) => x.s.kind === "item").flatMap((x) => x.list.map((c) => c.mainsnak.datavalue.value && c.mainsnak.datavalue.value.id)).filter(Boolean))];
+  let labels = {};
+  if (ids.length) {
+    try {
+      const lj = await wpJson(url({ action: "wbgetentities", ids: ids.join("|"), props: "labels", languages: "de", languagefallback: "1" }));
+      for (const id of ids) { const e = lj.entities && lj.entities[id], l = e && e.labels && (e.labels.de || Object.values(e.labels)[0]); if (l) labels[id] = l.value; }
+    } catch (e) { labels = {}; }
+  }
+  const hasPop = picked.some((x) => x.s.key === "pop"), out = [];
+  for (const { s, list } of picked) {
+    const c = list[0], dv = c.mainsnak.datavalue.value;
+    let v = "", l = WD_LABEL[s.key];
+    if (s.kind === "time") v = wdTime(dv);
+    else if (s.kind === "item") v = list.map((x) => labels[x.mainsnak.datavalue.value && x.mainsnak.datavalue.value.id]).filter(Boolean).join(", ");
+    else v = wdQty(dv, s.kind);
+    if (!v) continue;
+    if (s.key === "inc" && hasPop) l = "Gegründet";
+    if (s.key === "pop") { const yr = /^[+-](\d{4})/.exec(wdQualTime(c)); if (yr) l += ` (${+yr[1]})`; }
+    out.push({ k: s.key, l, v });
+  }
+  return out;
+}
+
+/* ---------- Zeichnen (Kachel und Vorschau-Fenster) ---------- */
+function wpSource(wp) {
+  const date = wp.date ? fmtDate(wp.date, { day: "2-digit", month: "2-digit", year: "numeric" }) : "";
+  const wd = wp.wd && (wp.facts || []).some((f) => f.on);
+  return `Quelle: Wikipedia, „${wp.title || "Artikel"}“, CC BY-SA 4.0${wd ? "; Kennzahlen: Wikidata, CC0" : ""}${date ? ", abgerufen " + date : ""}`;
+}
+
+function wikiDraw(pg, T, wp, r, warns, i) {
+  const facts = (wp.facts || []).filter((f) => f.on && (f.l || f.v)), gap = 6;
+  let y = r.y;
+  pg.label(r.x, y, "Wikipedia"); y += 13;
+  if (wp.title) {
+    const ts = r.w >= 190 ? 14 : 12, tl = wrapMax(wp.title, "SB", ts, r.w, r.h >= 140 ? 2 : 1);
+    tl.lines.forEach((l, k) => pg.text(r.x, y + k * ts * 1.15, l, { f: "SB", s: ts }));
+    y += tl.lines.length * ts * 1.15 + 5;
+  }
+  const sl = wrapMax(wpSource(wp), "R", 6.3, r.w, 2).lines, srcH = sl.length * 8 + 2, bottom = r.y + r.h - srcH;
+  if (facts.length) {
+    const cols = clamp(Math.floor((r.w + gap) / (74 + gap)), 1, Math.min(4, facts.length)), bw = (r.w - gap * (cols - 1)) / cols, bh = 30;
+    const maxRows = Math.max(0, Math.floor((bottom - y - (wp.text && wp.text.trim() ? 26 : 0) + gap) / (bh + gap))), rows = Math.min(Math.ceil(facts.length / cols), maxRows);
+    if (rows * cols < facts.length) warns.push(`Tag ${i + 1}: Nicht alle Kennzahlen der Wikipedia-Kachel passen hinein.`);
+    facts.slice(0, rows * cols).forEach((f, k) => {
+      const x = r.x + (k % cols) * (bw + gap), yy = y + Math.floor(k / cols) * (bh + gap);
+      pg.rect(x, yy, bw, bh, { fill: T.soft, r: 6 });
+      let vs = 11.5; while (vs > 8 && tw(f.v || "–", "SB", vs) > bw - 14) vs -= 0.5; // lange Werte erst verkleinern, dann kürzen
+      pg.text(x + 7, yy + 5 + (11.5 - vs) / 2, fitT(f.v || "–", "SB", vs, bw - 14), { f: "SB", s: vs, c: T.accent });
+      pg.text(x + 7, yy + 20, fitT((f.l || "").toUpperCase(), "B", 5.8, bw - 14, 0.8), { f: "B", s: 5.8, c: T.muted, ls: 0.8 });
+    });
+    if (rows) y += rows * (bh + gap) + 2;
+  }
+  if (wp.text && wp.text.trim()) {
+    const avail = bottom - y - 3;
+    if (avail < 14) warns.push(`Tag ${i + 1}: Der Wikipedia-Text passt nicht in die Kachel, bitte die Kachel vergrößern.`);
+    else if (!drawParas(pg, wp.text, { x: r.x, y, w: r.w, h: avail }, 0, 10, 6.5)) warns.push(`Tag ${i + 1}: Der Wikipedia-Text ist für die Kachel zu lang und wird gekürzt.`);
+  }
+  sl.forEach((l, k) => pg.text(r.x, r.y + r.h - srcH + 1 + k * 8, l, { s: 6.3, c: T.muted }));
+  if (validWpUrl(wp.url)) pg.link(r.x, r.y + r.h - srcH, r.w, srcH, wp.url);
+}
+
 /* ===== 80-ui.js ===== */
 /* ---------- Oberfläche ---------- */
 const S = { trip: newTrip(), tab: "trip", open: new Set(), newPoint: blankPlace(), busy: false };
@@ -2842,6 +3236,24 @@ function panelTrip() {
   <h3>Ort und Wetter aus den Fotodaten</h3>
   ${selFld("Ort aus GPS", "placeMode", t.placeMode, [["auto", "OpenStreetMap (Straße, Hausnummer), sonst offline"], ["offline", "Nur offline (nächster Ort aus der eingebauten Liste)"], ["off", "Aus"]])}
   ${chk("Wetter aus den Fotodaten ermitteln (Koordinaten und Aufnahmedatum gehen dafür an DWD/Bright Sky bzw. Open-Meteo)", "capWeather", t.capWeather)}`;
+}
+
+/* Voraussichtliche Größe des PDFs (Schätzung, wie im Foto-Protokoll): Bilder auf den Seiten nach dpi (JPEG, etwa 0,25 Byte je Pixel, höchstens so groß wie das Original),
+   eingebettete Fotos (Originale oder verkleinert), Karte und Titelfoto als Anhang, Projektdaten, Seiten */
+function pdfEstimate(t, pages) {
+  const dpi = +t.dpi || 150, photos = t.days.flatMap((d) => d.photos), byId = new Map(photos.map((p) => [p.id, p])), seen = new Set();
+  let img = 0;
+  for (const pg of pages) for (const o of pg.ops) {
+    if (o.k !== "img") continue;
+    const p = o.pid && byId.get(o.pid);
+    if (p) { const e = (o.w * dpi / 72) * (o.h * dpi / 72) * 0.25; img += Math.min(e, p.file ? p.file.size : p.size || e); }
+    else if (o.src && !seen.has(o.src)) { seen.add(o.src); img += o.src.length * 0.75; }
+  }
+  const orig = photos.reduce((s, p) => s + (p.file ? p.file.size : p.size || p.src.length * 0.75), 0), per = { 3200: 1.2, 2400: 0.7, 1600: 0.3 }[t.embed];
+  const embedded = t.projData ? (t.embed === "original" ? orig : Math.min(orig, (per || 0.7) * 1048576 * photos.length)) : 0;
+  const extra = t.projData ? (t.mapImg ? t.mapImg.length * 0.75 : 0) + (t.coverPhoto ? t.coverPhoto.length * 0.75 : 0) + t.days.flatMap((d) => d.pages.flatMap((pg) => pg.tiles)).reduce((s, x) => s + (x.ptImg ? x.ptImg.length * 0.75 : 0), 0) + 30000 : 0;
+  const base = 8000 + pages.length * 2500;
+  return { total: img + embedded + extra + base, img, embedded, extra, base };
 }
 
 function embedEstimate(t) {
@@ -2912,6 +3324,8 @@ function tileRow(d, pg, x, k, over) {
   if (x.mod === "foto") extra = `<select data-k="${base}.photo"><option value="">– Foto wählen –</option>${d.photos.map((p, n) => `<option value="${p.id}" ${p.id === x.photo ? "selected" : ""}>${n + 1}: ${esc(p.name)}${inUse.has(p.id) ? " (steht schon auf einer Kachel, wird verschoben)" : ""}</option>`).join("")}</select>`;
   if (x.mod === "notiz") extra = `<select data-k="${base}.font" title="Schrift">${Object.entries(FAMILIES).map(([id, f]) => `<option value="${id}" ${(x.font || "serif") === id ? "selected" : ""}>${esc(f.name)}</option>`).join("")}</select>
     <textarea data-k="${base}.text" rows="4" placeholder="Freier Text. Markdown: **fett**, *kursiv*, # Überschrift, - Liste">${esc(x.text || "")}</textarea>`;
+  if (x.mod === "punktkarte") extra = `<div class="btnrow"><button data-act="pmOpen" ${ids}>${x.pt ? "Position ändern …" : "Position wählen …"}</button></div>${x.pt ? `<small>${esc(x.pt.name || "ohne Beschriftung")} · ${x.pt.lat.toFixed(4)}, ${x.pt.lon.toFixed(4)} · Zoom ${x.pt.zoom}</small>` : ""}`;
+  if (x.mod === "wikipedia") extra = `<div class="btnrow"><button data-act="wpOpen" ${ids}>${x.wp ? "Wikipedia-Eintrag bearbeiten …" : "Wikipedia-Eintrag suchen …"}</button></div>${x.wp ? `<small>${esc(x.wp.title)}${x.wp.facts && x.wp.facts.some((f) => f.on) ? " · " + x.wp.facts.filter((f) => f.on).length + " Kennzahlen" : ""}</small>` : ""}`;
   if (x.mod === "wettersymbol") extra = `<select data-k="${base}.sym" title="Symbol"><option value="auto" ${!x.sym || x.sym === "auto" ? "selected" : ""}>Wetter des Tages (automatisch)</option>${SYMBOLS.map((q) => `<option value="${q.id}" ${x.sym === q.id ? "selected" : ""}>${esc(q.name)}</option>`).join("")}</select>`;
   return `<div class="tile ${over ? "over" : ""}"><div class="th"><b>${k + 1}</b>
     <select data-k="${base}.mod">${Object.entries(MODULES).map(([id, m]) => `<option value="${id}" ${id === x.mod ? "selected" : ""}>${esc(m.name)}</option>`).join("")}</select>
@@ -2998,7 +3412,9 @@ function renderPreview() {
   const { pages, warns } = layoutTrip(S.trip);
   S.pages = pages;
   $("#pages").innerHTML = pages.map((pg, i) => `<div class="sheet" data-pi="${i}" style="aspect-ratio:${pg.W}/${pg.H}">${pageHtml(pg)}${tileOverlay(pg)}</div>`).join("");
-  $("#pageCount").textContent = `${pages.length} ${pages.length === 1 ? "Seite" : "Seiten"}`;
+  const est = pdfEstimate(S.trip, pages);
+  $("#pageCount").textContent = `${pages.length} ${pages.length === 1 ? "Seite" : "Seiten"} · PDF ca. ${fmtSize(est.total)}`;
+  $("#pageCount").title = `Voraussichtliche Größe des PDFs:\nBilder auf den Seiten (${S.trip.dpi} dpi): ${fmtSize(est.img)}\n${S.trip.projData ? `Eingebettete Fotos (${S.trip.embed === "original" ? "Originale" : "verkleinert auf " + S.trip.embed + " px"}): ${fmtSize(est.embedded)}\nKarte, Titelfoto und Projektdaten: ${fmtSize(est.extra)}` : "Ohne Bearbeitungsdaten und eingebettete Fotos"}\nSeiten und Grundgerüst: ${fmtSize(est.base)}`;
   $("#warn").textContent = warns.length ? "⚠ " + warns[0] + (warns.length > 1 ? ` (+${warns.length - 1})` : "") : "";
   $("#warn").title = warns.join("\n");
   syncSelection();
@@ -3073,7 +3489,7 @@ document.addEventListener("change", (e) => {
   const el = e.target;
   if (el.matches("[data-addtile]")) {
     const d = dayOf(el.dataset.day), pg = d && d.pages.find((x) => x.id === el.dataset.addtile);
-    if (pg && el.value) { pg.tiles.push(tileOf(el.value, S.trip.cols)); S.open.add(d.id); changed(); renderPanel(); }
+    if (pg && el.value) { const nt = tileOf(el.value, S.trip.cols); pg.tiles.push(nt); S.open.add(d.id); changed(); renderPanel(); if (el.value === "wikipedia") openWikipedia(nt, d); if (el.value === "punktkarte") openPointMap(nt, d); }
     return;
   }
   if (el.matches("[data-photos]")) addPhotosToDay(el.dataset.photos, [...el.files]);
@@ -3122,6 +3538,8 @@ document.addEventListener("click", async (e) => {
     case "addCost": dayOf(dayId).costs.push({ id: uid(), l: "", cat: "sonstiges", a: "" }); S.open.add(dayId); renderPanel(); break;
     case "delCost": { const d = dayOf(dayId); d.costs = d.costs.filter((c) => c.id !== id); changed(); renderPanel(); break; }
     case "delPhoto": { const d = dayOf(dayId); d.photos = d.photos.filter((p) => p.id !== id); pruneTiles(d); changed(); renderPanel(); break; }
+    case "pmOpen": { const d = dayOf(dayId), pg = d.pages.find((q) => q.id === b.dataset.page), tl = pg && pg.tiles.find((q) => q.id === id); if (tl) openPointMap(tl, d); break; }
+    case "wpOpen": { const d = dayOf(dayId), pg = d.pages.find((q) => q.id === b.dataset.page), tl = pg && pg.tiles.find((q) => q.id === id); if (tl) openWikipedia(tl, d); break; }
     case "addPage": { const d = dayOf(dayId); d.pages.push(newPage()); S.open.add(dayId); changed(); renderPanel(); break; }
     case "resetPages": { const d = dayOf(dayId); if (confirm("Den Seitenaufbau dieses Tages auf den Standard zurücksetzen?")) { d.pages = defaultPages(t.cols); changed(); renderPanel(); } break; }
     case "delPage": { const d = dayOf(dayId), pg = d.pages.find((x) => x.id === b.dataset.page); if (pg && (!pg.tiles.length || confirm("Diese Seite mit allen Kacheln löschen?"))) { d.pages = d.pages.filter((x) => x !== pg); changed(); renderPanel(); } break; }
@@ -3571,6 +3989,8 @@ function buildToolbar() {
     <button class="ico" data-tb="prev" title="In der Reihenfolge nach vorn" ${idx <= 0 ? "disabled" : ""}>◀</button><button class="ico" data-tb="next" title="In der Reihenfolge nach hinten" ${idx >= c.pg.tiles.length - 1 ? "disabled" : ""}>▶</button>
     <button class="ico" data-tb="del" title="Kachel entfernen">✕</button></div>
     ${fixed ? `<div class="tbrow"><small>feste Größe 1×1</small></div>` : `<div class="tbrow">${SIZES.map(sz).join("")}<button data-tb="size" data-w="${t.cols}" data-h="1" aria-pressed="${w === t.cols && h === 1}">Ganze Breite</button><small>${w}×${h}</small></div>`}
+    ${tile.mod === "punktkarte" ? `<div class="tbrow"><button data-tb="pm">${tile.pt ? "Position ändern …" : "Position wählen …"}</button></div>` : ""}
+    ${tile.mod === "wikipedia" ? `<div class="tbrow"><button data-tb="wp">${tile.wp ? "Wikipedia bearbeiten …" : "Wikipedia suchen …"}</button></div>` : ""}
     ${tile.mod === "wettersymbol" ? `<div class="tbrow"><select data-tb="sym" title="Symbol"><option value="auto" ${!tile.sym || tile.sym === "auto" ? "selected" : ""}>Wetter des Tages (automatisch)</option>${SYMBOLS.map((q) => `<option value="${q.id}" ${tile.sym === q.id ? "selected" : ""}>${esc(q.name)}</option>`).join("")}</select></div>` : ""}
     ${tile.mod === "notiz" ? `<div class="tbrow"><select data-tb="font" title="Schrift">${Object.entries(FAMILIES).map(([id, f]) => `<option value="${id}" ${(tile.font || "serif") === id ? "selected" : ""}>${esc(f.name)}</option>`).join("")}</select>
       <button data-tb="md" data-md="b" title="Fett (**Text**)"><b>B</b></button><button data-tb="md" data-md="i" title="Kursiv (*Text*)"><i>I</i></button><button data-tb="md" data-md="h" title="Überschrift (## )">H</button><button data-tb="md" data-md="ul" title="Aufzählung (- )">•</button><button data-tb="md" data-md="ol" title="Nummerierung (1. )">1.</button><button data-tb="md" data-md="q" title="Zitat (> )">❝</button><button data-tb="md" data-md="hr" title="Trennlinie (---)">―</button></div>
@@ -3680,6 +4100,8 @@ function bindPreviewTiles() {
     const b = e.target.closest("button[data-tb]"); if (!b) return;
     const c = selCtx(), t = S.trip;
     if (b.dataset.tb === "cancel") { ia = null; hideToolbar(); return; }
+    if (b.dataset.tb === "pm") { const c1 = selCtx(); if (c1) openPointMap(c1.tile, c1.d); return; }
+    if (b.dataset.tb === "wp") { const c0 = selCtx(); if (c0) openWikipedia(c0.tile, c0.d); return; }
     if (b.dataset.tb === "md") { mdApply($('#tb [data-tb="text"]'), b.dataset.md); return; }
     if (!c) return;
     if (b.dataset.tb === "size") { c.tile.w = Math.min(+b.dataset.w, t.cols); c.tile.h = +b.dataset.h; }
@@ -3691,7 +4113,7 @@ function bindPreviewTiles() {
     const el = e.target, c = selCtx();
     if (el.dataset.tb === "add") { addFromMenu(el.value); return; }
     if (!c) return;
-    if (el.dataset.tb === "mod") setTileMod(c.tile, el.value);
+    if (el.dataset.tb === "mod") { setTileMod(c.tile, el.value); if (el.value === "wikipedia" && !c.tile.wp) { tileChanged(); openWikipedia(c.tile, c.d); return; } if (el.value === "punktkarte" && !c.tile.pt) { tileChanged(); openPointMap(c.tile, c.d); return; } }
     if (el.dataset.tb === "sym") c.tile.sym = el.value;
     if (el.dataset.tb === "photo") setTilePhoto(c.d, c.tile, el.value);
     if (el.dataset.tb === "font") c.tile.font = el.value;
@@ -3702,7 +4124,7 @@ function bindPreviewTiles() {
     c.tile.text = e.target.value; changed();
   });
   document.addEventListener("keydown", (e) => {
-    if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName || "") || !$("#editor").hidden) return;
+    if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName || "") || !$("#editor").hidden || !$("#wp").hidden || !$("#pm").hidden) return;
     if (e.key === "Escape" && S.brush) { endBrush(); return; }
     if (e.key === "Escape" && (S.sel || ia)) select(null);
     if ((e.key === "Delete" || e.key === "Backspace") && S.sel) { const c = selCtx(); if (c) { e.preventDefault(); c.pg.tiles = c.pg.tiles.filter((x) => x !== c.tile); S.sel = null; tileChanged(); } }
@@ -3753,12 +4175,16 @@ function addFromMenu(mod) {
   pg.tiles.splice(insertIndex(pg.tiles, m, a.cell.r * m.cols + a.cell.c, null), 0, tile);
   S.sel = { dayId: d.id, pageId: pg.id, tileId: tile.id }; ia = null;
   tileChanged();
+  if (mod === "wikipedia") openWikipedia(tile, d);
+  if (mod === "punktkarte") openPointMap(tile, d);
 }
 
 /* ---------- Doppelklick auf eine Kachel: dorthin springen, wo man sie bearbeitet ---------- */
 const TILE_FIELD = { text: "text", plan: "plan", highlights: "highlights", wetter: "weather", unterkunft: "lodging", strecke: "km", kosten: "costs" };
 function editTile(d, tile) {
   if (tile.mod === "foto") { const p = d.photos.find((x) => x.id === tile.photo); if (p) openEditor(p); else { const sel = $('#tb [data-tb="photo"]'); if (sel) sel.focus(); } return; }
+  if (tile.mod === "wikipedia") { openWikipedia(tile, d); return; }
+  if (tile.mod === "punktkarte") { openPointMap(tile, d); return; }
   if (tile.mod === "notiz") { const ta = $('#tb [data-tb="text"]'); if (ta) ta.focus(); return; }
   if (tile.mod === "karte") { S.tab = "map"; renderPanel(); return; }
   if (tile.mod === "kennzahlen") { S.tab = "sum"; renderPanel(); return; }
@@ -3868,11 +4294,272 @@ function bindUndo() {
   $("#undoBtn").addEventListener("click", undoLayout);
   $("#redoBtn").addEventListener("click", redoLayout);
   document.addEventListener("keydown", (e) => {
-    if (!(e.ctrlKey || e.metaKey) || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName || "") || !$("#editor").hidden) return;
+    if (!(e.ctrlKey || e.metaKey) || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName || "") || !$("#editor").hidden || !$("#wp").hidden || !$("#pm").hidden) return;
     const k = e.key.toLowerCase();
     if (k === "z" && !e.shiftKey) { e.preventDefault(); undoLayout(); }
     else if (k === "y" || (k === "z" && e.shiftKey)) { e.preventDefault(); redoLayout(); }
   });
+}
+
+/* ===== 86-wikidialog.js ===== */
+/* ---------- Wikipedia-Fenster: suchen, Vorschau, vor dem Einfügen bearbeiten ----------
+   Ablauf: Suchbegriff (vorgeschlagen: Ort des Tages) → Treffer wählen → Überschrift, Text (kürzbar) und Kennzahlen (an-/abwählbar, änderbar) bearbeiten,
+   dabei zeigt die Vorschau die Kachel in ihrer echten Größe → „Übernehmen“ schreibt alles in die Kachel (tile.wp). Abbrechen ändert nichts. */
+const wpd = { pos: [], sort: "views", near: null, d: null, tile: null, hits: [], orig: "", facts: [], w: 2, h: 2, url: "", date: "", wd: false, busy: 0 };
+const wpq = (id) => document.getElementById(id);
+
+function openWikipedia(tile, d) {
+  const wp = tile.wp;
+  Object.assign(wpd, { d, tile, hits: [], orig: wp ? wp.text : "", facts: wp ? wp.facts.map((f) => ({ ...f })) : [], w: tile.w, h: tile.h, url: wp ? wp.url : "", date: wp ? wp.date : "", wd: wp ? !!wp.wd : false, busy: 0 });
+  wpq("wpTit").value = wp ? wp.title : ""; wpq("wpTxt").value = wp ? wp.text : "";
+  wpq("wpQ").value = (wp && wp.title) || dayPlaceName(S.trip, d) || d.title || "";
+  wpd.pos = wpPositions(d); wpd.near = null; wpd.sort = "views";
+  wpq("wpNear").innerHTML = wpd.pos.map((p, i) => `<option value="${i}">${esc(p.l)}</option>`).join("");
+  wpq("wpSort").hidden = true;
+  wpq("wpHits").innerHTML = ""; wpq("wpStatus").textContent = ""; wpq("wpEd").hidden = !wp;
+  wpq("wp").hidden = false;
+  wpRenderFacts(); wpRenderSizes(); wpPreview(); wpSyncOk();
+  if (!wp && wpq("wpQ").value.trim()) wpSearchRun();
+  else if (!wp && !touchUi) wpq("wpQ").focus();
+}
+function closeWikipedia() { wpq("wp").hidden = true; wpd.d = wpd.tile = null; }
+const wpSyncOk = () => { wpq("wpOk").disabled = wpq("wpEd").hidden || (!wpq("wpTit").value.trim() && !wpq("wpTxt").value.trim()); };
+
+/* Orte für „In der Nähe“: Ort des Tages (mit Position), Fotos mit GPS (ohne Doppelte), aktueller Standort des Geräts */
+function wpPositions(d) {
+  const list = [];
+  if (hasGeo(d.place)) list.push({ l: "Ort des Tages: " + d.place.name, lat: d.place.lat, lon: d.place.lon, n: d.place.name });
+  d.photos.forEach((p, n) => {
+    if (list.length >= 9 || !p.gps || list.some((q) => q.lat != null && haversine(q, p.gps) < 0.3)) return;
+    list.push({ l: `Foto ${n + 1}${p.place ? ": " + p.place : ""}`, lat: p.gps.lat, lon: p.gps.lon, n: p.place || "" });
+  });
+  list.push({ l: "Aktueller Standort des Geräts", here: true });
+  return list;
+}
+const wpHere = () => new Promise((res, rej) => (navigator.geolocation ? navigator.geolocation.getCurrentPosition((p) => res({ lat: p.coords.latitude, lon: p.coords.longitude }), (e) => rej(e), { timeout: 15000, maximumAge: 60000 }) : rej(new Error("keine Ortung"))));
+function wpRenderHits(hits) {
+  wpq("wpHits").innerHTML = hits.map((h, i) => `<button type="button" data-i="${i}"><b>${esc(h.title)}</b> <small>${esc(h.desc)}${h.desc && h.dist != null ? " · " : ""}${h.dist != null ? esc(wpDist(h.dist)) : ""}</small></button>`).join("");
+}
+async function wpNearRun() {
+  const src = wpd.pos[+wpq("wpNear").value], st = wpq("wpStatus"), id = ++wpd.busy; if (!src) return;
+  wpq("wpHits").innerHTML = ""; wpq("wpSort").hidden = true;
+  let at = src;
+  if (src.here) {
+    st.textContent = "Standort wird ermittelt (das Gerät fragt nach Erlaubnis) …";
+    try { at = { ...src, ...(await wpHere()) }; } catch (e) { if (id === wpd.busy) st.textContent = "Der Standort ist nicht verfügbar (keine Erlaubnis oder aus einer lokalen Datei nicht möglich). Stattdessen den Ort des Tages oder ein Foto wählen."; return; }
+    if (id !== wpd.busy) return;
+  } else if (src.lat == null) { st.textContent = "Für diese Auswahl gibt es keine Position."; return; }
+  const rad = +wpq("wpRad").value;
+  st.textContent = "Suche in der Nähe …";
+  const show = (items, done) => {
+    if (id !== wpd.busy) return;
+    wpd.hits = wpSortNear(items, done && items.some((x) => x.views != null) ? wpd.sort : "dist"); wpRenderHits(wpd.hits); // während des Ladens bleibt die Reihenfolge stehen (nach Entfernung)
+    const known = items.some((x) => x.views != null);
+    st.textContent = done ? (items.length ? `${items.length} Artikel im Umkreis von ${rad} km, ${known && wpd.sort === "views" ? "beliebteste zuerst (Seitenaufrufe)" : "nächste zuerst"}. Auswählen:` : `Im Umkreis von ${rad} km gibt es keine Artikel.`) : `${items.length} Artikel gefunden, Beliebtheit wird ermittelt (${items.filter((x) => x.views != null).length}/${items.length}) …`;
+    const sb = wpq("wpSort"); sb.hidden = !(done && known); sb.textContent = wpd.sort === "views" ? "nach Entfernung sortieren" : "nach Beliebtheit sortieren";
+  };
+  try {
+    wpd.near = []; const items = await wpNearby(at.lat, at.lon, rad * 1000, (it) => { wpd.near = it; show(it, false); });
+    if (id !== wpd.busy) return;
+    wpd.near = items; show(items, true);
+  } catch (e) { if (id === wpd.busy) st.textContent = wpErrText(e); }
+}
+
+async function wpSearchRun() {
+  const q = wpq("wpQ").value.trim(), st = wpq("wpStatus"), box = wpq("wpHits"); if (!q) return;
+  const id = ++wpd.busy; st.textContent = "Suche …"; box.innerHTML = "";
+  try {
+    const hits = await wpSearch(q); if (id !== wpd.busy) return;
+    wpd.hits = hits;
+    box.innerHTML = hits.length ? hits.map((h, i) => `<button type="button" data-i="${i}"><b>${esc(h.title)}</b> <small>${esc(h.desc)}</small></button>`).join("") : "";
+    st.textContent = hits.length ? "Treffer wählen:" : "Nichts gefunden. Anderen Suchbegriff versuchen.";
+  } catch (e) { if (id === wpd.busy) st.textContent = wpErrText(e); }
+}
+
+async function wpPick(i) {
+  const hit = wpd.hits[i]; if (!hit) return;
+  const id = ++wpd.busy, st = wpq("wpStatus"); st.textContent = "Artikel wird geladen …";
+  try {
+    const art = await wpArticle(hit.title); if (id !== wpd.busy) return;
+    const qid = art.qid || hit.qid;
+    st.textContent = qid ? "Kennzahlen werden geladen …" : "";
+    let facts = []; if (qid) { try { facts = await wdFacts(qid); } catch (e) { facts = []; } }
+    if (id !== wpd.busy) return;
+    wpd.orig = wpTidy(art.text); wpd.url = art.url; wpd.date = isoOf(new Date()); wpd.wd = facts.length > 0;
+    wpd.facts = facts.map((f, k) => ({ l: f.l, v: f.v, on: k < 4 }));
+    wpq("wpTit").value = art.title; wpq("wpTxt").value = wpCut(wpd.orig, 4);
+    wpq("wpEd").hidden = false; wpq("wpHits").innerHTML = "";
+    st.textContent = facts.length ? "Text auf 4 Sätze gekürzt, Kennzahlen aus Wikidata. Alles lässt sich noch ändern." : "Keine Kennzahlen gefunden, nur Text. Eigene Kennzahlen lassen sich unten ergänzen.";
+    wpRenderFacts(); wpPreview(); wpSyncOk();
+  } catch (e) { if (id === wpd.busy) st.textContent = "Der Artikel konnte nicht geladen werden (" + (e.message || "Fehler") + ")."; }
+}
+
+function wpRenderFacts() {
+  wpq("wpFacts").innerHTML = wpd.facts.map((f, k) => `<div class="fact"><input type="checkbox" data-k="${k}" data-f="on" ${f.on ? "checked" : ""} aria-label="anzeigen"><input data-k="${k}" data-f="l" value="${esc(f.l)}" placeholder="Bezeichnung" aria-label="Bezeichnung"><input data-k="${k}" data-f="v" value="${esc(f.v)}" placeholder="Wert" aria-label="Wert"><button type="button" class="ico" data-k="${k}" data-f="del" title="Entfernen">×</button></div>`).join("") || "<small>Keine Kennzahlen.</small>";
+}
+function wpRenderSizes() {
+  const t = S.trip, w = Math.min(wpd.w, t.cols), h = wpd.h;
+  wpq("wpSizes").innerHTML = SIZES.map(([a, b]) => `<button type="button" data-w="${a}" data-h="${b}" aria-pressed="${w === Math.min(a, t.cols) && h === b}">${a}×${b}</button>`).join("")
+    + `<button type="button" data-w="${t.cols}" data-h="1" aria-pressed="${w === t.cols && h === 1}">Ganze Breite</button><button type="button" data-w="${t.cols}" data-h="2" aria-pressed="${w === t.cols && h === 2}">Breit ×2</button>`;
+}
+const wpCurrent = () => ({ title: wpq("wpTit").value.trim(), url: wpd.url, text: wpq("wpTxt").value, facts: wpd.facts, date: wpd.date, wd: wpd.wd });
+
+/* Vorschau in der echten Größe der Kachel */
+function wpPreview() {
+  const t = S.trip, T = THEMES[t.theme] || THEMES.meer, gap = 10, colW = (CW - gap * (t.cols - 1)) / t.cols, rowH = (BOTTOM - 124 - gap * (GRID_ROWS - 1)) / GRID_ROWS;
+  const w = Math.min(wpd.w, t.cols), h = wpd.h, r = { x: 8, y: 8, w: w * colW + (w - 1) * gap, h: h * rowH + (h - 1) * gap };
+  const pg = new Pg(T); pg.W = r.w + 16; pg.H = r.h + 16;
+  pg.ops = [{ k: "rect", x: 0, y: 0, w: pg.W, h: pg.H, fill: T.paper, stroke: null, sw: 0.6, r: 0, fo: undefined }];
+  const warns = []; wikiDraw(pg, T, wpCurrent(), r, warns, 0);
+  const sh = wpq("wpSheet"); sh.innerHTML = pageHtml(pg); sh.style.aspectRatio = `${pg.W} / ${pg.H}`;
+  wpq("wpWarn").textContent = warns.length ? "⚠ " + warns[0].replace(/^Tag 1: /, "") : "";
+}
+let wpPrevT; const wpPreviewSoon = () => { clearTimeout(wpPrevT); wpPrevT = setTimeout(wpPreview, 120); };
+
+function wpApply() {
+  const tile = wpd.tile, d = wpd.d; if (!tile || !d) return;
+  const c = wpCurrent();
+  tile.wp = { title: c.title.slice(0, 200), url: validWpUrl(c.url) ? c.url : "", text: c.text.slice(0, 4000), date: c.date || isoOf(new Date()), wd: !!c.wd,
+    facts: c.facts.filter((f) => (f.l || "").trim() || (f.v || "").trim()).slice(0, 12).map((f) => ({ l: f.l.trim().slice(0, 40), v: f.v.trim().slice(0, 80), on: !!f.on })) };
+  tile.w = Math.min(wpd.w, S.trip.cols); tile.h = wpd.h;
+  closeWikipedia(); tileChanged();
+}
+
+function bindWikipedia() {
+  const modal = wpq("wp");
+  wpq("wpGo").addEventListener("click", wpSearchRun);
+  wpq("wpQ").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); wpSearchRun(); } });
+  wpq("wpNearGo").addEventListener("click", wpNearRun);
+  wpq("wpSort").addEventListener("click", () => { wpd.sort = wpd.sort === "views" ? "dist" : "views"; if (wpd.near) { wpd.hits = wpSortNear(wpd.near, wpd.sort); wpRenderHits(wpd.hits); const sb = wpq("wpSort"); sb.textContent = wpd.sort === "views" ? "nach Entfernung sortieren" : "nach Beliebtheit sortieren"; wpq("wpStatus").textContent = `${wpd.near.length} Artikel im Umkreis von ${wpq("wpRad").value} km, ${wpd.sort === "views" ? "beliebteste zuerst (Seitenaufrufe)" : "nächste zuerst"}. Auswählen:`; } });
+  wpq("wpHits").addEventListener("click", (e) => { const b = e.target.closest("button[data-i]"); if (b) wpPick(+b.dataset.i); });
+  wpq("wpTit").addEventListener("input", () => { wpPreviewSoon(); wpSyncOk(); });
+  wpq("wpTxt").addEventListener("input", () => { wpPreviewSoon(); wpSyncOk(); });
+  wpq("wpLen").addEventListener("click", (e) => { const b = e.target.closest("button[data-n]"); if (!b) return; wpq("wpTxt").value = wpCut(wpd.orig || wpq("wpTxt").value, +b.dataset.n); wpPreview(); wpSyncOk(); });
+  wpq("wpFacts").addEventListener("input", (e) => { const el = e.target, f = wpd.facts[+el.dataset.k]; if (!f || el.dataset.f === "on") return; f[el.dataset.f] = el.value; wpPreviewSoon(); });
+  wpq("wpFacts").addEventListener("change", (e) => { const el = e.target, f = wpd.facts[+el.dataset.k]; if (f && el.dataset.f === "on") { f.on = el.checked; wpPreview(); } });
+  wpq("wpFacts").addEventListener("click", (e) => { const b = e.target.closest("button[data-f=del]"); if (b) { wpd.facts.splice(+b.dataset.k, 1); wpRenderFacts(); wpPreview(); } });
+  wpq("wpAddFact").addEventListener("click", () => { wpd.facts.push({ l: "", v: "", on: true }); wpRenderFacts(); const rows = wpq("wpFacts").querySelectorAll(".fact"); const last = rows[rows.length - 1]; if (last) last.querySelector("input[data-f=l]").focus(); });
+  wpq("wpSizes").addEventListener("click", (e) => { const b = e.target.closest("button[data-w]"); if (!b) return; wpd.w = +b.dataset.w; wpd.h = +b.dataset.h; wpRenderSizes(); wpPreview(); });
+  wpq("wpOk").addEventListener("click", wpApply);
+  wpq("wpCancel").addEventListener("click", closeWikipedia);
+  modal.addEventListener("click", (e) => { if (e.target === modal) closeWikipedia(); });
+  document.addEventListener("keydown", (e) => { if (!modal.hidden && e.key === "Escape") closeWikipedia(); });
+}
+
+/* ===== 87-mapdialog.js ===== */
+/* ---------- Fenster „Karte (Punkt)“: Position wählen ----------
+   Die Karte lässt sich mit Maus oder Finger verschieben und mit +/− (oder Mausrad) zoomen; die Nadel in der Mitte zeigt die Position.
+   Die Position kommt aus der Suche (Nominatim), vom Ort des Tages, von einem Foto mit GPS oder vom Gerät. „Übernehmen“ erzeugt das Kartenbild in der
+   Größe der Kachel (tile.ptImg, im Projekt-PDF als Anhang) und speichert Position, Zoom, Beschriftung (tile.pt). Abbrechen ändert nichts. */
+const pmd = { d: null, tile: null, lat: 48.1374, lon: 11.5755, z: 15, w: 2, h: 2, pos: [], hits: [], busy: 0, job: 0, credit: "" };
+const pmq = (id) => document.getElementById(id);
+
+/* Maße einer Kachel in pt (wie im Seitenraster) */
+function tileRectPt(w, h) {
+  const t = S.trip, gap = 10, colW = (CW - gap * (t.cols - 1)) / t.cols, rowH = (BOTTOM - 124 - gap * (GRID_ROWS - 1)) / GRID_ROWS, ww = Math.min(w, t.cols);
+  return { w: ww * colW + (ww - 1) * gap, h: h * rowH + (h - 1) * gap };
+}
+
+function openPointMap(tile, d) {
+  const pt = tile.pt;
+  Object.assign(pmd, { d, tile, w: tile.w, h: tile.h, hits: [], busy: 0, pos: wpPositions(d) });
+  if (pt) Object.assign(pmd, { lat: pt.lat, lon: pt.lon, z: pt.zoom });
+  else {
+    const p = pmd.pos.find((x) => x.lat != null);
+    Object.assign(pmd, p ? { lat: p.lat, lon: p.lon } : { lat: 51.16, lon: 10.45 }, { z: p ? 15 : 6 }); // ohne Position: Deutschland
+  }
+  pmq("pmName").value = pt ? pt.name : (pmd.pos.find((x) => x.lat != null) || {}).n || "";
+  pmq("pmQ").value = ""; pmq("pmHits").innerHTML = ""; pmq("pmStatus").textContent = "";
+  pmq("pmPos").innerHTML = pmd.pos.map((p, i) => `<option value="${i}">${esc(p.l)}</option>`).join("");
+  pmq("pm").hidden = false;
+  pmRenderSizes(); pmRender();
+}
+function closePointMap() { pmq("pm").hidden = true; pmd.d = pmd.tile = null; }
+
+/* Ansicht neu malen (Kacheln werden zwischengespeichert, das Verschieben bleibt flüssig) */
+async function pmRender() {
+  const T = THEMES[S.trip.theme] || THEMES.meer, r = tileRectPt(pmd.w, pmd.h), cv = document.createElement("canvas"), job = ++pmd.job;
+  cv.width = Math.round(r.w * 2); cv.height = Math.round(r.h * 2);
+  pmq("pmStatus").textContent = "Karte wird geladen …";
+  const res = await paintPointMap(cv, pmd.lat, pmd.lon, pmd.z, T);
+  if (job !== pmd.job) return;
+  const view = pmq("pmCv"); view.width = cv.width; view.height = cv.height; view.getContext("2d").drawImage(cv, 0, 0); view.style.transform = "";
+  pmd.credit = res.credit;
+  pmq("pmStatus").textContent = res.mode === "osm" ? res.credit : "Kartenkacheln sind nicht erreichbar (offline oder gesperrt): Es entsteht eine Schemakarte ohne Hintergrund. Die Position wird trotzdem gespeichert.";
+  pmq("pmZ").textContent = pmd.z; pmq("pmCoord").textContent = `${pmd.lat.toFixed(5)}° ${pmd.lat >= 0 ? "N" : "S"}, ${Math.abs(pmd.lon).toFixed(5)}° ${pmd.lon >= 0 ? "O" : "W"}`;
+  pmq("pmZm").disabled = pmd.z <= 2; pmq("pmZp").disabled = pmd.z >= 18;
+}
+function pmSetZoom(z) { pmd.z = clamp(z, 2, 18); pmRender(); }
+
+function pmRenderSizes() {
+  const t = S.trip, w = Math.min(pmd.w, t.cols), h = pmd.h;
+  pmq("pmSizes").innerHTML = SIZES.map(([a, b]) => `<button type="button" data-w="${a}" data-h="${b}" aria-pressed="${w === Math.min(a, t.cols) && h === b}">${a}×${b}</button>`).join("")
+    + `<button type="button" data-w="${t.cols}" data-h="1" aria-pressed="${w === t.cols && h === 1}">Ganze Breite</button><button type="button" data-w="${t.cols}" data-h="2" aria-pressed="${w === t.cols && h === 2}">Breit ×2</button>`;
+}
+
+async function pmSearch() {
+  const q = pmq("pmQ").value.trim(), st = pmq("pmStatus"), box = pmq("pmHits"), id = ++pmd.busy; if (!q) return;
+  st.textContent = "Suche …"; box.innerHTML = "";
+  try {
+    const hits = await searchPlace(q); if (id !== pmd.busy) return;
+    pmd.hits = hits;
+    box.innerHTML = hits.map((h, i) => `<button type="button" data-i="${i}"><b>${esc(h.name)}</b> <small>${esc((h.info || "").split(",").slice(1, 4).join(","))}</small></button>`).join("");
+    st.textContent = hits.length ? "Treffer wählen:" : "Nichts gefunden. Anderen Suchbegriff versuchen.";
+  } catch (e) { if (id === pmd.busy) st.textContent = "Die Ortssuche ist nicht erreichbar (kein Internet oder gesperrt). Die Karte lässt sich trotzdem verschieben."; }
+}
+
+async function pmApply() {
+  const tile = pmd.tile, d = pmd.d; if (!tile || !d) return;
+  const T = THEMES[S.trip.theme] || THEMES.meer, r = tileRectPt(pmd.w, pmd.h), cv = document.createElement("canvas"), btn = pmq("pmOk");
+  cv.width = Math.round(r.w * 2); cv.height = Math.round(r.h * 2); btn.disabled = true;
+  try {
+    const res = await paintPointMap(cv, pmd.lat, pmd.lon, pmd.z, T);
+    tile.pt = { lat: pmd.lat, lon: pmd.lon, zoom: pmd.z, name: pmq("pmName").value.trim().slice(0, 120), credit: res.credit };
+    tile.ptImg = cv.toDataURL("image/jpeg", 0.85); tile.ptW = cv.width; tile.ptH = cv.height;
+    tile.w = Math.min(pmd.w, S.trip.cols); tile.h = pmd.h;
+    closePointMap(); tileChanged();
+  } catch (e) { pmq("pmStatus").textContent = "Das Kartenbild konnte nicht erzeugt werden: " + (e.message || "Fehler"); }
+  btn.disabled = false;
+}
+
+function bindPointMap() {
+  const modal = pmq("pm"), map = pmq("pmMap");
+  pmq("pmGo").addEventListener("click", pmSearch);
+  pmq("pmQ").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); pmSearch(); } });
+  pmq("pmHits").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-i]"), h = b && pmd.hits[+b.dataset.i]; if (!h) return;
+    Object.assign(pmd, { lat: h.lat, lon: h.lon, z: Math.max(pmd.z, 14) }); pmq("pmName").value = h.name; pmq("pmHits").innerHTML = ""; pmRender();
+  });
+  pmq("pmPosGo").addEventListener("click", async () => {
+    const p = pmd.pos[+pmq("pmPos").value]; if (!p) return;
+    let at = p;
+    if (p.here) {
+      pmq("pmStatus").textContent = "Standort wird ermittelt (das Gerät fragt nach Erlaubnis) …";
+      try { at = { ...p, ...(await wpHere()) }; } catch (e) { pmq("pmStatus").textContent = "Der Standort ist nicht verfügbar (keine Erlaubnis oder aus einer lokalen Datei nicht möglich)."; return; }
+    }
+    if (at.lat == null) return;
+    Object.assign(pmd, { lat: at.lat, lon: at.lon }); if (at.n) pmq("pmName").value = at.n; pmRender();
+  });
+  pmq("pmZm").addEventListener("click", () => pmSetZoom(pmd.z - 1));
+  pmq("pmZp").addEventListener("click", () => pmSetZoom(pmd.z + 1));
+  let wheelT; map.addEventListener("wheel", (e) => { e.preventDefault(); clearTimeout(wheelT); const dz = e.deltaY < 0 ? 1 : -1; wheelT = setTimeout(() => pmSetZoom(pmd.z + dz), 120); }, { passive: false });
+  /* Verschieben: Die Ansicht folgt dem Zeiger sofort (Transformation), beim Loslassen wird die Position neu berechnet und die Karte neu gemalt */
+  let drag = null;
+  map.addEventListener("pointerdown", (e) => { drag = { x: e.clientX, y: e.clientY, dx: 0, dy: 0 }; map.setPointerCapture(e.pointerId); map.classList.add("drag"); });
+  map.addEventListener("pointermove", (e) => { if (!drag) return; drag.dx = e.clientX - drag.x; drag.dy = e.clientY - drag.y; pmq("pmCv").style.transform = `translate(${drag.dx}px, ${drag.dy}px)`; });
+  const end = () => {
+    if (!drag) return; const d0 = drag; drag = null; map.classList.remove("drag");
+    if (Math.hypot(d0.dx, d0.dy) < 3) { pmq("pmCv").style.transform = ""; return; }
+    const r = tileRectPt(pmd.w, pmd.h), f = r.w / map.clientWidth, Z = pmd.z + 1, c = mapProj(pmd.lat, pmd.lon, Z); // 1 CSS-Pixel = f pt = 2f Kartenpunkte
+    const p = mapInv(c.x - d0.dx * f * 2, c.y - d0.dy * f * 2, Z);
+    pmd.lat = clamp(p.lat, -85, 85); pmd.lon = ((p.lon + 540) % 360) - 180; pmRender();
+  };
+  map.addEventListener("pointerup", end); map.addEventListener("pointercancel", end);
+  pmq("pmSizes").addEventListener("click", (e) => { const b = e.target.closest("button[data-w]"); if (!b) return; pmd.w = +b.dataset.w; pmd.h = +b.dataset.h; pmRenderSizes(); pmRender(); });
+  pmq("pmOk").addEventListener("click", pmApply);
+  pmq("pmCancel").addEventListener("click", closePointMap);
+  modal.addEventListener("click", (e) => { if (e.target === modal) closePointMap(); });
+  document.addEventListener("keydown", (e) => { if (!modal.hidden && e.key === "Escape") closePointMap(); });
 }
 
 /* ===== 90-main.js ===== */
@@ -3882,7 +4569,7 @@ function bindUndo() {
   try { saved = await idbGet("trip"); } catch (e) { /* kein Speicher verfügbar */ }
   if (saved && saved.days) { S.trip = normalizeTrip(saved); refreshDerived(S.trip); }
   else S.trip = demoTrip("rundreise");
-  bindEditor(); bindPreviewTiles(); bindUndo();
+  bindEditor(); bindPreviewTiles(); bindUndo(); bindWikipedia(); bindPointMap();
   resetUndo();
   renderPanel(); renderPreview();
   await initFonts();

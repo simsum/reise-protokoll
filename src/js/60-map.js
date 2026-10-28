@@ -175,3 +175,41 @@ function drawSchemaGrid(g, T) {
   for (let x = 0; x < MAP_W; x += 103) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, MAP_H); g.stroke(); }
   for (let y = 0; y < MAP_H; y += 103) { g.beginPath(); g.moveTo(0, y); g.lineTo(MAP_W, y); g.stroke(); }
 }
+
+/* ---------- Karte um einen Punkt (Kachel „Karte (Punkt)“) ----------
+   Ausschnitt um (lat, lon) in die Leinwand cv malen. Maßstab: 1 pt der Kachel = 1 Bildpunkt der Ansicht, die Leinwand hat 2 Pixel je pt; geladen
+   werden Kacheln der Stufe zoom + 1 (Pixel 1:1, scharf). Nadel, Beschriftung und Quellenangabe zeichnet die Kachel als Vektoren darüber. */
+const mapInv = (x, y, z) => {
+  const n = TILE * 2 ** z, lon = x / n * 360 - 180, lat = Math.atan(Math.sinh(Math.PI * (1 - 2 * y / n))) * 180 / Math.PI;
+  return { lat, lon };
+};
+const pmCache = new Map(); let pmLast = "";
+function pmTile(src, z, x, y) {
+  const k = `${src.id}|${z}|${x}|${y}`;
+  if (!pmCache.has(k)) {
+    if (pmCache.size > 240) pmCache.clear();
+    pmCache.set(k, loadTile(src, z, x, y).then((im) => { if (!im) pmCache.delete(k); return im; }));
+  }
+  return pmCache.get(k);
+}
+/* Liefert {source, credit, blocked, mode}; ohne Kacheln entsteht eine Schemakarte (Raster) */
+async function paintPointMap(cv, lat, lon, zoom, T, { noTiles = false } = {}) {
+  const W = cv.width, H = cv.height, Z = clamp(Math.round(zoom), 1, 18) + 1, c = mapProj(lat, lon, Z), ox = c.x - W / 2, oy = c.y - H / 2, g = cv.getContext("2d"), nT = 2 ** Z;
+  g.fillStyle = mix(T.soft, "#FFFFFF", 0.4); g.fillRect(0, 0, W, H);
+  const coords = [];
+  for (let ty = Math.floor(oy / TILE); ty <= Math.floor((oy + H) / TILE); ty++) for (let tx = Math.floor(ox / TILE); tx <= Math.floor((ox + W) / TILE); tx++) if (ty >= 0 && ty < nT) coords.push({ tx, ty, wx: ((tx % nT) + nT) % nT });
+  let source = null, blocked = false;
+  const order = tileSources().slice().sort((a, b) => (b.id === pmLast) - (a.id === pmLast));
+  for (const src of noTiles ? [] : order) {
+    const tiles = await Promise.all(coords.map((co) => pmTile(src, Z, co.wx, co.ty).then((im) => ({ im, ...co }))));
+    const ok = tiles.filter((x) => x.im);
+    if (ok.length >= Math.max(1, tiles.length * 0.7)) { for (const { im, tx, ty } of ok) g.drawImage(im, Math.round(tx * TILE - ox), Math.round(ty * TILE - oy)); source = src; pmLast = src.id; break; }
+    blocked = true;
+  }
+  if (!source) {
+    g.strokeStyle = mix(T.rule, "#FFFFFF", 0.3); g.lineWidth = 2;
+    for (let x = 0; x < W; x += 103) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); }
+    for (let y = 0; y < H; y += 103) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
+  }
+  return { source: source ? source.id : "", credit: source ? source.credit : "Schemakarte (ohne Kartenhintergrund)", blocked, mode: source ? "osm" : "schema" };
+}

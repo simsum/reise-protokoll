@@ -33,7 +33,7 @@ const draw = await page.evaluate(() => {
   const res = {};
   for (const th of Object.keys(THEMES)) for (const s of SYMBOLS) {
     const T = THEMES[th], pg = new Pg(T), r = { x: 100, y: 200, w: 121, h: 103 };
-    MODULES.wettersymbol.draw(pg, { d: { weather: "" }, T }, { sym: s.id }, r);
+    MODULES.wettersymbol.draw(pg, { t: S.trip, d: { weather: "" }, T }, { sym: s.id }, r);
     const paths = pg.ops.filter((o) => o.k === "path");
     const inside = pg.ops.every((o) => o.k !== "path" || (o.x >= r.x - 0.5 && o.y >= r.y - 0.5 && o.x + o.w <= r.x + r.w + 0.5 && o.y + o.h <= r.y + r.h + 0.5));
     res[th + "/" + s.id] = { n: paths.length, filled: paths.some((o) => o.fill), inside };
@@ -43,8 +43,8 @@ const draw = await page.evaluate(() => {
 const keys = Object.keys(draw);
 ok(keys.length === 50 && keys.every((k) => draw[k].n >= 3 && draw[k].inside), `alle ${keys.length} Kombinationen (10 Symbole × 5 Farbschemata): mehrteilige Vektorbilder innerhalb der Kachel`);
 ok(await page.evaluate(() => SYMBOLS.length) === 10, "10 Symbole: Sonne, Heiter, Bewölkt, Regen, Gewitter, Schnee, Nebel, Mond und Sterne, Regenbogen, Wind");
-ok(await page.evaluate(() => { const T = THEMES.meer, a = new Pg(T), b = new Pg(THEMES.herbst); const r = { x: 0, y: 0, w: 121, h: 103 }; MODULES.wettersymbol.draw(a, { d: {}, T: THEMES.meer }, { sym: "rain" }, r); MODULES.wettersymbol.draw(b, { d: {}, T: THEMES.herbst }, { sym: "rain" }, r); return JSON.stringify(a.ops) !== JSON.stringify(b.ops); }), "Farben folgen dem Farbschema");
-ok(await page.evaluate(() => { const T = THEMES.meer, pg = new Pg(T); MODULES.wettersymbol.draw(pg, { d: { weather: "" }, T }, {}, { x: 0, y: 0, w: 121, h: 103 }); const n1 = pg.ops.length; const p2 = new Pg(T); MODULES.wettersymbol.draw(p2, { d: { weather: "storm" }, T }, { sym: "auto" }, { x: 0, y: 0, w: 121, h: 103 }); return n1 === pg.ops.length && n1 === (new Pg(T)).ops.length && p2.ops.length > n1; }), "Automatisch: ohne Wetter des Tages zeichnet die Kachel nichts, mit Wetter das passende Symbol");
+ok(await page.evaluate(() => { const T = THEMES.meer, a = new Pg(T), b = new Pg(THEMES.herbst); const r = { x: 0, y: 0, w: 121, h: 103 }; MODULES.wettersymbol.draw(a, { t: S.trip, d: {}, T: THEMES.meer }, { sym: "rain" }, r); MODULES.wettersymbol.draw(b, { t: S.trip, d: {}, T: THEMES.herbst }, { sym: "rain" }, r); return JSON.stringify(a.ops) !== JSON.stringify(b.ops); }), "Farben folgen dem Farbschema");
+ok(await page.evaluate(() => { const T = THEMES.meer, pg = new Pg(T); MODULES.wettersymbol.draw(pg, { t: S.trip, d: { weather: "" }, T }, {}, { x: 0, y: 0, w: 121, h: 103 }); const n1 = pg.ops.length; const p2 = new Pg(T); MODULES.wettersymbol.draw(p2, { t: S.trip, d: { weather: "storm" }, T }, { sym: "auto" }, { x: 0, y: 0, w: 121, h: 103 }); return n1 === pg.ops.length && n1 === (new Pg(T)).ops.length && p2.ops.length > n1; }), "Automatisch: ohne Wetter des Tages zeichnet die Kachel nichts, mit Wetter das passende Symbol");
 
 console.log("Feste Größe 1×1");
 ok(await page.evaluate(() => { const p = packTiles([newTile("wettersymbol", 3, 4), newTile("wettersymbol", 1, 1)], 4, 6); return p.placed.every((q) => q.w === 1 && q.h === 1) && p.placed.length === 2; }), "Raster erzwingt 1×1, auch bei anderen Maßen in den Daten");
