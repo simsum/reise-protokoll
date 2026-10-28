@@ -79,7 +79,9 @@ const DAY_FIELDS = {
   drive: (d) => fld("Fahrzeit (Std:Min)", `d:${d.id}.drive`, d.drive, { ph: "2:30" }),
   title: (d) => fld("Titel des Tages", `d:${d.id}.title`, d.title, { ph: "z. B. Salzkammergut" }),
   weather: (d) => `<div class="wx">${selFld("Wetter", `d:${d.id}.weather`, d.weather, [["", "–"], ...WEATHER.map((w) => [w.id, w.name])])}${fld("Min °C", `d:${d.id}.tmin`, d.tmin, { inputmode: "decimal" })}${fld("Max °C", `d:${d.id}.tmax`, d.tmax, { inputmode: "decimal" })}</div>${fld("Wetter-Details (optional, ersetzt die Zeile aus den Fotodaten)", `d:${d.id}.wxExtra`, d.wxExtra, { ph: "z. B. Wind Ø 12 km/h aus SW, am Nachmittag Schauer" })}${wxHint(d)}`,
-  lodging: (d) => fld("Unterkunft", `d:${d.id}.lodging`, d.lodging),
+  lodging: (d) => `${selFld("Art der Unterkunft", `d:${d.id}.lodgingKind`, d.lodgingKind, [["unterkunft", "Unterkunft (Hotel, Pension …)"], ["stellplatz", "Stellplatz (Camper)"]])}
+    ${fld(d.lodgingKind === "stellplatz" ? "Name des Stellplatzes" : "Unterkunft", `d:${d.id}.lodging`, d.lodging)}
+    ${d.lodgingKind === "stellplatz" ? `<div class="camp">${CAMP_OPTS.map(([id, n]) => chk(n, `d:${d.id}.camp.${id}`, d.camp[id])).join("")}${d.camp.sonstiges ? fld("Sonstiges (erscheint auf der Kachel)", `d:${d.id}.campNote`, d.campNote, { ph: "z. B. Hunde erlaubt" }) : ""}</div>` : ""}`,
   text: (d) => fld("Tagebuch", `d:${d.id}.text`, d.text, { rows: 6, ph: "Was haben wir erlebt?" }),
   plan: (d) => fld("Tagesplan (eine Zeile pro Punkt, Uhrzeit vorn)", `d:${d.id}.plan`, d.plan, { rows: 7, ph: "09:30 Frühstück im Café, 11:00 Stadtrundgang, …" }),
   highlights: (d) => fld("Highlights (eine pro Zeile)", `d:${d.id}.highlights`, d.highlights, { rows: 3 }),
@@ -123,14 +125,15 @@ function tileRow(d, pg, x, k, over) {
   const nums = (n, v) => Array.from({ length: n }, (_, j) => `<option value="${j + 1}" ${j + 1 === v ? "selected" : ""}>${j + 1}</option>`).join("");
   const size = ([a, b]) => `<button data-act="tileSize" ${ids} data-w="${a}" data-h="${b}" aria-pressed="${w === Math.min(a, t.cols) && h === b}">${a}×${b}</button>`;
   let extra = "";
-  const inUse = photosInUse(d, x);
+  const fixed = MODULES[x.mod] && MODULES[x.mod].fixed, inUse = photosInUse(d, x);
   if (x.mod === "foto") extra = `<select data-k="${base}.photo"><option value="">– Foto wählen –</option>${d.photos.map((p, n) => `<option value="${p.id}" ${p.id === x.photo ? "selected" : ""}>${n + 1}: ${esc(p.name)}${inUse.has(p.id) ? " (steht schon auf einer Kachel, wird verschoben)" : ""}</option>`).join("")}</select>`;
   if (x.mod === "notiz") extra = `<select data-k="${base}.font" title="Schrift">${Object.entries(FAMILIES).map(([id, f]) => `<option value="${id}" ${(x.font || "serif") === id ? "selected" : ""}>${esc(f.name)}</option>`).join("")}</select>
     <textarea data-k="${base}.text" rows="4" placeholder="Freier Text. Markdown: **fett**, *kursiv*, # Überschrift, - Liste">${esc(x.text || "")}</textarea>`;
+  if (x.mod === "wettersymbol") extra = `<select data-k="${base}.sym" title="Symbol"><option value="auto" ${!x.sym || x.sym === "auto" ? "selected" : ""}>Wetter des Tages (automatisch)</option>${SYMBOLS.map((q) => `<option value="${q.id}" ${x.sym === q.id ? "selected" : ""}>${esc(q.name)}</option>`).join("")}</select>`;
   return `<div class="tile ${over ? "over" : ""}"><div class="th"><b>${k + 1}</b>
     <select data-k="${base}.mod">${Object.entries(MODULES).map(([id, m]) => `<option value="${id}" ${id === x.mod ? "selected" : ""}>${esc(m.name)}</option>`).join("")}</select>
-    <label>B <select data-k="${base}.w">${nums(t.cols, w)}</select></label><label>H <select data-k="${base}.h">${nums(GRID_ROWS, h)}</select></label></div>
-    <div class="btnrow">${SIZES.map(size).join("")}<button data-act="tileSize" ${ids} data-w="${t.cols}" data-h="1" aria-pressed="${w === t.cols && h === 1}">Ganze Breite</button>
+    ${fixed ? `<small>feste Größe 1×1</small>` : `<label>B <select data-k="${base}.w">${nums(t.cols, w)}</select></label><label>H <select data-k="${base}.h">${nums(GRID_ROWS, h)}</select></label>`}</div>
+    <div class="btnrow">${fixed ? "" : SIZES.map(size).join("")}${fixed ? "" : `<button data-act="tileSize" ${ids} data-w="${t.cols}" data-h="1" aria-pressed="${w === t.cols && h === 1}">Ganze Breite</button>`}
     <button class="ico" data-act="tileUp" ${ids} title="Früher">↑</button><button class="ico" data-act="tileDown" ${ids} title="Später">↓</button><button class="ico" data-act="delTile" ${ids} title="Kachel entfernen">×</button></div>${extra}</div>`;
 }
 
@@ -196,8 +199,19 @@ function renderPanel() {
 }
 
 let prevTimer, saveTimer;
-function schedulePreview() { clearTimeout(prevTimer); prevTimer = setTimeout(renderPreview, 220); }
+/* Touch-Geräte (wie im Foto-Protokoll): Beim Tippen mit Bildschirmtastatur die Vorschau nicht ständig neu aufbauen (die Tastatur flackert und die
+   Eingabe ruckelt unter Android). Die Vorschau wird erst beim Verlassen des Feldes aktualisiert. */
+const touchUi = !!(window.matchMedia && matchMedia("(pointer: coarse)").matches);
+const typingNow = () => { const a = document.activeElement; return !!a && /^(INPUT|TEXTAREA)$/.test(a.tagName) && !/^(checkbox|radio|button|file|range|color)$/.test(a.type || "") && !!(a.closest("#panel") || a.closest("#tb")); };
+let previewPending = false;
+function schedulePreview() {
+  clearTimeout(prevTimer);
+  if (touchUi && typingNow()) { previewPending = true; return; }
+  prevTimer = setTimeout(renderPreview, 220);
+}
+document.addEventListener("focusout", () => { if (touchUi && previewPending) setTimeout(() => { if (previewPending && !typingNow()) renderPreview(); }, 0); });
 function renderPreview() {
+  previewPending = false;
   const { pages, warns } = layoutTrip(S.trip);
   S.pages = pages;
   $("#pages").innerHTML = pages.map((pg, i) => `<div class="sheet" data-pi="${i}" style="aspect-ratio:${pg.W}/${pg.H}">${pageHtml(pg)}${tileOverlay(pg)}</div>`).join("");
@@ -242,6 +256,7 @@ document.addEventListener("input", (e) => {
   if (key === "cols") { setCols(+el.value); changed(key); return; }
   r.obj[r.prop] = el.type === "checkbox" ? el.checked : el.value;
   if (/\.tiles\.[^.]+\.[wh]$/.test(key)) r.obj[r.prop] = +el.value;
+  if (/\.tiles\.[^.]+\.mod$/.test(key)) setTileMod(r.obj, el.value);
   if (/\.tiles\.[^.]+\.photo$/.test(key)) { const dd = dayOf(key.split(".")[0].slice(2)); if (dd) setTilePhoto(dd, r.obj, el.value); }
   if (/^d:[^.]+\.(weather|tmin|tmax)$/.test(key)) { const wd = dayOf(key.split(".")[0].slice(2)); if (wd) wd.wxAuto = false; }
   if (key === "capWeather" && el.checked) { wxState = "unknown"; queueAllWeather(); }
@@ -286,7 +301,7 @@ document.addEventListener("change", (e) => {
   else if (el.id === "demo") { if (el.value) loadTrip(demoTrip(el.value)); el.value = ""; }
   else if (el.id === "zoom") document.documentElement.style.setProperty("--z", el.value / 100);
   else if (el.dataset.k === "start" || el.dataset.k === "roundTrip" || el.dataset.k === "ruled" || el.dataset.k === "costPage") { /* nur Vorschau */ }
-  if (el.dataset && el.dataset.k && /\.(weather|cat|date|mod|w|h|photo)$/.test(el.dataset.k)) renderPanel();
+  if (el.dataset && el.dataset.k && /\.(weather|cat|date|mod|w|h|photo|lodgingKind|sonstiges)$/.test(el.dataset.k)) renderPanel();
 });
 
 document.addEventListener("click", async (e) => {

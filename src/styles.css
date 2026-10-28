@@ -192,3 +192,6 @@ body.brush .sheet { outline: 2px dashed color-mix(in srgb, var(--ui) 55%, transp
 .tl.empty.sel { background-color: color-mix(in srgb, var(--ui) 10%, transparent); }
 #tb .tbrow select[data-tb="font"] { max-width: 150px; }
 .tile > select[data-k$=".font"] { margin-bottom: 4px; }
+.tl.fixed .hd { display: none !important; }
+.camp { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; margin: -4px 0 10px; }
+.camp .f { grid-column: 1 / -1; }

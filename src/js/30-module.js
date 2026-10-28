@@ -51,7 +51,8 @@ function packTiles(tiles, cols, rows) {
   const used = new Set(), placed = [], rest = [];
   const free = (c, r, w, h) => { for (let y = r; y < r + h; y++) for (let x = c; x < c + w; x++) if (used.has(y * cols + x)) return false; return true; };
   for (const tile of tiles) {
-    const w = clamp(Math.round(tile.w) || 1, 1, cols), h = clamp(Math.round(tile.h) || 1, 1, rows);
+    const fx = MODULES[tile.mod] && MODULES[tile.mod].fixed; // Module mit fester Größe (Wettersymbol)
+    const w = fx ? fx[0] : clamp(Math.round(tile.w) || 1, 1, cols), h = fx ? fx[1] : clamp(Math.round(tile.h) || 1, 1, rows);
     let spot = null;
     for (let r = 0; r + h <= rows && !spot; r++) for (let c = 0; c + w <= cols; c++) if (free(c, r, w, h)) { spot = { c, r }; break; }
     if (!spot) { rest.push(tile); continue; }
@@ -124,9 +125,46 @@ function drawParas(pg, text, r, top, hi, lo) {
   return fits;
 }
 
+/* Stellplatz (Camper): Name und alle Ausstattungsmerkmale, je mit Haken (vorhanden) oder Kreuz (nicht vorhanden) */
+function drawCamp(pg, c, r, v) {
+  const { d, i, T, warns } = c, cols = r.w >= 190 ? 2 : 1, rows = Math.ceil(CAMP_OPTS.length / cols);
+  card(pg, r);
+  pg.label(r.x + 12, r.y + 8, "Stellplatz", T.muted);
+  pg.icon("camper", r.x + r.w - 12 - 17, r.y + 6, 17, T.accent, 1.5);
+  let y = r.y + 21;
+  if (v) {
+    const l = wrapMax(v, "B", 9.5, r.w - 24, r.h >= 150 ? 2 : 1);
+    l.lines.forEach((x, k) => pg.text(r.x + 12, y + k * 12, x, { f: "B", s: 9.5 }));
+    y += l.lines.length * 12 + 3;
+    if (l.cut) warns.push(`Tag ${i + 1}: Der Name des Stellplatzes ist für die Kachel zu lang und wird gekürzt.`);
+  }
+  const avail = r.y + r.h - 8 - y, rowH = clamp(avail / rows, 8.5, 15), s = Math.min(9, rowH * 0.74), iw = s * 1.15, colW = (r.w - 24) / cols;
+  if (avail < rows * 8.5 - 0.5) warns.push(`Tag ${i + 1}: Die Stellplatz-Angaben passen nicht in die Kachel, bitte die Kachel vergrößern.`);
+  CAMP_OPTS.forEach(([id, name], k) => {
+    const col = Math.floor(k / rows), row = k % rows, x = r.x + 12 + col * colW, yy = y + row * rowH, on = !!(d.camp && d.camp[id]);
+    if (on) pg.icon("check", x, yy + (rowH - iw) / 2 - 0.5, iw, T.accent, 2.4);
+    else pg.icon("cross", x + iw * 0.1, yy + (rowH - iw) / 2 - 0.5 + iw * 0.1, iw * 0.8, mix(T.muted, "#FFFFFF", 0.3), 2);
+    const label = id === "sonstiges" && on && (d.campNote || "").trim() ? d.campNote.trim() : name;
+    pg.text(x + iw + 4, yy + (rowH - s) / 2, fitT(label, "R", s, colW - iw - 8), { s, c: on ? T.ink : T.muted, f: on ? "B" : "R" });
+  });
+}
+
 /* ---------- Die Module ---------- */
 const MODULES = {
   leer: { name: "Leer (Platzhalter)", size: () => [1, 1], draw() {} },
+
+  /* Nur ein Symbol, immer 1×1: macht freie Flächen hübscher. tile.sym: "auto" (Wetter des Tages) oder ein Symbol aus SYMBOLS */
+  wettersymbol: {
+    name: "Wettersymbol", size: () => [1, 1], fixed: [1, 1],
+    draw(pg, c, tile, r) {
+      const id = tile.sym && tile.sym !== "auto" ? tile.sym : c.d.weather;
+      if (!id) return;
+      const s = Math.min(r.w, r.h), sz = s * 0.8, T = c.T;
+      card(pg, r);
+      pg.rect(r.x + (r.w - s * 0.9) / 2, r.y + (r.h - s * 0.9) / 2, s * 0.9, s * 0.9, { fill: "#FFFFFF", fo: 0.6, r: s * 0.45 });
+      drawSymbol(pg, id, r.x + (r.w - sz) / 2, r.y + (r.h - sz) / 2, sz, T);
+    },
+  },
 
   foto: {
     name: "Foto", size: () => [2, 2],
@@ -164,6 +202,7 @@ const MODULES = {
     name: "Unterkunft", size: () => [1, 1],
     draw(pg, c, tile, r) {
       const { d, i, T, warns } = c, v = (d.lodging || "").trim();
+      if (d.lodgingKind === "stellplatz") { drawCamp(pg, c, r, v); return; }
       if (!v) return;
       card(pg, r);
       pg.label(r.x + 12, r.y + 8, "Unterkunft", T.muted);

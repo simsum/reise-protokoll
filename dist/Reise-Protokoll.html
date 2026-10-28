@@ -193,11 +193,14 @@ body.brush .sheet { outline: 2px dashed color-mix(in srgb, var(--ui) 55%, transp
 .tl.empty.sel { background-color: color-mix(in srgb, var(--ui) 10%, transparent); }
 #tb .tbrow select[data-tb="font"] { max-width: 150px; }
 .tile > select[data-k$=".font"] { margin-bottom: 4px; }
+.tl.fixed .hd { display: none !important; }
+.camp { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; margin: -4px 0 10px; }
+.camp .f { grid-column: 1 / -1; }
 </style>
 
 <div id="app">
   <header class="top">
-    <div class="brand"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s6.5-5.7 6.5-11a6.5 6.5 0 1 0-13 0C5.5 15.3 12 21 12 21z"/><circle cx="12" cy="10" r="2.4"/></svg> Reise-Protokoll <span class="ver">v0.12.0</span></div>
+    <div class="brand"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s6.5-5.7 6.5-11a6.5 6.5 0 1 0-13 0C5.5 15.3 12 21 12 21z"/><circle cx="12" cy="10" r="2.4"/></svg> Reise-Protokoll <span class="ver">v0.14.1</span></div>
     <div class="grow"></div>
     <select id="demo" title="Beispielreise laden">
       <option value="">Beispiel laden …</option>
@@ -369,9 +372,15 @@ const weatherName = (id) => (WEATHER.find((w) => w.id === id) || {}).name || "";
 
 const blankPlace = () => ({ name: "", lat: null, lon: null });
 
+/* Camper: Ausstattung des Stellplatzes (Kachel „Unterkunft“ mit lodgingKind "stellplatz") */
+const CAMP_OPTS = [["wasser", "Wasser"], ["wc", "WC"], ["duschen", "Duschen"], ["strom", "Strom"], ["wlan", "WLAN"], ["sonstiges", "Sonstiges"]];
+const blankCamp = () => Object.fromEntries(CAMP_OPTS.map(([id]) => [id, false]));
+
 /* ---------- Kacheln ----------
    Ein Tag hat Seiten, eine Seite eine Liste von Kacheln {id, mod, w, h, photo?, text?} (Beschreibung in 30-module.js). */
 const newTile = (mod, w = 1, h = 1, o = {}) => ({ id: uid(), mod, w, h, ...o });
+/* Modul einer Kachel wechseln (Module mit fester Größe übernehmen diese) */
+function setTileMod(tile, mod) { tile.mod = mod; const fx = MODULES[mod] && MODULES[mod].fixed; if (fx) { tile.w = fx[0]; tile.h = fx[1]; } }
 const newPage = (tiles = []) => ({ id: uid(), tiles });
 const tileOf = (mod, cols, o) => { const [w, h] = MODULES[mod].size(cols); return newTile(mod, w, h, o); };
 
@@ -431,7 +440,7 @@ function addPhotoTiles(d, photos, cols) {
 }
 
 /* Kacheln als Format kopieren (neue Kennungen); Notiztext und Fotos gehören zum Inhalt, nicht zum Format */
-const copyTiles = (tiles) => tiles.map((x) => ({ id: uid(), mod: x.mod, w: x.w, h: x.h, ...(x.mod === "notiz" ? { text: "" } : {}), ...(x.font ? { font: x.font } : {}) }));
+const copyTiles = (tiles) => tiles.map((x) => ({ id: uid(), mod: x.mod, w: x.w, h: x.h, ...(x.mod === "notiz" ? { text: "" } : {}), ...(x.font ? { font: x.font } : {}), ...(x.sym ? { sym: x.sym } : {}) }));
 
 /* Seitenaufbau (Vorschlag oder übertragenes Format) auf eine Seite eines Tages anwenden.
    Fotokacheln werden mit Fotos des Tages belegt: zuerst Fotos ohne Kachel und von dieser Seite, dann Fotos von anderen Seiten (die verschwinden dort,
@@ -458,7 +467,7 @@ function applyLayout(d, page, tiles, cols) {
 
 function newDay(date = "", cols = 4) {
   return {
-    id: uid(), date, place: blankPlace(), from: "", km: "", drive: "", title: "", lodging: "",
+    id: uid(), date, place: blankPlace(), from: "", km: "", drive: "", title: "", lodging: "", lodgingKind: "unterkunft", camp: blankCamp(), campNote: "",
     weather: "", tmin: "", tmax: "", wxAuto: null, wxExtra: "", text: "", plan: "",
     highlights: "", costs: [], photos: [], pages: defaultPages(cols),
   };
@@ -483,7 +492,7 @@ function normalizeTrip(t) {
   if (!THEMES[out.theme]) out.theme = "meer";
   if (out.embed === "work") out.embed = "1600"; // frühere Bezeichnung
   out.days = (Array.isArray(t.days) ? t.days : []).map((d) => ({
-    ...newDay("", out.cols), ...d, place: { ...blankPlace(), ...(d.place || {}) },
+    ...newDay("", out.cols), ...d, place: { ...blankPlace(), ...(d.place || {}) }, camp: { ...blankCamp(), ...(d.camp || {}) },
     costs: Array.isArray(d.costs) ? d.costs.map((c) => ({ id: uid(), l: "", cat: "sonstiges", a: "", ...c })) : [],
     photos: Array.isArray(d.photos) ? d.photos : [],
     pages: Array.isArray(d.pages) ? d.pages : defaultPages(out.cols),
@@ -652,6 +661,9 @@ const ICONS = {
   storm: "M7 15a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 7.5a3.8 3.8 0 0 1-.5 7.5z M12.5 13l-3 4.5h3.5l-2 4",
   snow: "M7 15a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 7.5a3.8 3.8 0 0 1-.5 7.5z M8 18.5v.01 M12 20.5v.01 M16 18.5v.01 M10 22v.01 M14 22v.01",
   fog: "M7 13a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 5.5a3.8 3.8 0 0 1-.5 7.5z M3 17h18 M5 21h14",
+  check: "M5 12.5l4.5 4.5L19 7.5",
+  cross: "M6 6l12 12M18 6L6 18",
+  camper: "M2.5 17V8.5a2 2 0 0 1 2-2h9.8a3 3 0 0 1 2.4 1.2L21.5 12v5 M2.5 17h19 M13.5 6.5V12h8 M6.5 20a2 2 0 1 0 0-4a2 2 0 1 0 0 4z M17 20a2 2 0 1 0 0-4a2 2 0 1 0 0 4z M5.5 9.5h5v2h-5z",
   bed: "M3 19V6 M3 15h18v4 M21 15v-3a3 3 0 0 0-3-3h-8v6 M6.5 11.5a1.5 1.5 0 1 0 0-3a1.5 1.5 0 1 0 0 3z",
   car: "M5 16l1.3-5.2A2 2 0 0 1 8.2 9.3h7.6a2 2 0 0 1 1.9 1.5L19 16 M3 16h18v3H3z M6.5 19v1.5 M17.5 19v1.5",
   euro: "M17.5 6.5A6.5 6.5 0 1 0 17.5 17.5 M5 10.5h8 M5 13.5h8",
@@ -712,7 +724,8 @@ function packTiles(tiles, cols, rows) {
   const used = new Set(), placed = [], rest = [];
   const free = (c, r, w, h) => { for (let y = r; y < r + h; y++) for (let x = c; x < c + w; x++) if (used.has(y * cols + x)) return false; return true; };
   for (const tile of tiles) {
-    const w = clamp(Math.round(tile.w) || 1, 1, cols), h = clamp(Math.round(tile.h) || 1, 1, rows);
+    const fx = MODULES[tile.mod] && MODULES[tile.mod].fixed; // Module mit fester Größe (Wettersymbol)
+    const w = fx ? fx[0] : clamp(Math.round(tile.w) || 1, 1, cols), h = fx ? fx[1] : clamp(Math.round(tile.h) || 1, 1, rows);
     let spot = null;
     for (let r = 0; r + h <= rows && !spot; r++) for (let c = 0; c + w <= cols; c++) if (free(c, r, w, h)) { spot = { c, r }; break; }
     if (!spot) { rest.push(tile); continue; }
@@ -785,9 +798,46 @@ function drawParas(pg, text, r, top, hi, lo) {
   return fits;
 }
 
+/* Stellplatz (Camper): Name und alle Ausstattungsmerkmale, je mit Haken (vorhanden) oder Kreuz (nicht vorhanden) */
+function drawCamp(pg, c, r, v) {
+  const { d, i, T, warns } = c, cols = r.w >= 190 ? 2 : 1, rows = Math.ceil(CAMP_OPTS.length / cols);
+  card(pg, r);
+  pg.label(r.x + 12, r.y + 8, "Stellplatz", T.muted);
+  pg.icon("camper", r.x + r.w - 12 - 17, r.y + 6, 17, T.accent, 1.5);
+  let y = r.y + 21;
+  if (v) {
+    const l = wrapMax(v, "B", 9.5, r.w - 24, r.h >= 150 ? 2 : 1);
+    l.lines.forEach((x, k) => pg.text(r.x + 12, y + k * 12, x, { f: "B", s: 9.5 }));
+    y += l.lines.length * 12 + 3;
+    if (l.cut) warns.push(`Tag ${i + 1}: Der Name des Stellplatzes ist für die Kachel zu lang und wird gekürzt.`);
+  }
+  const avail = r.y + r.h - 8 - y, rowH = clamp(avail / rows, 8.5, 15), s = Math.min(9, rowH * 0.74), iw = s * 1.15, colW = (r.w - 24) / cols;
+  if (avail < rows * 8.5 - 0.5) warns.push(`Tag ${i + 1}: Die Stellplatz-Angaben passen nicht in die Kachel, bitte die Kachel vergrößern.`);
+  CAMP_OPTS.forEach(([id, name], k) => {
+    const col = Math.floor(k / rows), row = k % rows, x = r.x + 12 + col * colW, yy = y + row * rowH, on = !!(d.camp && d.camp[id]);
+    if (on) pg.icon("check", x, yy + (rowH - iw) / 2 - 0.5, iw, T.accent, 2.4);
+    else pg.icon("cross", x + iw * 0.1, yy + (rowH - iw) / 2 - 0.5 + iw * 0.1, iw * 0.8, mix(T.muted, "#FFFFFF", 0.3), 2);
+    const label = id === "sonstiges" && on && (d.campNote || "").trim() ? d.campNote.trim() : name;
+    pg.text(x + iw + 4, yy + (rowH - s) / 2, fitT(label, "R", s, colW - iw - 8), { s, c: on ? T.ink : T.muted, f: on ? "B" : "R" });
+  });
+}
+
 /* ---------- Die Module ---------- */
 const MODULES = {
   leer: { name: "Leer (Platzhalter)", size: () => [1, 1], draw() {} },
+
+  /* Nur ein Symbol, immer 1×1: macht freie Flächen hübscher. tile.sym: "auto" (Wetter des Tages) oder ein Symbol aus SYMBOLS */
+  wettersymbol: {
+    name: "Wettersymbol", size: () => [1, 1], fixed: [1, 1],
+    draw(pg, c, tile, r) {
+      const id = tile.sym && tile.sym !== "auto" ? tile.sym : c.d.weather;
+      if (!id) return;
+      const s = Math.min(r.w, r.h), sz = s * 0.8, T = c.T;
+      card(pg, r);
+      pg.rect(r.x + (r.w - s * 0.9) / 2, r.y + (r.h - s * 0.9) / 2, s * 0.9, s * 0.9, { fill: "#FFFFFF", fo: 0.6, r: s * 0.45 });
+      drawSymbol(pg, id, r.x + (r.w - sz) / 2, r.y + (r.h - sz) / 2, sz, T);
+    },
+  },
 
   foto: {
     name: "Foto", size: () => [2, 2],
@@ -825,6 +875,7 @@ const MODULES = {
     name: "Unterkunft", size: () => [1, 1],
     draw(pg, c, tile, r) {
       const { d, i, T, warns } = c, v = (d.lodging || "").trim();
+      if (d.lodgingKind === "stellplatz") { drawCamp(pg, c, r, v); return; }
       if (!v) return;
       card(pg, r);
       pg.label(r.x + 12, r.y + 8, "Unterkunft", T.muted);
@@ -1238,6 +1289,81 @@ function drawMd(pg, text, r, top, hi, lo, fam) {
     drawn++;
   }
   return fits && drawn >= 0;
+}
+
+/* ===== 37-symbols.js ===== */
+/* ---------- Wettersymbole (Kachel „Wettersymbol“) ----------
+   Gefüllte Vektorbilder im 100×100-Raster in den Farben des Farbschemas (Pfade, keine Bilder: gleich in Vorschau und PDF, beliebig scharf).
+   Neues Symbol = ein Eintrag in SYMBOLS plus eine Zeichenfunktion in ART. */
+const SYMBOLS = [
+  { id: "sun", name: "Sonne" }, { id: "partly", name: "Heiter" }, { id: "cloud", name: "Bewölkt" }, { id: "rain", name: "Regen" },
+  { id: "storm", name: "Gewitter" }, { id: "snow", name: "Schnee" }, { id: "fog", name: "Nebel" },
+  { id: "moon", name: "Mond und Sterne" }, { id: "rainbow", name: "Regenbogen" }, { id: "wind", name: "Wind" },
+];
+
+/* Wolke aus Bézierkurven (absolute Koordinaten, Raster 100), verschoben auf (cx, cy) und skaliert mit k */
+const CLOUD_SHAPE = [["M", 26, 72], ["C", 14, 72, 8, 63, 10, 55], ["C", 12, 47, 19, 43, 27, 44], ["C", 28, 32, 39, 24, 51, 26], ["C", 60, 27, 66, 33, 68, 41], ["C", 79, 40, 88, 48, 87, 58], ["C", 86, 67, 79, 72, 70, 72], ["Z"]];
+const shapePath = (cmds, cx, cy, k) => cmds.map(([c, ...n]) => c + n.map((v, i) => +(((v - 50) * k + (i % 2 ? cy : cx))).toFixed(2)).join(" ")).join("");
+const circPath = (cx, cy, r) => `M${cx - r} ${cy}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0z`;
+const starPath = (x, y, r) => `M${x} ${y - r}L${x + r * 0.27} ${y - r * 0.27}L${x + r} ${y}L${x + r * 0.27} ${y + r * 0.27}L${x} ${y + r}L${x - r * 0.27} ${y + r * 0.27}L${x - r} ${y}L${x - r * 0.27} ${y - r * 0.27}Z`;
+
+function drawSymbol(pg, id, x, y, s, T) {
+  const P = (d, o = {}) => pg.ops.push({ k: "path", x, y, w: s, h: s, vw: 100, vh: 100, d, fill: o.fill || null, stroke: o.stroke || null, sw: o.sw || 0, fo: o.fo, so: o.so });
+  const light = mix(T.accent, "#FFFFFF", 0.9), mid = mix(T.accent, "#FFFFFF", 0.74), edge = mix(T.accent, "#FFFFFF", 0.5), drop = mix(T.accent, "#FFFFFF", 0.12);
+  const sunC = T.accent2, sunEdge = mix(T.accent2, "#000000", 0.14);
+  const shadow = (cx, cy, rx) => P(`M${cx - rx} ${cy}a${rx} 3.4 0 1 0 ${2 * rx} 0a${rx} 3.4 0 1 0 ${-2 * rx} 0z`, { fill: "#000000", fo: 0.07 });
+  const cloud = (cx, cy, k, fill) => P(shapePath(CLOUD_SHAPE, cx, cy, k), { fill, stroke: edge, sw: 2.2, so: 0.85 });
+  const sun = (cx, cy, R) => {
+    P(circPath(cx, cy, R * 1.9), { fill: sunC, fo: 0.1 }); P(circPath(cx, cy, R * 1.5), { fill: sunC, fo: 0.18 });
+    for (let i = 0; i < 8; i++) {
+      const a = i * Math.PI / 4, r1 = R * 1.3, r2 = R * (i % 2 ? 1.62 : 1.9);
+      P(`M${(cx + Math.cos(a) * r1).toFixed(2)} ${(cy + Math.sin(a) * r1).toFixed(2)}L${(cx + Math.cos(a) * r2).toFixed(2)} ${(cy + Math.sin(a) * r2).toFixed(2)}`, { stroke: sunC, sw: R * 0.27 });
+    }
+    P(circPath(cx, cy, R), { fill: sunC, stroke: sunEdge, sw: 1.4, so: 0.6 });
+    P(circPath(cx - R * 0.34, cy - R * 0.34, R * 0.36), { fill: "#FFFFFF", fo: 0.38 });
+  };
+  const art = {
+    sun: () => { sun(50, 50, 18); },
+    partly: () => { sun(36, 36, 13); shadow(54, 84, 30); cloud(54, 62, 0.9, light); },
+    cloud: () => { shadow(50, 84, 32); cloud(66, 44, 0.66, mid); cloud(46, 60, 0.96, light); },
+    rain: () => {
+      cloud(50, 42, 0.98, light);
+      [[34, 78, 29, 92], [50, 80, 45, 94], [66, 78, 61, 92]].forEach(([a, b, c, d]) => P(`M${a} ${b}L${c} ${d}`, { stroke: drop, sw: 4.6 }));
+      [[42, 86, 39, 94], [58, 86, 55, 94]].forEach(([a, b, c, d]) => P(`M${a} ${b}L${c} ${d}`, { stroke: edge, sw: 3.4 }));
+    },
+    storm: () => {
+      cloud(50, 40, 0.98, mid);
+      P("M57 58L40 80H51L45 98L69 71H57L63 58Z", { fill: sunC, stroke: "#FFFFFF", sw: 2, so: 0.9 });
+      P(`M30 78L27 86 M72 80L69 88`, { stroke: drop, sw: 3.6 });
+    },
+    snow: () => {
+      cloud(50, 40, 0.98, light);
+      [[32, 82], [50, 91], [68, 82]].forEach(([fx, fy]) => {
+        P(`M${fx - 7} ${fy}h14M${fx - 3.5} ${fy - 6.06}l7 12.12M${fx + 3.5} ${fy - 6.06}l-7 12.12`, { stroke: T.accent, sw: 2.4 });
+        P(circPath(fx, fy, 1.6), { fill: sunC });
+      });
+    },
+    fog: () => {
+      cloud(50, 36, 0.92, light);
+      [[18, 82, 78, 0.95], [26, 91, 90, 0.7], [14, 100, 66, 0.45]].forEach(([a, b, c, o]) => P(`M${a} ${b - 14}H${c}`, { stroke: mix(T.accent, "#FFFFFF", 0.25), sw: 5, so: o }));
+    },
+    moon: () => {
+      P(circPath(50, 50, 40), { fill: T.accent, fo: 0.07 });
+      P("M60 16A34 34 0 1 0 84 62A27 27 0 1 1 60 16Z", { fill: mix(T.accent2, "#FFFFFF", 0.28), stroke: sunEdge, sw: 1.6, so: 0.7 });
+      P(starPath(72, 30, 8), { fill: sunC }); P(starPath(84, 50, 5), { fill: sunC, fo: 0.85 }); P(starPath(66, 14, 4), { fill: sunC, fo: 0.7 });
+    },
+    rainbow: () => {
+      const cols = [sunC, mix(sunC, T.accent, 0.5), T.accent, mix(T.accent, "#FFFFFF", 0.5)];
+      cols.forEach((c, i) => { const r = 38 - i * 6.4; P(`M${50 - r} 74A${r} ${r} 0 0 1 ${50 + r} 74`, { stroke: c, sw: 5.6 }); });
+      shadow(50, 84, 38); cloud(22, 70, 0.5, light); cloud(78, 70, 0.5, light);
+    },
+    wind: () => {
+      P("M12 38H58A9 9 0 1 0 49 29", { stroke: T.accent, sw: 4.8 });
+      P("M12 54H78A10 10 0 1 1 68 64", { stroke: mix(T.accent, "#FFFFFF", 0.35), sw: 4.8 });
+      P("M12 70H44A8 8 0 1 1 36 78", { stroke: sunC, sw: 4.8 });
+    },
+  };
+  (art[id] || art.sun)();
 }
 
 /* ===== 40-layout.js ===== */
@@ -2245,6 +2371,8 @@ function cleanTile(x, cols, seen) {
   if (typeof x.photo === "string" && /^[A-Za-z0-9_-]{1,24}$/.test(x.photo)) o.photo = x.photo;
   if (typeof x.text === "string") o.text = clipStr(x.text, 4000);
   if (Object.keys(FAMILIES).includes(x.font)) o.font = x.font;
+  if (x.sym === "auto" || SYMBOLS.some((q) => q.id === x.sym)) o.sym = x.sym;
+  const fx = MODULES[o.mod] && MODULES[o.mod].fixed; if (fx) { o.w = fx[0]; o.h = fx[1]; }
   return o;
 }
 const cleanPage = (pg, cols, seen) => ({ id: cleanId(pg && pg.id, seen), tiles: (pg && Array.isArray(pg.tiles) ? pg.tiles : []).slice(0, 60).map((x) => cleanTile(x, cols, seen)) });
@@ -2272,7 +2400,8 @@ function cleanTrip(j) {
       d = d && typeof d === "object" ? d : {};
       return {
         id: cleanId(d.id, seen), date: cleanIso(d.date), place: cleanPlace(d.place), from: clipStr(d.from, 200), km: clipStr(d.km, 20), drive: clipStr(d.drive, 20),
-        title: clipStr(d.title, 200), lodging: clipStr(d.lodging, 200), weather: oneOf(d.weather, ["", ...WEATHER.map((w) => w.id)], ""), tmin: clipStr(d.tmin, 12), tmax: clipStr(d.tmax, 12), wxAuto: typeof d.wxAuto === "boolean" ? d.wxAuto : null, wxExtra: clipStr(d.wxExtra, 300),
+        title: clipStr(d.title, 200), lodging: clipStr(d.lodging, 200), lodgingKind: oneOf(d.lodgingKind, ["unterkunft", "stellplatz"], "unterkunft"), campNote: clipStr(d.campNote, 100),
+        camp: Object.fromEntries(CAMP_OPTS.map(([id]) => [id, !!(d.camp && typeof d.camp === "object" && d.camp[id] === true)])), weather: oneOf(d.weather, ["", ...WEATHER.map((w) => w.id)], ""), tmin: clipStr(d.tmin, 12), tmax: clipStr(d.tmax, 12), wxAuto: typeof d.wxAuto === "boolean" ? d.wxAuto : null, wxExtra: clipStr(d.wxExtra, 300),
         text: clipStr(d.text, 20000), plan: clipStr(d.plan, 8000), highlights: clipStr(d.highlights, 4000),
         costs: (Array.isArray(d.costs) ? d.costs : []).slice(0, 200).map((c) => ({ id: cleanId(c && c.id, seen), l: clipStr(c && c.l, 200), cat: oneOf(c && c.cat, CATS.map((k) => k.id), "sonstiges"), a: clipStr(c && c.a, 20) })),
         photos: (Array.isArray(d.photos) ? d.photos : []).slice(0, 500).map((g) => cleanPhotoMeta(g, photoIds)),
@@ -2733,7 +2862,9 @@ const DAY_FIELDS = {
   drive: (d) => fld("Fahrzeit (Std:Min)", `d:${d.id}.drive`, d.drive, { ph: "2:30" }),
   title: (d) => fld("Titel des Tages", `d:${d.id}.title`, d.title, { ph: "z. B. Salzkammergut" }),
   weather: (d) => `<div class="wx">${selFld("Wetter", `d:${d.id}.weather`, d.weather, [["", "–"], ...WEATHER.map((w) => [w.id, w.name])])}${fld("Min °C", `d:${d.id}.tmin`, d.tmin, { inputmode: "decimal" })}${fld("Max °C", `d:${d.id}.tmax`, d.tmax, { inputmode: "decimal" })}</div>${fld("Wetter-Details (optional, ersetzt die Zeile aus den Fotodaten)", `d:${d.id}.wxExtra`, d.wxExtra, { ph: "z. B. Wind Ø 12 km/h aus SW, am Nachmittag Schauer" })}${wxHint(d)}`,
-  lodging: (d) => fld("Unterkunft", `d:${d.id}.lodging`, d.lodging),
+  lodging: (d) => `${selFld("Art der Unterkunft", `d:${d.id}.lodgingKind`, d.lodgingKind, [["unterkunft", "Unterkunft (Hotel, Pension …)"], ["stellplatz", "Stellplatz (Camper)"]])}
+    ${fld(d.lodgingKind === "stellplatz" ? "Name des Stellplatzes" : "Unterkunft", `d:${d.id}.lodging`, d.lodging)}
+    ${d.lodgingKind === "stellplatz" ? `<div class="camp">${CAMP_OPTS.map(([id, n]) => chk(n, `d:${d.id}.camp.${id}`, d.camp[id])).join("")}${d.camp.sonstiges ? fld("Sonstiges (erscheint auf der Kachel)", `d:${d.id}.campNote`, d.campNote, { ph: "z. B. Hunde erlaubt" }) : ""}</div>` : ""}`,
   text: (d) => fld("Tagebuch", `d:${d.id}.text`, d.text, { rows: 6, ph: "Was haben wir erlebt?" }),
   plan: (d) => fld("Tagesplan (eine Zeile pro Punkt, Uhrzeit vorn)", `d:${d.id}.plan`, d.plan, { rows: 7, ph: "09:30 Frühstück im Café, 11:00 Stadtrundgang, …" }),
   highlights: (d) => fld("Highlights (eine pro Zeile)", `d:${d.id}.highlights`, d.highlights, { rows: 3 }),
@@ -2777,14 +2908,15 @@ function tileRow(d, pg, x, k, over) {
   const nums = (n, v) => Array.from({ length: n }, (_, j) => `<option value="${j + 1}" ${j + 1 === v ? "selected" : ""}>${j + 1}</option>`).join("");
   const size = ([a, b]) => `<button data-act="tileSize" ${ids} data-w="${a}" data-h="${b}" aria-pressed="${w === Math.min(a, t.cols) && h === b}">${a}×${b}</button>`;
   let extra = "";
-  const inUse = photosInUse(d, x);
+  const fixed = MODULES[x.mod] && MODULES[x.mod].fixed, inUse = photosInUse(d, x);
   if (x.mod === "foto") extra = `<select data-k="${base}.photo"><option value="">– Foto wählen –</option>${d.photos.map((p, n) => `<option value="${p.id}" ${p.id === x.photo ? "selected" : ""}>${n + 1}: ${esc(p.name)}${inUse.has(p.id) ? " (steht schon auf einer Kachel, wird verschoben)" : ""}</option>`).join("")}</select>`;
   if (x.mod === "notiz") extra = `<select data-k="${base}.font" title="Schrift">${Object.entries(FAMILIES).map(([id, f]) => `<option value="${id}" ${(x.font || "serif") === id ? "selected" : ""}>${esc(f.name)}</option>`).join("")}</select>
     <textarea data-k="${base}.text" rows="4" placeholder="Freier Text. Markdown: **fett**, *kursiv*, # Überschrift, - Liste">${esc(x.text || "")}</textarea>`;
+  if (x.mod === "wettersymbol") extra = `<select data-k="${base}.sym" title="Symbol"><option value="auto" ${!x.sym || x.sym === "auto" ? "selected" : ""}>Wetter des Tages (automatisch)</option>${SYMBOLS.map((q) => `<option value="${q.id}" ${x.sym === q.id ? "selected" : ""}>${esc(q.name)}</option>`).join("")}</select>`;
   return `<div class="tile ${over ? "over" : ""}"><div class="th"><b>${k + 1}</b>
     <select data-k="${base}.mod">${Object.entries(MODULES).map(([id, m]) => `<option value="${id}" ${id === x.mod ? "selected" : ""}>${esc(m.name)}</option>`).join("")}</select>
-    <label>B <select data-k="${base}.w">${nums(t.cols, w)}</select></label><label>H <select data-k="${base}.h">${nums(GRID_ROWS, h)}</select></label></div>
-    <div class="btnrow">${SIZES.map(size).join("")}<button data-act="tileSize" ${ids} data-w="${t.cols}" data-h="1" aria-pressed="${w === t.cols && h === 1}">Ganze Breite</button>
+    ${fixed ? `<small>feste Größe 1×1</small>` : `<label>B <select data-k="${base}.w">${nums(t.cols, w)}</select></label><label>H <select data-k="${base}.h">${nums(GRID_ROWS, h)}</select></label>`}</div>
+    <div class="btnrow">${fixed ? "" : SIZES.map(size).join("")}${fixed ? "" : `<button data-act="tileSize" ${ids} data-w="${t.cols}" data-h="1" aria-pressed="${w === t.cols && h === 1}">Ganze Breite</button>`}
     <button class="ico" data-act="tileUp" ${ids} title="Früher">↑</button><button class="ico" data-act="tileDown" ${ids} title="Später">↓</button><button class="ico" data-act="delTile" ${ids} title="Kachel entfernen">×</button></div>${extra}</div>`;
 }
 
@@ -2850,8 +2982,19 @@ function renderPanel() {
 }
 
 let prevTimer, saveTimer;
-function schedulePreview() { clearTimeout(prevTimer); prevTimer = setTimeout(renderPreview, 220); }
+/* Touch-Geräte (wie im Foto-Protokoll): Beim Tippen mit Bildschirmtastatur die Vorschau nicht ständig neu aufbauen (die Tastatur flackert und die
+   Eingabe ruckelt unter Android). Die Vorschau wird erst beim Verlassen des Feldes aktualisiert. */
+const touchUi = !!(window.matchMedia && matchMedia("(pointer: coarse)").matches);
+const typingNow = () => { const a = document.activeElement; return !!a && /^(INPUT|TEXTAREA)$/.test(a.tagName) && !/^(checkbox|radio|button|file|range|color)$/.test(a.type || "") && !!(a.closest("#panel") || a.closest("#tb")); };
+let previewPending = false;
+function schedulePreview() {
+  clearTimeout(prevTimer);
+  if (touchUi && typingNow()) { previewPending = true; return; }
+  prevTimer = setTimeout(renderPreview, 220);
+}
+document.addEventListener("focusout", () => { if (touchUi && previewPending) setTimeout(() => { if (previewPending && !typingNow()) renderPreview(); }, 0); });
 function renderPreview() {
+  previewPending = false;
   const { pages, warns } = layoutTrip(S.trip);
   S.pages = pages;
   $("#pages").innerHTML = pages.map((pg, i) => `<div class="sheet" data-pi="${i}" style="aspect-ratio:${pg.W}/${pg.H}">${pageHtml(pg)}${tileOverlay(pg)}</div>`).join("");
@@ -2896,6 +3039,7 @@ document.addEventListener("input", (e) => {
   if (key === "cols") { setCols(+el.value); changed(key); return; }
   r.obj[r.prop] = el.type === "checkbox" ? el.checked : el.value;
   if (/\.tiles\.[^.]+\.[wh]$/.test(key)) r.obj[r.prop] = +el.value;
+  if (/\.tiles\.[^.]+\.mod$/.test(key)) setTileMod(r.obj, el.value);
   if (/\.tiles\.[^.]+\.photo$/.test(key)) { const dd = dayOf(key.split(".")[0].slice(2)); if (dd) setTilePhoto(dd, r.obj, el.value); }
   if (/^d:[^.]+\.(weather|tmin|tmax)$/.test(key)) { const wd = dayOf(key.split(".")[0].slice(2)); if (wd) wd.wxAuto = false; }
   if (key === "capWeather" && el.checked) { wxState = "unknown"; queueAllWeather(); }
@@ -2940,7 +3084,7 @@ document.addEventListener("change", (e) => {
   else if (el.id === "demo") { if (el.value) loadTrip(demoTrip(el.value)); el.value = ""; }
   else if (el.id === "zoom") document.documentElement.style.setProperty("--z", el.value / 100);
   else if (el.dataset.k === "start" || el.dataset.k === "roundTrip" || el.dataset.k === "ruled" || el.dataset.k === "costPage") { /* nur Vorschau */ }
-  if (el.dataset && el.dataset.k && /\.(weather|cat|date|mod|w|h|photo)$/.test(el.dataset.k)) renderPanel();
+  if (el.dataset && el.dataset.k && /\.(weather|cat|date|mod|w|h|photo|lodgingKind|sonstiges)$/.test(el.dataset.k)) renderPanel();
 });
 
 document.addEventListener("click", async (e) => {
@@ -3388,7 +3532,7 @@ function tileOverlay(pg) {
   const bar = `<div class="pbar"><button data-pb="add" title="Neue leere Seite danach einfügen">+ Seite</button>${m.spill ? "" : `<button data-pb="up" title="Seite nach vorn">↑</button><button data-pb="down" title="Seite nach hinten">↓</button><button data-pb="del" title="Diese Seite mit allen Kacheln löschen">✕</button>`}
     <select data-pb="preset" title="Seitenaufbau aus einem Vorschlag"><option value="">Aufbau …</option>${LAYOUTS.map((l) => `<option value="${l.id}">${esc(l.name)}</option>`).join("")}</select><button data-pb="brush" title="Format übertragen: Aufbau dieser Seite auf andere Seiten übernehmen">🖌 Format</button></div>`;
   return `${bar}${m.spill ? `<div class="ovf">Fortsetzung: Diese Kacheln hatten auf der Seite davor keinen Platz</div>` : ""}<div class="ov" style="left:${p(m.x0, pg.W)};top:${p(m.y0, pg.H)};width:${p(gw, pg.W)};height:${p(gh, pg.H)}">${free}${m.tiles.map((q) =>
-    `<div class="tl${q.empty ? " empty" : ""}" data-id="${q.id}" style="left:${p(q.rx - m.x0, gw)};top:${p(q.ry - m.y0, gh)};width:${p(q.rw, gw)};height:${p(q.rh, gh)}"><span class="tn">${esc((MODULES[q.mod] || MODULES.leer).name)}</span>${q.empty ? `<span class="te">${q.mod === "foto" ? "Kein Foto gewählt" : q.mod === "leer" ? "Leer" : "Nichts eingetragen"}</span>` : ""}<i class="hd" title="Größe ändern"></i></div>`).join("")}</div>`;
+    `<div class="tl${q.empty ? " empty" : ""}${(MODULES[q.mod] || {}).fixed ? " fixed" : ""}" data-id="${q.id}" style="left:${p(q.rx - m.x0, gw)};top:${p(q.ry - m.y0, gh)};width:${p(q.rw, gw)};height:${p(q.rh, gh)}"><span class="tn">${esc((MODULES[q.mod] || MODULES.leer).name)}</span>${q.empty ? `<span class="te">${q.mod === "foto" ? "Kein Foto gewählt" : q.mod === "leer" ? "Leer" : "Nichts eingetragen"}</span>` : ""}<i class="hd" title="Größe ändern"></i></div>`).join("")}</div>`;
 }
 
 /* Kontext der gewählten Kachel: Tag, Seite, Kachel */
@@ -3420,13 +3564,14 @@ function select(sel) {
 function hideToolbar() { const tb = $("#tb"); tb.hidden = true; tb.innerHTML = ""; }
 function buildToolbar() {
   const tb = $("#tb"), c = selCtx(); if (!c) { hideToolbar(); return; }
-  const t = S.trip, { tile, d } = c, w = clamp(tile.w, 1, t.cols), h = clamp(tile.h, 1, GRID_ROWS), idx = c.pg.tiles.indexOf(tile), inUse = photosInUse(d, tile);
+  const t = S.trip, { tile, d } = c, w = clamp(tile.w, 1, t.cols), h = clamp(tile.h, 1, GRID_ROWS), idx = c.pg.tiles.indexOf(tile), inUse = photosInUse(d, tile), fixed = MODULES[tile.mod] && MODULES[tile.mod].fixed;
   const sz = ([a, b]) => `<button data-tb="size" data-w="${a}" data-h="${b}" aria-pressed="${w === Math.min(a, t.cols) && h === b}">${a}×${b}</button>`;
   tb.innerHTML = `<div class="tbrow"><select data-tb="mod" title="Modul">${Object.entries(MODULES).map(([id, m]) => `<option value="${id}" ${id === tile.mod ? "selected" : ""}>${esc(m.name)}</option>`).join("")}</select>
     ${tile.mod === "foto" ? `<select data-tb="photo" title="Foto"><option value="">– Foto wählen –</option>${d.photos.map((p, n) => `<option value="${p.id}" ${p.id === tile.photo ? "selected" : ""}>${n + 1}: ${esc(p.name)}${inUse.has(p.id) ? " (schon platziert, wird verschoben)" : ""}</option>`).join("")}</select>` : ""}
     <button class="ico" data-tb="prev" title="In der Reihenfolge nach vorn" ${idx <= 0 ? "disabled" : ""}>◀</button><button class="ico" data-tb="next" title="In der Reihenfolge nach hinten" ${idx >= c.pg.tiles.length - 1 ? "disabled" : ""}>▶</button>
     <button class="ico" data-tb="del" title="Kachel entfernen">✕</button></div>
-    <div class="tbrow">${SIZES.map(sz).join("")}<button data-tb="size" data-w="${t.cols}" data-h="1" aria-pressed="${w === t.cols && h === 1}">Ganze Breite</button><small>${w}×${h}</small></div>
+    ${fixed ? `<div class="tbrow"><small>feste Größe 1×1</small></div>` : `<div class="tbrow">${SIZES.map(sz).join("")}<button data-tb="size" data-w="${t.cols}" data-h="1" aria-pressed="${w === t.cols && h === 1}">Ganze Breite</button><small>${w}×${h}</small></div>`}
+    ${tile.mod === "wettersymbol" ? `<div class="tbrow"><select data-tb="sym" title="Symbol"><option value="auto" ${!tile.sym || tile.sym === "auto" ? "selected" : ""}>Wetter des Tages (automatisch)</option>${SYMBOLS.map((q) => `<option value="${q.id}" ${tile.sym === q.id ? "selected" : ""}>${esc(q.name)}</option>`).join("")}</select></div>` : ""}
     ${tile.mod === "notiz" ? `<div class="tbrow"><select data-tb="font" title="Schrift">${Object.entries(FAMILIES).map(([id, f]) => `<option value="${id}" ${(tile.font || "serif") === id ? "selected" : ""}>${esc(f.name)}</option>`).join("")}</select>
       <button data-tb="md" data-md="b" title="Fett (**Text**)"><b>B</b></button><button data-tb="md" data-md="i" title="Kursiv (*Text*)"><i>I</i></button><button data-tb="md" data-md="h" title="Überschrift (## )">H</button><button data-tb="md" data-md="ul" title="Aufzählung (- )">•</button><button data-tb="md" data-md="ol" title="Nummerierung (1. )">1.</button><button data-tb="md" data-md="q" title="Zitat (> )">❝</button><button data-tb="md" data-md="hr" title="Trennlinie (---)">―</button></div>
       <textarea data-tb="text" rows="4" placeholder="Freier Text. Markdown: **fett**, *kursiv*, # Überschrift, - Liste">${esc(tile.text || "")}</textarea>` : ""}`;
@@ -3546,7 +3691,8 @@ function bindPreviewTiles() {
     const el = e.target, c = selCtx();
     if (el.dataset.tb === "add") { addFromMenu(el.value); return; }
     if (!c) return;
-    if (el.dataset.tb === "mod") c.tile.mod = el.value;
+    if (el.dataset.tb === "mod") setTileMod(c.tile, el.value);
+    if (el.dataset.tb === "sym") c.tile.sym = el.value;
     if (el.dataset.tb === "photo") setTilePhoto(c.d, c.tile, el.value);
     if (el.dataset.tb === "font") c.tile.font = el.value;
     tileChanged();

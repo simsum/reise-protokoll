@@ -17,9 +17,15 @@ const weatherName = (id) => (WEATHER.find((w) => w.id === id) || {}).name || "";
 
 const blankPlace = () => ({ name: "", lat: null, lon: null });
 
+/* Camper: Ausstattung des Stellplatzes (Kachel „Unterkunft“ mit lodgingKind "stellplatz") */
+const CAMP_OPTS = [["wasser", "Wasser"], ["wc", "WC"], ["duschen", "Duschen"], ["strom", "Strom"], ["wlan", "WLAN"], ["sonstiges", "Sonstiges"]];
+const blankCamp = () => Object.fromEntries(CAMP_OPTS.map(([id]) => [id, false]));
+
 /* ---------- Kacheln ----------
    Ein Tag hat Seiten, eine Seite eine Liste von Kacheln {id, mod, w, h, photo?, text?} (Beschreibung in 30-module.js). */
 const newTile = (mod, w = 1, h = 1, o = {}) => ({ id: uid(), mod, w, h, ...o });
+/* Modul einer Kachel wechseln (Module mit fester Größe übernehmen diese) */
+function setTileMod(tile, mod) { tile.mod = mod; const fx = MODULES[mod] && MODULES[mod].fixed; if (fx) { tile.w = fx[0]; tile.h = fx[1]; } }
 const newPage = (tiles = []) => ({ id: uid(), tiles });
 const tileOf = (mod, cols, o) => { const [w, h] = MODULES[mod].size(cols); return newTile(mod, w, h, o); };
 
@@ -79,7 +85,7 @@ function addPhotoTiles(d, photos, cols) {
 }
 
 /* Kacheln als Format kopieren (neue Kennungen); Notiztext und Fotos gehören zum Inhalt, nicht zum Format */
-const copyTiles = (tiles) => tiles.map((x) => ({ id: uid(), mod: x.mod, w: x.w, h: x.h, ...(x.mod === "notiz" ? { text: "" } : {}), ...(x.font ? { font: x.font } : {}) }));
+const copyTiles = (tiles) => tiles.map((x) => ({ id: uid(), mod: x.mod, w: x.w, h: x.h, ...(x.mod === "notiz" ? { text: "" } : {}), ...(x.font ? { font: x.font } : {}), ...(x.sym ? { sym: x.sym } : {}) }));
 
 /* Seitenaufbau (Vorschlag oder übertragenes Format) auf eine Seite eines Tages anwenden.
    Fotokacheln werden mit Fotos des Tages belegt: zuerst Fotos ohne Kachel und von dieser Seite, dann Fotos von anderen Seiten (die verschwinden dort,
@@ -106,7 +112,7 @@ function applyLayout(d, page, tiles, cols) {
 
 function newDay(date = "", cols = 4) {
   return {
-    id: uid(), date, place: blankPlace(), from: "", km: "", drive: "", title: "", lodging: "",
+    id: uid(), date, place: blankPlace(), from: "", km: "", drive: "", title: "", lodging: "", lodgingKind: "unterkunft", camp: blankCamp(), campNote: "",
     weather: "", tmin: "", tmax: "", wxAuto: null, wxExtra: "", text: "", plan: "",
     highlights: "", costs: [], photos: [], pages: defaultPages(cols),
   };
@@ -131,7 +137,7 @@ function normalizeTrip(t) {
   if (!THEMES[out.theme]) out.theme = "meer";
   if (out.embed === "work") out.embed = "1600"; // frühere Bezeichnung
   out.days = (Array.isArray(t.days) ? t.days : []).map((d) => ({
-    ...newDay("", out.cols), ...d, place: { ...blankPlace(), ...(d.place || {}) },
+    ...newDay("", out.cols), ...d, place: { ...blankPlace(), ...(d.place || {}) }, camp: { ...blankCamp(), ...(d.camp || {}) },
     costs: Array.isArray(d.costs) ? d.costs.map((c) => ({ id: uid(), l: "", cat: "sonstiges", a: "", ...c })) : [],
     photos: Array.isArray(d.photos) ? d.photos : [],
     pages: Array.isArray(d.pages) ? d.pages : defaultPages(out.cols),

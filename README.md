@@ -8,7 +8,7 @@ Das Tool ist eine einzige HTML-Datei ([`dist/Reise-Protokoll.html`](dist/Reise-P
 
 ## Freies Layout aus Kacheln
 
-Jede Seite eines Tages ist ein Raster aus 3 oder 4 Kacheln pro Reihe und 6 Reihen (Einstellung im Reiter „Reise“). Jede Kachel nimmt ein **Modul** auf, frei wählbar: Foto, Wetter, Unterkunft, Strecke, Tagesplan, Tagebuch, Highlights, Ausgaben, Karte, Kennzahlen, Notiz (freier Text mit Markdown) oder Leer (Platzhalter). Bearbeiten geht **direkt in der Vorschau** (oder im Reiter „Tage“ unter jedem Tag):
+Jede Seite eines Tages ist ein Raster aus 3 oder 4 Kacheln pro Reihe und 6 Reihen (Einstellung im Reiter „Reise“). Jede Kachel nimmt ein **Modul** auf, frei wählbar: Foto, Wetter, Unterkunft, Strecke, Tagesplan, Tagebuch, Highlights, Ausgaben, Karte, Kennzahlen, Notiz (freier Text mit Markdown), Wettersymbol (nur ein hübsches Symbol, immer 1×1, schmückt freie Flächen; „automatisch“ zeigt das Wetter des Tages, oder man wählt Sonne, Heiter, Bewölkt, Regen, Gewitter, Schnee, Nebel, Mond und Sterne, Regenbogen, Wind; die Farben folgen dem Farbschema) oder Leer (Platzhalter). Bearbeiten geht **direkt in der Vorschau** (oder im Reiter „Tage“ unter jedem Tag):
 
 - **Anklicken** wählt eine Kachel; eine Werkzeugleiste über der Kachel bietet Modul, Foto, Größe und Reihenfolge. **Ziehen** verschiebt die Kachel an eine andere Stelle (auch auf eine andere Seite desselben Tages), die **Ecke unten rechts** ändert die Größe im Raster, ein Klick auf **freie Fläche** fügt eine Kachel ein. Escape hebt die Auswahl auf, Entf löscht die Kachel. **Doppelklick** springt dorthin, wo man den Inhalt bearbeitet (Foto-Editor, Textfeld des Tages, Reiter „Karte“ …). Beim Darüberfahren markieren gestrichelte Felder die **freien Plätze** der Seite.
 - **Rückgängig / Wiederholen** (Pfeile oben in der Vorschau, Strg+Z / Strg+Y) gelten für den Seitenaufbau, auch für Löschen und Verschieben von Kacheln und Seiten.
@@ -24,6 +24,7 @@ Der Seitenaufbau im Detail:
 - Neue Tage bekommen einen Standardaufbau (Strecke, Wetter, Unterkunft, Ausgaben, Highlights, Tagesplan, Tagebuch). Hinzugefügte Fotos bekommen je eine Fotokachel (Querformat 2×2, Hochformat 1×2) mit allen Foto-Funktionen (Markieren, Drehen, Ausschnitt, Beschriftung).
 - **Notizen mit Markdown und Schrift:** In der Werkzeugleiste einer Notiz wählst du die Schrift (Serif = Times, Sans = Helvetica/Arial, Mono = Courier; das sind PDF-Standardschriften, damit Vorschau und PDF gleich umbrechen) und setzt die Formatierung per Knopf oder von Hand: `# Überschrift` (bis `###`), `**fett**`, `*kursiv*`, `***beides***`, `` `Code` ``, `- Aufzählung`, `1. Nummerierung`, `> Zitat`, `---` Trennlinie. Links zeigen nur den Text.
 - Ein leeres Modul (z. B. ein Tag ohne Tagesplan) zeichnet nichts. Ist der Inhalt für die Kachel zu lang, wird die Schrift kleiner und dann gekürzt; oben in der Vorschau erscheint ein Hinweis.
+- **Camper:** Beim Tag lässt sich die Unterkunft auf **Stellplatz** umschalten. Die Kachel „Unterkunft“ zeigt dann den Namen und immer alle sechs Merkmale (Wasser, WC, Duschen, Strom, WLAN, Sonstiges), je mit Haken (vorhanden) oder Kreuz (nicht vorhanden). Bei „Sonstiges“ steht der eigene Text auf der Kachel (z. B. „Hunde erlaubt“). Die Angaben bleiben beim Zurückschalten erhalten.
 - Mehrere Tage am selben Ort: Ohne Ortsangabe gilt der Ort des Vortags.
 
 Die Deckseite ist immer gleich aufgebaut: Dauer, Kennzahlen (Reiseziel oder Stationen, Strecke, Kosten, Fotos, Temperatur – was vorhanden ist), Karte der Fahrstrecke und Zusammenfassung. Dazu kommen bei Bedarf weitere Seiten je Tag sowie eine Kostenübersicht am Ende. Fünf Farbschemata (Meer, Herbst, Wald, Nacht, Mono).
@@ -75,7 +76,7 @@ Aufbau und Regeln stehen in [CLAUDE.md](CLAUDE.md).
 ## Ideen für später
 
 - **Tipps fürs nächste Mal**: Abschnitt für Erkenntnisse (je Tag und/oder als eigene Seite am Ende)
-- **Camper**: statt „Unterkunft“ ein Stellplatz mit Wasser, Entsorgung und Strom
+- **Camper**: weitere Merkmale des Stellplatzes (z. B. Entsorgung, Hunde, Preis)
 - Weitere Aufbau-Vorschläge (Städtereise, Wanderung, Strandurlaub), eigene Aufbauten speichern
 - **Seitenformate** (A4, A5, A3, US Letter, Hoch- und Querformat)
 - **Export als HTML-Datei und als Markdown-Datei** (Text, Fotos, Karte), zusätzlich zum PDF

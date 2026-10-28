@@ -15,7 +15,7 @@ function tileOverlay(pg) {
   const bar = `<div class="pbar"><button data-pb="add" title="Neue leere Seite danach einfügen">+ Seite</button>${m.spill ? "" : `<button data-pb="up" title="Seite nach vorn">↑</button><button data-pb="down" title="Seite nach hinten">↓</button><button data-pb="del" title="Diese Seite mit allen Kacheln löschen">✕</button>`}
     <select data-pb="preset" title="Seitenaufbau aus einem Vorschlag"><option value="">Aufbau …</option>${LAYOUTS.map((l) => `<option value="${l.id}">${esc(l.name)}</option>`).join("")}</select><button data-pb="brush" title="Format übertragen: Aufbau dieser Seite auf andere Seiten übernehmen">🖌 Format</button></div>`;
   return `${bar}${m.spill ? `<div class="ovf">Fortsetzung: Diese Kacheln hatten auf der Seite davor keinen Platz</div>` : ""}<div class="ov" style="left:${p(m.x0, pg.W)};top:${p(m.y0, pg.H)};width:${p(gw, pg.W)};height:${p(gh, pg.H)}">${free}${m.tiles.map((q) =>
-    `<div class="tl${q.empty ? " empty" : ""}" data-id="${q.id}" style="left:${p(q.rx - m.x0, gw)};top:${p(q.ry - m.y0, gh)};width:${p(q.rw, gw)};height:${p(q.rh, gh)}"><span class="tn">${esc((MODULES[q.mod] || MODULES.leer).name)}</span>${q.empty ? `<span class="te">${q.mod === "foto" ? "Kein Foto gewählt" : q.mod === "leer" ? "Leer" : "Nichts eingetragen"}</span>` : ""}<i class="hd" title="Größe ändern"></i></div>`).join("")}</div>`;
+    `<div class="tl${q.empty ? " empty" : ""}${(MODULES[q.mod] || {}).fixed ? " fixed" : ""}" data-id="${q.id}" style="left:${p(q.rx - m.x0, gw)};top:${p(q.ry - m.y0, gh)};width:${p(q.rw, gw)};height:${p(q.rh, gh)}"><span class="tn">${esc((MODULES[q.mod] || MODULES.leer).name)}</span>${q.empty ? `<span class="te">${q.mod === "foto" ? "Kein Foto gewählt" : q.mod === "leer" ? "Leer" : "Nichts eingetragen"}</span>` : ""}<i class="hd" title="Größe ändern"></i></div>`).join("")}</div>`;
 }
 
 /* Kontext der gewählten Kachel: Tag, Seite, Kachel */
@@ -47,13 +47,14 @@ function select(sel) {
 function hideToolbar() { const tb = $("#tb"); tb.hidden = true; tb.innerHTML = ""; }
 function buildToolbar() {
   const tb = $("#tb"), c = selCtx(); if (!c) { hideToolbar(); return; }
-  const t = S.trip, { tile, d } = c, w = clamp(tile.w, 1, t.cols), h = clamp(tile.h, 1, GRID_ROWS), idx = c.pg.tiles.indexOf(tile), inUse = photosInUse(d, tile);
+  const t = S.trip, { tile, d } = c, w = clamp(tile.w, 1, t.cols), h = clamp(tile.h, 1, GRID_ROWS), idx = c.pg.tiles.indexOf(tile), inUse = photosInUse(d, tile), fixed = MODULES[tile.mod] && MODULES[tile.mod].fixed;
   const sz = ([a, b]) => `<button data-tb="size" data-w="${a}" data-h="${b}" aria-pressed="${w === Math.min(a, t.cols) && h === b}">${a}×${b}</button>`;
   tb.innerHTML = `<div class="tbrow"><select data-tb="mod" title="Modul">${Object.entries(MODULES).map(([id, m]) => `<option value="${id}" ${id === tile.mod ? "selected" : ""}>${esc(m.name)}</option>`).join("")}</select>
     ${tile.mod === "foto" ? `<select data-tb="photo" title="Foto"><option value="">– Foto wählen –</option>${d.photos.map((p, n) => `<option value="${p.id}" ${p.id === tile.photo ? "selected" : ""}>${n + 1}: ${esc(p.name)}${inUse.has(p.id) ? " (schon platziert, wird verschoben)" : ""}</option>`).join("")}</select>` : ""}
     <button class="ico" data-tb="prev" title="In der Reihenfolge nach vorn" ${idx <= 0 ? "disabled" : ""}>◀</button><button class="ico" data-tb="next" title="In der Reihenfolge nach hinten" ${idx >= c.pg.tiles.length - 1 ? "disabled" : ""}>▶</button>
     <button class="ico" data-tb="del" title="Kachel entfernen">✕</button></div>
-    <div class="tbrow">${SIZES.map(sz).join("")}<button data-tb="size" data-w="${t.cols}" data-h="1" aria-pressed="${w === t.cols && h === 1}">Ganze Breite</button><small>${w}×${h}</small></div>
+    ${fixed ? `<div class="tbrow"><small>feste Größe 1×1</small></div>` : `<div class="tbrow">${SIZES.map(sz).join("")}<button data-tb="size" data-w="${t.cols}" data-h="1" aria-pressed="${w === t.cols && h === 1}">Ganze Breite</button><small>${w}×${h}</small></div>`}
+    ${tile.mod === "wettersymbol" ? `<div class="tbrow"><select data-tb="sym" title="Symbol"><option value="auto" ${!tile.sym || tile.sym === "auto" ? "selected" : ""}>Wetter des Tages (automatisch)</option>${SYMBOLS.map((q) => `<option value="${q.id}" ${tile.sym === q.id ? "selected" : ""}>${esc(q.name)}</option>`).join("")}</select></div>` : ""}
     ${tile.mod === "notiz" ? `<div class="tbrow"><select data-tb="font" title="Schrift">${Object.entries(FAMILIES).map(([id, f]) => `<option value="${id}" ${(tile.font || "serif") === id ? "selected" : ""}>${esc(f.name)}</option>`).join("")}</select>
       <button data-tb="md" data-md="b" title="Fett (**Text**)"><b>B</b></button><button data-tb="md" data-md="i" title="Kursiv (*Text*)"><i>I</i></button><button data-tb="md" data-md="h" title="Überschrift (## )">H</button><button data-tb="md" data-md="ul" title="Aufzählung (- )">•</button><button data-tb="md" data-md="ol" title="Nummerierung (1. )">1.</button><button data-tb="md" data-md="q" title="Zitat (> )">❝</button><button data-tb="md" data-md="hr" title="Trennlinie (---)">―</button></div>
       <textarea data-tb="text" rows="4" placeholder="Freier Text. Markdown: **fett**, *kursiv*, # Überschrift, - Liste">${esc(tile.text || "")}</textarea>` : ""}`;
@@ -173,7 +174,8 @@ function bindPreviewTiles() {
     const el = e.target, c = selCtx();
     if (el.dataset.tb === "add") { addFromMenu(el.value); return; }
     if (!c) return;
-    if (el.dataset.tb === "mod") c.tile.mod = el.value;
+    if (el.dataset.tb === "mod") setTileMod(c.tile, el.value);
+    if (el.dataset.tb === "sym") c.tile.sym = el.value;
     if (el.dataset.tb === "photo") setTilePhoto(c.d, c.tile, el.value);
     if (el.dataset.tb === "font") c.tile.font = el.value;
     tileChanged();

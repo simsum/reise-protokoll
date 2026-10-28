@@ -19,6 +19,7 @@ Reise-Protokoll ist ein eigenständiges Tool (kein Teil von Foto-Protokoll, nur 
 | `30-module` | **Module** `MODULES` (Kachel-Inhalte, Vertrag im Dateikopf), `packTiles()` (Raster), Tageshilfen (`parsePlan`, `routeInfo`) |
 | `35-text` | Schrift-Metriken, `wrapAll`, `fitT`, `clean` (WinAnsi) |
 | `36-markdown` | Markdown für Notiz-Kacheln: `mdInline`, `mdBlocks`, `mdWrap` (Läufe mit gemischten Schriften), `drawMd`; Schriftfamilien `FAMILIES` (Serif/Times, Sans/Helvetica, Mono/Courier, je R/B/I/BI) |
+| `37-symbols` | Wettersymbole für die Kachel „Wettersymbol“: `SYMBOLS`, `drawSymbol()` (gefüllte Pfade im 100×100-Raster in Schemafarben); Module mit `fixed: [w, h]` (feste Größe) erzwingt `packTiles()` |
 | `40-layout` | Seitenmodell: `coverPage`, `dayPages` (Kopf + Kachelraster, Überlauf auf Folgeseiten), `costPages`, `layoutTrip` |
 | `50-render` | `pageHtml` (Vorschau) und `buildPdf` (pdf-lib) aus dem Seitenmodell |
 | `60-map` | Karte: OSM-Kacheln + Route auf Canvas, OSRM, Schemakarte als Rückfall |
@@ -48,6 +49,7 @@ Reise-Protokoll ist ein eigenständiges Tool (kein Teil von Foto-Protokoll, nur 
 - Text-`y` im Seitenmodell ist die **Oberkante** der Zeile (CSS `line-height: 1`); das PDF setzt die Grundlinie bei `y + BASELINE × Größe`.
 - pdf-lib: `drawSvgPath` skaliert auch die Linienbreite mit `scale`; Bilder werden mit Klippfad zugeschnitten (`pushGraphicsState` … `clip`).
 - Kacheln kommen per `fetch` (damit 403 erkannt wird), Reihenfolge `tileSources()`: bei `file://` OSM.de → Esri → OSM (Hauptserver sperrt ohne Referer), sonst OSM → OSM.de → Esri (alle mit CORS `*`). Zusätzlich erkennt `looksBlocked()` die Sperrkachel (gelb-schwarz gestreift) am Bild, auch bei Status 200. `tile.openstreetmap.org` antwortet ohne Referer (Datei von der Festplatte) mit 403 und einer Fehlerkachel – nicht als `<img>` laden, sonst wird die Fehlerkachel in die Karte gemalt. CARTO (`basemaps.cartocdn.com`) ist nicht nutzbar (Schlüssel nötig, Wasserzeichen). Fehlen Kacheln insgesamt, entsteht automatisch die Schemakarte. Öffentliche Dienste (Kacheln, Nominatim max. 1 Anfrage/s, OSRM-Demo-Server) nur für gelegentliche Nutzung; Quellenangabe steht auf der Karte.
+- **Android/Touch** (gleiche Lösung wie im Foto-Protokoll v0.7.1): Beim Tippen darf weder die Seitenleiste neu aufgebaut werden (sonst flackert die Bildschirmtastatur) noch ständig die Vorschau. Auf Geräten mit `(pointer: coarse)` zeigt `schedulePreview()` die Vorschau erst beim Verlassen des Feldes (`focusout`); Auswahlfelder, Knöpfe und Kachel-Aktionen aktualisieren sofort. Neue Eingabefelder dürfen beim Tippen kein `renderPanel()` auslösen (`test/touch.mjs`).
 - Tests: Playwright ersetzt alle Netzzugriffe durch Testantworten (`test/e2e.mjs`: Oberfläche, Karte, Kacheln; `test/projekt.mjs`: Mehrfach-Import, PDF-Roundtrip, manipulierte PDFs). PDFs lassen sich mit `pip install pymupdf` zu Bildern rendern, um das Layout zu prüfen.
 
 ## Windows

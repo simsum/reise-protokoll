@@ -48,6 +48,8 @@ function cleanTile(x, cols, seen) {
   if (typeof x.photo === "string" && /^[A-Za-z0-9_-]{1,24}$/.test(x.photo)) o.photo = x.photo;
   if (typeof x.text === "string") o.text = clipStr(x.text, 4000);
   if (Object.keys(FAMILIES).includes(x.font)) o.font = x.font;
+  if (x.sym === "auto" || SYMBOLS.some((q) => q.id === x.sym)) o.sym = x.sym;
+  const fx = MODULES[o.mod] && MODULES[o.mod].fixed; if (fx) { o.w = fx[0]; o.h = fx[1]; }
   return o;
 }
 const cleanPage = (pg, cols, seen) => ({ id: cleanId(pg && pg.id, seen), tiles: (pg && Array.isArray(pg.tiles) ? pg.tiles : []).slice(0, 60).map((x) => cleanTile(x, cols, seen)) });
@@ -75,7 +77,8 @@ function cleanTrip(j) {
       d = d && typeof d === "object" ? d : {};
       return {
         id: cleanId(d.id, seen), date: cleanIso(d.date), place: cleanPlace(d.place), from: clipStr(d.from, 200), km: clipStr(d.km, 20), drive: clipStr(d.drive, 20),
-        title: clipStr(d.title, 200), lodging: clipStr(d.lodging, 200), weather: oneOf(d.weather, ["", ...WEATHER.map((w) => w.id)], ""), tmin: clipStr(d.tmin, 12), tmax: clipStr(d.tmax, 12), wxAuto: typeof d.wxAuto === "boolean" ? d.wxAuto : null, wxExtra: clipStr(d.wxExtra, 300),
+        title: clipStr(d.title, 200), lodging: clipStr(d.lodging, 200), lodgingKind: oneOf(d.lodgingKind, ["unterkunft", "stellplatz"], "unterkunft"), campNote: clipStr(d.campNote, 100),
+        camp: Object.fromEntries(CAMP_OPTS.map(([id]) => [id, !!(d.camp && typeof d.camp === "object" && d.camp[id] === true)])), weather: oneOf(d.weather, ["", ...WEATHER.map((w) => w.id)], ""), tmin: clipStr(d.tmin, 12), tmax: clipStr(d.tmax, 12), wxAuto: typeof d.wxAuto === "boolean" ? d.wxAuto : null, wxExtra: clipStr(d.wxExtra, 300),
         text: clipStr(d.text, 20000), plan: clipStr(d.plan, 8000), highlights: clipStr(d.highlights, 4000),
         costs: (Array.isArray(d.costs) ? d.costs : []).slice(0, 200).map((c) => ({ id: cleanId(c && c.id, seen), l: clipStr(c && c.l, 200), cat: oneOf(c && c.cat, CATS.map((k) => k.id), "sonstiges"), a: clipStr(c && c.a, 20) })),
         photos: (Array.isArray(d.photos) ? d.photos : []).slice(0, 500).map((g) => cleanPhotoMeta(g, photoIds)),
