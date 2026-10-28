@@ -213,3 +213,54 @@ async function paintPointMap(cv, lat, lon, zoom, T, { noTiles = false } = {}) {
   }
   return { source: source ? source.id : "", credit: source ? source.credit : "Schemakarte (ohne Kartenhintergrund)", blocked, mode: source ? "osm" : "schema" };
 }
+
+/* ---------- Karte (Tag) ----------
+   Orte des Tages: Start (Ort des Vortags oder Startort), Fotos mit GPS in Aufnahmereihenfolge, Ort des Tages. Nahe Punkte (unter 150 m) werden zusammengefasst. */
+function dayMapPoints(t, i) {
+  const d = t.days[i], pts = [];
+  const add = (p, name) => { if (hasGeo(p) && !pts.some((q) => haversine(q, p) < 0.15)) pts.push({ lat: p.lat, lon: p.lon, name: name || "" }); };
+  let from = hasGeo(t.startPlace) ? t.startPlace : null;
+  for (let k = i - 1; k >= 0; k--) if (hasGeo(t.days[k].place)) { from = t.days[k].place; break; }
+  if (from && hasGeo(d.place) && haversine(from, d.place) >= 0.15) add(from, from.name);
+  d.photos.filter((p) => p.gps).map((p, n) => ({ p, n })).sort((a, b) => (a.p.time || "99").localeCompare(b.p.time || "99") || a.n - b.n).forEach((x) => add(x.p.gps, ""));
+  add(d.place, d.place.name);
+  return pts;
+}
+/* Mitte und Zoom, bei denen alle Punkte in eine Kachel von w × h pt passen (Rand 34 pt) */
+function fitDayMap(pts, w, h) {
+  if (!pts.length) return null;
+  const lats = pts.map((p) => p.lat), lons = pts.map((p) => p.lon), a = Math.min(...lats), b = Math.max(...lats), c = Math.min(...lons), e = Math.max(...lons);
+  let z = 16;
+  for (; z > 2; z--) {
+    const p1 = mapProj(b, c, z + 1), p2 = mapProj(a, e, z + 1);
+    if (p2.x - p1.x <= 2 * (w - 68) && p2.y - p1.y <= 2 * (h - 68)) break;
+  }
+  const q1 = mapProj(b, c, z + 1), q2 = mapProj(a, e, z + 1), m = mapInv((q1.x + q2.x) / 2, (q1.y + q2.y) / 2, z + 1);
+  return { lat: m.lat, lon: m.lon, zoom: z };
+}
+/* Weg und nummerierte Marken über die gemalte Karte (Leinwand 2 Pixel je pt) */
+function drawDayOverlay(cv, pts, lat, lon, zoom, T) {
+  const W = cv.width, H = cv.height, Z = clamp(Math.round(zoom), 1, 18) + 1, c = mapProj(lat, lon, Z), g = cv.getContext("2d");
+  const to = (p) => { const q = mapProj(p.lat, p.lon, Z); return { x: q.x - c.x + W / 2, y: q.y - c.y + H / 2 }; };
+  g.lineJoin = "round"; g.lineCap = "round";
+  if (pts.length > 1) {
+    const path = () => { g.beginPath(); pts.forEach((p, k) => { const q = to(p); k ? g.lineTo(q.x, q.y) : g.moveTo(q.x, q.y); }); };
+    path(); g.strokeStyle = "rgba(255,255,255,.95)"; g.lineWidth = 13; g.stroke();
+    path(); g.strokeStyle = T.accent; g.lineWidth = 7; g.setLineDash([16, 12]); g.stroke(); g.setLineDash([]);
+  }
+  g.textBaseline = "middle"; g.textAlign = "center";
+  const placed = [];
+  pts.forEach((p, k) => {
+    const q = to(p);
+    g.beginPath(); g.arc(q.x, q.y, 17, 0, 7); g.fillStyle = "#fff"; g.fill();
+    g.beginPath(); g.arc(q.x, q.y, 13, 0, 7); g.fillStyle = T.accent2; g.fill();
+    g.fillStyle = T.ink; g.font = "700 15px Helvetica, Arial, sans-serif"; g.fillText(String(k + 1), q.x, q.y + 1, 22);
+    if (!p.name) return;
+    g.font = "700 19px Helvetica, Arial, sans-serif"; g.textAlign = "left";
+    const w = g.measureText(p.name).width, left = q.x + 24 + w > W - 8, x = left ? q.x - 24 - w : q.x + 24, r = { x0: x, x1: x + w, y0: q.y - 12, y1: q.y + 12 };
+    if (!placed.some((o) => r.x0 < o.x1 && r.x1 > o.x0 && r.y0 < o.y1 && r.y1 > o.y0)) {
+      placed.push(r); g.lineWidth = 6; g.strokeStyle = "rgba(255,255,255,.95)"; g.strokeText(p.name, x, q.y); g.fillStyle = T.ink; g.fillText(p.name, x, q.y);
+    }
+    g.textAlign = "center";
+  });
+}

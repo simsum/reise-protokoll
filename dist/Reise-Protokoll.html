@@ -221,11 +221,13 @@ body.brush .sheet { outline: 2px dashed color-mix(in srgb, var(--ui) 55%, transp
 #pm .btnrow b { min-width: 2ch; text-align: center; }
 #pm .btnrow button { padding: 3px 10px; }
 #pm #pmSizes button[aria-pressed="true"] { background: var(--ui); border-color: var(--ui); color: #fff; }
+
+.pmmap.day .pmpin { display: none; }
 </style>
 
 <div id="app">
   <header class="top">
-    <div class="brand"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s6.5-5.7 6.5-11a6.5 6.5 0 1 0-13 0C5.5 15.3 12 21 12 21z"/><circle cx="12" cy="10" r="2.4"/></svg> Reise-Protokoll <span class="ver">v0.18.1</span></div>
+    <div class="brand"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s6.5-5.7 6.5-11a6.5 6.5 0 1 0-13 0C5.5 15.3 12 21 12 21z"/><circle cx="12" cy="10" r="2.4"/></svg> Reise-Protokoll <span class="ver">v0.19.0</span></div>
     <div class="grow"></div>
     <select id="demo" title="Beispielreise laden">
       <option value="">Beispiel laden …</option>
@@ -320,10 +322,11 @@ body.brush .sheet { outline: 2px dashed color-mix(in srgb, var(--ui) 55%, transp
     <div id="pmHits" class="wphits"></div>
     <div class="wpgrid">
       <div class="wpform">
-        <label class="f"><span>Beschriftung (steht auf der Karte, kann leer bleiben)</span><input id="pmName"></label>
+        <label class="f" id="pmNameRow"><span>Beschriftung (steht auf der Karte, kann leer bleiben)</span><input id="pmName"></label>
+        <div class="btnrow"><button type="button" id="pmFit" hidden>Auf den Tag einpassen</button></div>
         <div class="f"><span>Zoom</span><div class="btnrow"><button type="button" id="pmZm" aria-label="Herauszoomen">−</button><b id="pmZ">15</b><button type="button" id="pmZp" aria-label="Hineinzoomen">+</button><small>klein = Land, groß = Straße</small></div></div>
         <div class="f"><span>Größe der Kachel</span><div class="btnrow" id="pmSizes"></div></div>
-        <small>Die Karte mit Maus oder Finger verschieben, mit dem Mausrad oder +/− zoomen. Die Nadel in der Mitte zeigt die Position.</small>
+        <small id="pmHelp">Die Karte mit Maus oder Finger verschieben, mit dem Mausrad oder +/− zoomen. Die Nadel in der Mitte zeigt die Position.</small>
       </div>
       <div class="wpprev"><div class="pmmap" id="pmMap"><canvas id="pmCv" width="2" height="2"></canvas><svg class="pmpin" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 100C50 100 16 64 16 38a34 34 0 1 1 68 0c0 26-34 62-34 62z" fill="#E0A458" stroke="#fff" stroke-width="5"/><circle cx="50" cy="38" r="12" fill="#fff"/></svg></div><small id="pmCoord"></small></div>
     </div>
@@ -897,6 +900,36 @@ function drawPin(pg, x, y, s, T) {
   P("M50 26a12 12 0 1 0 0.01 0z", { fill: "#FFFFFF" });
 }
 
+/* Gemeinsam für Karte (Punkt) und Karte (Tag): Kartenbild aus tile.ptImg im Rahmen; pin = Nadel in der Mitte (Punkt) */
+function drawPtMap(pg, c, tile, r, pin) {
+  const pt = tile.pt, { t, i, T, warns } = c;
+  if (!pt) return;
+  if (!tile.ptImg) {
+    pg.rect(r.x, r.y, r.w, r.h, { fill: T.soft, r: 8 });
+    pg.icon("pin", r.x + r.w / 2 - 12, r.y + r.h / 2 - 20, 24, T.muted, 1.4);
+    pg.text(r.x + r.w / 2, r.y + r.h / 2 + 10, fitT("Kartenbild fehlt, Position neu übernehmen", "R", 8, r.w - 12), { s: 8, c: T.muted, a: "c" });
+    warns.push(`Tag ${i + 1}: Einer Karte fehlt das Kartenbild (Position im Fenster neu übernehmen).`);
+    return;
+  }
+  const f = frameFor(pg, t, T, r.x, r.y, r.w, r.h);
+  pg.img(f.x, f.y, f.w, f.h, tile.ptImg, tile.ptW, tile.ptH, undefined, f.rad);
+  plainEdge(pg, f, T);
+  if (tile.ptW && tile.ptW < f.w * 1.6) warns.push(`Tag ${i + 1}: Eine Karte ist für eine kleinere Kachel erzeugt und wirkt unscharf (Position im Fenster neu übernehmen).`);
+  if (pin) drawPin(pg, f.x + f.w / 2, f.y + f.h / 2, clamp(Math.min(f.w, f.h) * 0.2, 18, 34), T);
+  const cs = 5.6, cr = pt.credit ? Math.min(f.w * 0.6, tw(pt.credit, "R", cs) + 8) : 0;
+  if (cr) {
+    pg.rect(f.x + f.w - cr - 3, f.y + f.h - 12, cr, 9.5, { fill: "#FFFFFF", fo: 0.85, r: 3 });
+    pg.text(f.x + f.w - cr + 1, f.y + f.h - 10.6, fitT(pt.credit, "R", cs, cr - 8), { s: cs, c: "#333333" });
+  }
+  const nm = (pt.name || "").trim(), room = f.w - cr - 22;
+  if (nm && room >= 30) {
+    const lw = Math.min(room, tw(nm, "SB", 8.5) + 14);
+    pg.rect(f.x + 5, f.y + f.h - 20, lw, 15, { fill: "#FFFFFF", fo: 0.92, r: 7.5 });
+    pg.text(f.x + 12, f.y + f.h - 16.2, fitT(nm, "SB", 8.5, lw - 14), { f: "SB", s: 8.5, c: T.ink });
+  }
+
+}
+
 /* ---------- Die Module ---------- */
 const MODULES = {
   leer: { name: "Leer (Platzhalter)", size: () => [1, 1], draw() {} },
@@ -1102,33 +1135,13 @@ const MODULES = {
   /* Karte um eine selbst gewählte Position (Fenster in 87-mapdialog.js): Bild aus OSM-Kacheln in tile.ptImg, Nadel, Beschriftung und Quelle als Vektoren */
   punktkarte: {
     name: "Karte (Punkt)", size: () => [2, 2],
-    draw(pg, c, tile, r) {
-      const pt = tile.pt, { t, i, T, warns } = c;
-      if (!pt) return;
-      if (!tile.ptImg) {
-        pg.rect(r.x, r.y, r.w, r.h, { fill: T.soft, r: 8 });
-        pg.icon("pin", r.x + r.w / 2 - 12, r.y + r.h / 2 - 20, 24, T.muted, 1.4);
-        pg.text(r.x + r.w / 2, r.y + r.h / 2 + 10, fitT("Kartenbild fehlt, Position neu übernehmen", "R", 8, r.w - 12), { s: 8, c: T.muted, a: "c" });
-        warns.push(`Tag ${i + 1}: Einer Punktkarte fehlt das Kartenbild (Position im Fenster neu übernehmen).`);
-        return;
-      }
-      const f = frameFor(pg, t, T, r.x, r.y, r.w, r.h);
-      pg.img(f.x, f.y, f.w, f.h, tile.ptImg, tile.ptW, tile.ptH, undefined, f.rad);
-      plainEdge(pg, f, T);
-      if (tile.ptW && tile.ptW < f.w * 1.6) warns.push(`Tag ${i + 1}: Eine Punktkarte ist für eine kleinere Kachel erzeugt und wirkt unscharf (Position im Fenster neu übernehmen).`);
-      drawPin(pg, f.x + f.w / 2, f.y + f.h / 2, clamp(Math.min(f.w, f.h) * 0.2, 18, 34), T);
-      const cs = 5.6, cr = pt.credit ? Math.min(f.w * 0.6, tw(pt.credit, "R", cs) + 8) : 0;
-      if (cr) {
-        pg.rect(f.x + f.w - cr - 3, f.y + f.h - 12, cr, 9.5, { fill: "#FFFFFF", fo: 0.85, r: 3 });
-        pg.text(f.x + f.w - cr + 1, f.y + f.h - 10.6, fitT(pt.credit, "R", cs, cr - 8), { s: cs, c: "#333333" });
-      }
-      const nm = (pt.name || "").trim(), room = f.w - cr - 22;
-      if (nm && room >= 30) {
-        const lw = Math.min(room, tw(nm, "SB", 8.5) + 14);
-        pg.rect(f.x + 5, f.y + f.h - 20, lw, 15, { fill: "#FFFFFF", fo: 0.92, r: 7.5 });
-        pg.text(f.x + 12, f.y + f.h - 16.2, fitT(nm, "SB", 8.5, lw - 14), { f: "SB", s: 8.5, c: T.ink });
-      }
-    },
+    draw(pg, c, tile, r) { drawPtMap(pg, c, tile, r, true); },
+  },
+
+  /* Karte des Tages: Orte des Tages (Start, Fotos mit GPS, Ort) als Weg mit Nummern, ins Bild eingerechnet; Fenster wie bei „Karte (Punkt)“ */
+  tageskarte: {
+    name: "Karte (Tag)", size: () => [2, 2],
+    draw(pg, c, tile, r) { drawPtMap(pg, c, tile, r, false); },
   },
 
   kennzahlen: {
@@ -2171,6 +2184,57 @@ async function paintPointMap(cv, lat, lon, zoom, T, { noTiles = false } = {}) {
     for (let y = 0; y < H; y += 103) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
   }
   return { source: source ? source.id : "", credit: source ? source.credit : "Schemakarte (ohne Kartenhintergrund)", blocked, mode: source ? "osm" : "schema" };
+}
+
+/* ---------- Karte (Tag) ----------
+   Orte des Tages: Start (Ort des Vortags oder Startort), Fotos mit GPS in Aufnahmereihenfolge, Ort des Tages. Nahe Punkte (unter 150 m) werden zusammengefasst. */
+function dayMapPoints(t, i) {
+  const d = t.days[i], pts = [];
+  const add = (p, name) => { if (hasGeo(p) && !pts.some((q) => haversine(q, p) < 0.15)) pts.push({ lat: p.lat, lon: p.lon, name: name || "" }); };
+  let from = hasGeo(t.startPlace) ? t.startPlace : null;
+  for (let k = i - 1; k >= 0; k--) if (hasGeo(t.days[k].place)) { from = t.days[k].place; break; }
+  if (from && hasGeo(d.place) && haversine(from, d.place) >= 0.15) add(from, from.name);
+  d.photos.filter((p) => p.gps).map((p, n) => ({ p, n })).sort((a, b) => (a.p.time || "99").localeCompare(b.p.time || "99") || a.n - b.n).forEach((x) => add(x.p.gps, ""));
+  add(d.place, d.place.name);
+  return pts;
+}
+/* Mitte und Zoom, bei denen alle Punkte in eine Kachel von w × h pt passen (Rand 34 pt) */
+function fitDayMap(pts, w, h) {
+  if (!pts.length) return null;
+  const lats = pts.map((p) => p.lat), lons = pts.map((p) => p.lon), a = Math.min(...lats), b = Math.max(...lats), c = Math.min(...lons), e = Math.max(...lons);
+  let z = 16;
+  for (; z > 2; z--) {
+    const p1 = mapProj(b, c, z + 1), p2 = mapProj(a, e, z + 1);
+    if (p2.x - p1.x <= 2 * (w - 68) && p2.y - p1.y <= 2 * (h - 68)) break;
+  }
+  const q1 = mapProj(b, c, z + 1), q2 = mapProj(a, e, z + 1), m = mapInv((q1.x + q2.x) / 2, (q1.y + q2.y) / 2, z + 1);
+  return { lat: m.lat, lon: m.lon, zoom: z };
+}
+/* Weg und nummerierte Marken über die gemalte Karte (Leinwand 2 Pixel je pt) */
+function drawDayOverlay(cv, pts, lat, lon, zoom, T) {
+  const W = cv.width, H = cv.height, Z = clamp(Math.round(zoom), 1, 18) + 1, c = mapProj(lat, lon, Z), g = cv.getContext("2d");
+  const to = (p) => { const q = mapProj(p.lat, p.lon, Z); return { x: q.x - c.x + W / 2, y: q.y - c.y + H / 2 }; };
+  g.lineJoin = "round"; g.lineCap = "round";
+  if (pts.length > 1) {
+    const path = () => { g.beginPath(); pts.forEach((p, k) => { const q = to(p); k ? g.lineTo(q.x, q.y) : g.moveTo(q.x, q.y); }); };
+    path(); g.strokeStyle = "rgba(255,255,255,.95)"; g.lineWidth = 13; g.stroke();
+    path(); g.strokeStyle = T.accent; g.lineWidth = 7; g.setLineDash([16, 12]); g.stroke(); g.setLineDash([]);
+  }
+  g.textBaseline = "middle"; g.textAlign = "center";
+  const placed = [];
+  pts.forEach((p, k) => {
+    const q = to(p);
+    g.beginPath(); g.arc(q.x, q.y, 17, 0, 7); g.fillStyle = "#fff"; g.fill();
+    g.beginPath(); g.arc(q.x, q.y, 13, 0, 7); g.fillStyle = T.accent2; g.fill();
+    g.fillStyle = T.ink; g.font = "700 15px Helvetica, Arial, sans-serif"; g.fillText(String(k + 1), q.x, q.y + 1, 22);
+    if (!p.name) return;
+    g.font = "700 19px Helvetica, Arial, sans-serif"; g.textAlign = "left";
+    const w = g.measureText(p.name).width, left = q.x + 24 + w > W - 8, x = left ? q.x - 24 - w : q.x + 24, r = { x0: x, x1: x + w, y0: q.y - 12, y1: q.y + 12 };
+    if (!placed.some((o) => r.x0 < o.x1 && r.x1 > o.x0 && r.y0 < o.y1 && r.y1 > o.y0)) {
+      placed.push(r); g.lineWidth = 6; g.strokeStyle = "rgba(255,255,255,.95)"; g.strokeText(p.name, x, q.y); g.fillStyle = T.ink; g.fillText(p.name, x, q.y);
+    }
+    g.textAlign = "center";
+  });
 }
 
 /* ===== 70-photos.js ===== */
@@ -3325,6 +3389,7 @@ function tileRow(d, pg, x, k, over) {
   if (x.mod === "notiz") extra = `<select data-k="${base}.font" title="Schrift">${Object.entries(FAMILIES).map(([id, f]) => `<option value="${id}" ${(x.font || "serif") === id ? "selected" : ""}>${esc(f.name)}</option>`).join("")}</select>
     <textarea data-k="${base}.text" rows="4" placeholder="Freier Text. Markdown: **fett**, *kursiv*, # Überschrift, - Liste">${esc(x.text || "")}</textarea>`;
   if (x.mod === "punktkarte") extra = `<div class="btnrow"><button data-act="pmOpen" ${ids}>${x.pt ? "Position ändern …" : "Position wählen …"}</button></div>${x.pt ? `<small>${esc(x.pt.name || "ohne Beschriftung")} · ${x.pt.lat.toFixed(4)}, ${x.pt.lon.toFixed(4)} · Zoom ${x.pt.zoom}</small>` : ""}`;
+  if (x.mod === "tageskarte") extra = `<div class="btnrow"><button data-act="pmOpen" ${ids}>${x.pt ? "Ausschnitt ändern …" : "Ausschnitt wählen …"}</button></div>${x.pt ? `<small>Zoom ${x.pt.zoom} · ${dayMapPoints(t, t.days.indexOf(d)).length} Orte</small>` : ""}`;
   if (x.mod === "wikipedia") extra = `<div class="btnrow"><button data-act="wpOpen" ${ids}>${x.wp ? "Wikipedia-Eintrag bearbeiten …" : "Wikipedia-Eintrag suchen …"}</button></div>${x.wp ? `<small>${esc(x.wp.title)}${x.wp.facts && x.wp.facts.some((f) => f.on) ? " · " + x.wp.facts.filter((f) => f.on).length + " Kennzahlen" : ""}</small>` : ""}`;
   if (x.mod === "wettersymbol") extra = `<select data-k="${base}.sym" title="Symbol"><option value="auto" ${!x.sym || x.sym === "auto" ? "selected" : ""}>Wetter des Tages (automatisch)</option>${SYMBOLS.map((q) => `<option value="${q.id}" ${x.sym === q.id ? "selected" : ""}>${esc(q.name)}</option>`).join("")}</select>`;
   return `<div class="tile ${over ? "over" : ""}"><div class="th"><b>${k + 1}</b>
@@ -3489,7 +3554,7 @@ document.addEventListener("change", (e) => {
   const el = e.target;
   if (el.matches("[data-addtile]")) {
     const d = dayOf(el.dataset.day), pg = d && d.pages.find((x) => x.id === el.dataset.addtile);
-    if (pg && el.value) { const nt = tileOf(el.value, S.trip.cols); pg.tiles.push(nt); S.open.add(d.id); changed(); renderPanel(); if (el.value === "wikipedia") openWikipedia(nt, d); if (el.value === "punktkarte") openPointMap(nt, d); }
+    if (pg && el.value) { const nt = tileOf(el.value, S.trip.cols); pg.tiles.push(nt); S.open.add(d.id); changed(); renderPanel(); if (el.value === "wikipedia") openWikipedia(nt, d); if (el.value === "punktkarte" || el.value === "tageskarte") openPointMap(nt, d); }
     return;
   }
   if (el.matches("[data-photos]")) addPhotosToDay(el.dataset.photos, [...el.files]);
@@ -3989,7 +4054,7 @@ function buildToolbar() {
     <button class="ico" data-tb="prev" title="In der Reihenfolge nach vorn" ${idx <= 0 ? "disabled" : ""}>◀</button><button class="ico" data-tb="next" title="In der Reihenfolge nach hinten" ${idx >= c.pg.tiles.length - 1 ? "disabled" : ""}>▶</button>
     <button class="ico" data-tb="del" title="Kachel entfernen">✕</button></div>
     ${fixed ? `<div class="tbrow"><small>feste Größe 1×1</small></div>` : `<div class="tbrow">${SIZES.map(sz).join("")}<button data-tb="size" data-w="${t.cols}" data-h="1" aria-pressed="${w === t.cols && h === 1}">Ganze Breite</button><small>${w}×${h}</small></div>`}
-    ${tile.mod === "punktkarte" ? `<div class="tbrow"><button data-tb="pm">${tile.pt ? "Position ändern …" : "Position wählen …"}</button></div>` : ""}
+    ${tile.mod === "punktkarte" || tile.mod === "tageskarte" ? `<div class="tbrow"><button data-tb="pm">${tile.pt ? (tile.mod === "tageskarte" ? "Ausschnitt ändern …" : "Position ändern …") : (tile.mod === "tageskarte" ? "Ausschnitt wählen …" : "Position wählen …")}</button></div>` : ""}
     ${tile.mod === "wikipedia" ? `<div class="tbrow"><button data-tb="wp">${tile.wp ? "Wikipedia bearbeiten …" : "Wikipedia suchen …"}</button></div>` : ""}
     ${tile.mod === "wettersymbol" ? `<div class="tbrow"><select data-tb="sym" title="Symbol"><option value="auto" ${!tile.sym || tile.sym === "auto" ? "selected" : ""}>Wetter des Tages (automatisch)</option>${SYMBOLS.map((q) => `<option value="${q.id}" ${tile.sym === q.id ? "selected" : ""}>${esc(q.name)}</option>`).join("")}</select></div>` : ""}
     ${tile.mod === "notiz" ? `<div class="tbrow"><select data-tb="font" title="Schrift">${Object.entries(FAMILIES).map(([id, f]) => `<option value="${id}" ${(tile.font || "serif") === id ? "selected" : ""}>${esc(f.name)}</option>`).join("")}</select>
@@ -4113,7 +4178,7 @@ function bindPreviewTiles() {
     const el = e.target, c = selCtx();
     if (el.dataset.tb === "add") { addFromMenu(el.value); return; }
     if (!c) return;
-    if (el.dataset.tb === "mod") { setTileMod(c.tile, el.value); if (el.value === "wikipedia" && !c.tile.wp) { tileChanged(); openWikipedia(c.tile, c.d); return; } if (el.value === "punktkarte" && !c.tile.pt) { tileChanged(); openPointMap(c.tile, c.d); return; } }
+    if (el.dataset.tb === "mod") { setTileMod(c.tile, el.value); if (el.value === "wikipedia" && !c.tile.wp) { tileChanged(); openWikipedia(c.tile, c.d); return; } if ((el.value === "punktkarte" || el.value === "tageskarte") && !c.tile.pt) { tileChanged(); openPointMap(c.tile, c.d); return; } }
     if (el.dataset.tb === "sym") c.tile.sym = el.value;
     if (el.dataset.tb === "photo") setTilePhoto(c.d, c.tile, el.value);
     if (el.dataset.tb === "font") c.tile.font = el.value;
@@ -4176,7 +4241,7 @@ function addFromMenu(mod) {
   S.sel = { dayId: d.id, pageId: pg.id, tileId: tile.id }; ia = null;
   tileChanged();
   if (mod === "wikipedia") openWikipedia(tile, d);
-  if (mod === "punktkarte") openPointMap(tile, d);
+  if (mod === "punktkarte" || mod === "tageskarte") openPointMap(tile, d);
 }
 
 /* ---------- Doppelklick auf eine Kachel: dorthin springen, wo man sie bearbeitet ---------- */
@@ -4184,7 +4249,7 @@ const TILE_FIELD = { text: "text", plan: "plan", highlights: "highlights", wette
 function editTile(d, tile) {
   if (tile.mod === "foto") { const p = d.photos.find((x) => x.id === tile.photo); if (p) openEditor(p); else { const sel = $('#tb [data-tb="photo"]'); if (sel) sel.focus(); } return; }
   if (tile.mod === "wikipedia") { openWikipedia(tile, d); return; }
-  if (tile.mod === "punktkarte") { openPointMap(tile, d); return; }
+  if (tile.mod === "punktkarte" || tile.mod === "tageskarte") { openPointMap(tile, d); return; }
   if (tile.mod === "notiz") { const ta = $('#tb [data-tb="text"]'); if (ta) ta.focus(); return; }
   if (tile.mod === "karte") { S.tab = "map"; renderPanel(); return; }
   if (tile.mod === "kennzahlen") { S.tab = "sum"; renderPanel(); return; }
@@ -4451,7 +4516,7 @@ function bindWikipedia() {
    Die Karte lässt sich mit Maus oder Finger verschieben und mit +/− (oder Mausrad) zoomen; die Nadel in der Mitte zeigt die Position.
    Die Position kommt aus der Suche (Nominatim), vom Ort des Tages, von einem Foto mit GPS oder vom Gerät. „Übernehmen“ erzeugt das Kartenbild in der
    Größe der Kachel (tile.ptImg, im Projekt-PDF als Anhang) und speichert Position, Zoom, Beschriftung (tile.pt). Abbrechen ändert nichts. */
-const pmd = { d: null, tile: null, lat: 48.1374, lon: 11.5755, z: 15, w: 2, h: 2, pos: [], hits: [], busy: 0, job: 0, credit: "" };
+const pmd = { day: false, d: null, tile: null, lat: 48.1374, lon: 11.5755, z: 15, w: 2, h: 2, pos: [], hits: [], busy: 0, job: 0, credit: "" };
 const pmq = (id) => document.getElementById(id);
 
 /* Maße einer Kachel in pt (wie im Seitenraster) */
@@ -4461,18 +4526,28 @@ function tileRectPt(w, h) {
 }
 
 function openPointMap(tile, d) {
-  const pt = tile.pt;
-  Object.assign(pmd, { d, tile, w: tile.w, h: tile.h, hits: [], busy: 0, pos: wpPositions(d) });
+  const pt = tile.pt, day = tile.mod === "tageskarte";
+  Object.assign(pmd, { day, d, tile, w: tile.w, h: tile.h, hits: [], busy: 0, pos: wpPositions(d) });
+  pmq("pmHead").textContent = day ? "Karte (Tag)" : "Karte (Punkt)"; pmq("pmMap").classList.toggle("day", day);
+  pmq("pmHelp").textContent = day ? "Der Ausschnitt zeigt Start, Fotos mit GPS und den Ort des Tages als Weg. Mit Maus oder Finger verschieben, mit dem Mausrad oder +/− zoomen; „Auf den Tag einpassen“ stellt alle Orte ein." : "Die Karte mit Maus oder Finger verschieben, mit dem Mausrad oder +/− zoomen. Die Nadel in der Mitte zeigt die Position.";
+  pmq("pmNameRow").hidden = day; pmq("pmFit").hidden = !day;
   if (pt) Object.assign(pmd, { lat: pt.lat, lon: pt.lon, z: pt.zoom });
+  else if (day && pmFit(true)) { /* Tagesroute eingepasst */ }
   else {
     const p = pmd.pos.find((x) => x.lat != null);
     Object.assign(pmd, p ? { lat: p.lat, lon: p.lon } : { lat: 51.16, lon: 10.45 }, { z: p ? 15 : 6 }); // ohne Position: Deutschland
   }
-  pmq("pmName").value = pt ? pt.name : (pmd.pos.find((x) => x.lat != null) || {}).n || "";
+  pmq("pmName").value = day ? "" : pt ? pt.name : (pmd.pos.find((x) => x.lat != null) || {}).n || "";
   pmq("pmQ").value = ""; pmq("pmHits").innerHTML = ""; pmq("pmStatus").textContent = "";
   pmq("pmPos").innerHTML = pmd.pos.map((p, i) => `<option value="${i}">${esc(p.l)}</option>`).join("");
   pmq("pm").hidden = false;
   pmRenderSizes(); pmRender();
+}
+/* Alle Orte des Tages in die Kachel einpassen; liefert false, wenn der Tag keine Orte mit Koordinaten hat */
+function pmFit(quiet) {
+  const pts = dayMapPoints(S.trip, S.trip.days.indexOf(pmd.d)), r = tileRectPt(pmd.w, pmd.h), f = fitDayMap(pts, r.w, r.h);
+  if (!f) { if (!quiet) pmq("pmStatus").textContent = "Dieser Tag hat keine Orte mit Koordinaten (Ort über die Suche wählen oder Fotos mit GPS)."; return false; }
+  Object.assign(pmd, { lat: f.lat, lon: f.lon, z: f.zoom }); if (!quiet) pmRender(); return true;
 }
 function closePointMap() { pmq("pm").hidden = true; pmd.d = pmd.tile = null; }
 
@@ -4483,6 +4558,7 @@ async function pmRender() {
   pmq("pmStatus").textContent = "Karte wird geladen …";
   const res = await paintPointMap(cv, pmd.lat, pmd.lon, pmd.z, T);
   if (job !== pmd.job) return;
+  if (pmd.day) drawDayOverlay(cv, dayMapPoints(S.trip, S.trip.days.indexOf(pmd.d)), pmd.lat, pmd.lon, pmd.z, T);
   const view = pmq("pmCv"); view.width = cv.width; view.height = cv.height; view.getContext("2d").drawImage(cv, 0, 0); view.style.transform = "";
   pmd.credit = res.credit;
   pmq("pmStatus").textContent = res.mode === "osm" ? res.credit : "Kartenkacheln sind nicht erreichbar (offline oder gesperrt): Es entsteht eine Schemakarte ohne Hintergrund. Die Position wird trotzdem gespeichert.";
@@ -4514,6 +4590,7 @@ async function pmApply() {
   cv.width = Math.round(r.w * 2); cv.height = Math.round(r.h * 2); btn.disabled = true;
   try {
     const res = await paintPointMap(cv, pmd.lat, pmd.lon, pmd.z, T);
+    if (pmd.day) drawDayOverlay(cv, dayMapPoints(S.trip, S.trip.days.indexOf(d)), pmd.lat, pmd.lon, pmd.z, T);
     tile.pt = { lat: pmd.lat, lon: pmd.lon, zoom: pmd.z, name: pmq("pmName").value.trim().slice(0, 120), credit: res.credit };
     tile.ptImg = cv.toDataURL("image/jpeg", 0.85); tile.ptW = cv.width; tile.ptH = cv.height;
     tile.w = Math.min(pmd.w, S.trip.cols); tile.h = pmd.h;
@@ -4540,6 +4617,7 @@ function bindPointMap() {
     if (at.lat == null) return;
     Object.assign(pmd, { lat: at.lat, lon: at.lon }); if (at.n) pmq("pmName").value = at.n; pmRender();
   });
+  pmq("pmFit").addEventListener("click", () => pmFit(false));
   pmq("pmZm").addEventListener("click", () => pmSetZoom(pmd.z - 1));
   pmq("pmZp").addEventListener("click", () => pmSetZoom(pmd.z + 1));
   let wheelT; map.addEventListener("wheel", (e) => { e.preventDefault(); clearTimeout(wheelT); const dz = e.deltaY < 0 ? 1 : -1; wheelT = setTimeout(() => pmSetZoom(pmd.z + dz), 120); }, { passive: false });

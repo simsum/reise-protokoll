@@ -2,7 +2,7 @@
    Die Karte lässt sich mit Maus oder Finger verschieben und mit +/− (oder Mausrad) zoomen; die Nadel in der Mitte zeigt die Position.
    Die Position kommt aus der Suche (Nominatim), vom Ort des Tages, von einem Foto mit GPS oder vom Gerät. „Übernehmen“ erzeugt das Kartenbild in der
    Größe der Kachel (tile.ptImg, im Projekt-PDF als Anhang) und speichert Position, Zoom, Beschriftung (tile.pt). Abbrechen ändert nichts. */
-const pmd = { d: null, tile: null, lat: 48.1374, lon: 11.5755, z: 15, w: 2, h: 2, pos: [], hits: [], busy: 0, job: 0, credit: "" };
+const pmd = { day: false, d: null, tile: null, lat: 48.1374, lon: 11.5755, z: 15, w: 2, h: 2, pos: [], hits: [], busy: 0, job: 0, credit: "" };
 const pmq = (id) => document.getElementById(id);
 
 /* Maße einer Kachel in pt (wie im Seitenraster) */
@@ -12,18 +12,28 @@ function tileRectPt(w, h) {
 }
 
 function openPointMap(tile, d) {
-  const pt = tile.pt;
-  Object.assign(pmd, { d, tile, w: tile.w, h: tile.h, hits: [], busy: 0, pos: wpPositions(d) });
+  const pt = tile.pt, day = tile.mod === "tageskarte";
+  Object.assign(pmd, { day, d, tile, w: tile.w, h: tile.h, hits: [], busy: 0, pos: wpPositions(d) });
+  pmq("pmHead").textContent = day ? "Karte (Tag)" : "Karte (Punkt)"; pmq("pmMap").classList.toggle("day", day);
+  pmq("pmHelp").textContent = day ? "Der Ausschnitt zeigt Start, Fotos mit GPS und den Ort des Tages als Weg. Mit Maus oder Finger verschieben, mit dem Mausrad oder +/− zoomen; „Auf den Tag einpassen“ stellt alle Orte ein." : "Die Karte mit Maus oder Finger verschieben, mit dem Mausrad oder +/− zoomen. Die Nadel in der Mitte zeigt die Position.";
+  pmq("pmNameRow").hidden = day; pmq("pmFit").hidden = !day;
   if (pt) Object.assign(pmd, { lat: pt.lat, lon: pt.lon, z: pt.zoom });
+  else if (day && pmFit(true)) { /* Tagesroute eingepasst */ }
   else {
     const p = pmd.pos.find((x) => x.lat != null);
     Object.assign(pmd, p ? { lat: p.lat, lon: p.lon } : { lat: 51.16, lon: 10.45 }, { z: p ? 15 : 6 }); // ohne Position: Deutschland
   }
-  pmq("pmName").value = pt ? pt.name : (pmd.pos.find((x) => x.lat != null) || {}).n || "";
+  pmq("pmName").value = day ? "" : pt ? pt.name : (pmd.pos.find((x) => x.lat != null) || {}).n || "";
   pmq("pmQ").value = ""; pmq("pmHits").innerHTML = ""; pmq("pmStatus").textContent = "";
   pmq("pmPos").innerHTML = pmd.pos.map((p, i) => `<option value="${i}">${esc(p.l)}</option>`).join("");
   pmq("pm").hidden = false;
   pmRenderSizes(); pmRender();
+}
+/* Alle Orte des Tages in die Kachel einpassen; liefert false, wenn der Tag keine Orte mit Koordinaten hat */
+function pmFit(quiet) {
+  const pts = dayMapPoints(S.trip, S.trip.days.indexOf(pmd.d)), r = tileRectPt(pmd.w, pmd.h), f = fitDayMap(pts, r.w, r.h);
+  if (!f) { if (!quiet) pmq("pmStatus").textContent = "Dieser Tag hat keine Orte mit Koordinaten (Ort über die Suche wählen oder Fotos mit GPS)."; return false; }
+  Object.assign(pmd, { lat: f.lat, lon: f.lon, z: f.zoom }); if (!quiet) pmRender(); return true;
 }
 function closePointMap() { pmq("pm").hidden = true; pmd.d = pmd.tile = null; }
 
@@ -34,6 +44,7 @@ async function pmRender() {
   pmq("pmStatus").textContent = "Karte wird geladen …";
   const res = await paintPointMap(cv, pmd.lat, pmd.lon, pmd.z, T);
   if (job !== pmd.job) return;
+  if (pmd.day) drawDayOverlay(cv, dayMapPoints(S.trip, S.trip.days.indexOf(pmd.d)), pmd.lat, pmd.lon, pmd.z, T);
   const view = pmq("pmCv"); view.width = cv.width; view.height = cv.height; view.getContext("2d").drawImage(cv, 0, 0); view.style.transform = "";
   pmd.credit = res.credit;
   pmq("pmStatus").textContent = res.mode === "osm" ? res.credit : "Kartenkacheln sind nicht erreichbar (offline oder gesperrt): Es entsteht eine Schemakarte ohne Hintergrund. Die Position wird trotzdem gespeichert.";
@@ -65,6 +76,7 @@ async function pmApply() {
   cv.width = Math.round(r.w * 2); cv.height = Math.round(r.h * 2); btn.disabled = true;
   try {
     const res = await paintPointMap(cv, pmd.lat, pmd.lon, pmd.z, T);
+    if (pmd.day) drawDayOverlay(cv, dayMapPoints(S.trip, S.trip.days.indexOf(d)), pmd.lat, pmd.lon, pmd.z, T);
     tile.pt = { lat: pmd.lat, lon: pmd.lon, zoom: pmd.z, name: pmq("pmName").value.trim().slice(0, 120), credit: res.credit };
     tile.ptImg = cv.toDataURL("image/jpeg", 0.85); tile.ptW = cv.width; tile.ptH = cv.height;
     tile.w = Math.min(pmd.w, S.trip.cols); tile.h = pmd.h;
@@ -91,6 +103,7 @@ function bindPointMap() {
     if (at.lat == null) return;
     Object.assign(pmd, { lat: at.lat, lon: at.lon }); if (at.n) pmq("pmName").value = at.n; pmRender();
   });
+  pmq("pmFit").addEventListener("click", () => pmFit(false));
   pmq("pmZm").addEventListener("click", () => pmSetZoom(pmd.z - 1));
   pmq("pmZp").addEventListener("click", () => pmSetZoom(pmd.z + 1));
   let wheelT; map.addEventListener("wheel", (e) => { e.preventDefault(); clearTimeout(wheelT); const dz = e.deltaY < 0 ? 1 : -1; wheelT = setTimeout(() => pmSetZoom(pmd.z + dz), 120); }, { passive: false });

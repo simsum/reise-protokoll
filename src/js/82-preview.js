@@ -54,7 +54,7 @@ function buildToolbar() {
     <button class="ico" data-tb="prev" title="In der Reihenfolge nach vorn" ${idx <= 0 ? "disabled" : ""}>◀</button><button class="ico" data-tb="next" title="In der Reihenfolge nach hinten" ${idx >= c.pg.tiles.length - 1 ? "disabled" : ""}>▶</button>
     <button class="ico" data-tb="del" title="Kachel entfernen">✕</button></div>
     ${fixed ? `<div class="tbrow"><small>feste Größe 1×1</small></div>` : `<div class="tbrow">${SIZES.map(sz).join("")}<button data-tb="size" data-w="${t.cols}" data-h="1" aria-pressed="${w === t.cols && h === 1}">Ganze Breite</button><small>${w}×${h}</small></div>`}
-    ${tile.mod === "punktkarte" ? `<div class="tbrow"><button data-tb="pm">${tile.pt ? "Position ändern …" : "Position wählen …"}</button></div>` : ""}
+    ${tile.mod === "punktkarte" || tile.mod === "tageskarte" ? `<div class="tbrow"><button data-tb="pm">${tile.pt ? (tile.mod === "tageskarte" ? "Ausschnitt ändern …" : "Position ändern …") : (tile.mod === "tageskarte" ? "Ausschnitt wählen …" : "Position wählen …")}</button></div>` : ""}
     ${tile.mod === "wikipedia" ? `<div class="tbrow"><button data-tb="wp">${tile.wp ? "Wikipedia bearbeiten …" : "Wikipedia suchen …"}</button></div>` : ""}
     ${tile.mod === "wettersymbol" ? `<div class="tbrow"><select data-tb="sym" title="Symbol"><option value="auto" ${!tile.sym || tile.sym === "auto" ? "selected" : ""}>Wetter des Tages (automatisch)</option>${SYMBOLS.map((q) => `<option value="${q.id}" ${tile.sym === q.id ? "selected" : ""}>${esc(q.name)}</option>`).join("")}</select></div>` : ""}
     ${tile.mod === "notiz" ? `<div class="tbrow"><select data-tb="font" title="Schrift">${Object.entries(FAMILIES).map(([id, f]) => `<option value="${id}" ${(tile.font || "serif") === id ? "selected" : ""}>${esc(f.name)}</option>`).join("")}</select>
@@ -178,7 +178,7 @@ function bindPreviewTiles() {
     const el = e.target, c = selCtx();
     if (el.dataset.tb === "add") { addFromMenu(el.value); return; }
     if (!c) return;
-    if (el.dataset.tb === "mod") { setTileMod(c.tile, el.value); if (el.value === "wikipedia" && !c.tile.wp) { tileChanged(); openWikipedia(c.tile, c.d); return; } if (el.value === "punktkarte" && !c.tile.pt) { tileChanged(); openPointMap(c.tile, c.d); return; } }
+    if (el.dataset.tb === "mod") { setTileMod(c.tile, el.value); if (el.value === "wikipedia" && !c.tile.wp) { tileChanged(); openWikipedia(c.tile, c.d); return; } if ((el.value === "punktkarte" || el.value === "tageskarte") && !c.tile.pt) { tileChanged(); openPointMap(c.tile, c.d); return; } }
     if (el.dataset.tb === "sym") c.tile.sym = el.value;
     if (el.dataset.tb === "photo") setTilePhoto(c.d, c.tile, el.value);
     if (el.dataset.tb === "font") c.tile.font = el.value;
@@ -241,7 +241,7 @@ function addFromMenu(mod) {
   S.sel = { dayId: d.id, pageId: pg.id, tileId: tile.id }; ia = null;
   tileChanged();
   if (mod === "wikipedia") openWikipedia(tile, d);
-  if (mod === "punktkarte") openPointMap(tile, d);
+  if (mod === "punktkarte" || mod === "tageskarte") openPointMap(tile, d);
 }
 
 /* ---------- Doppelklick auf eine Kachel: dorthin springen, wo man sie bearbeitet ---------- */
@@ -249,7 +249,7 @@ const TILE_FIELD = { text: "text", plan: "plan", highlights: "highlights", wette
 function editTile(d, tile) {
   if (tile.mod === "foto") { const p = d.photos.find((x) => x.id === tile.photo); if (p) openEditor(p); else { const sel = $('#tb [data-tb="photo"]'); if (sel) sel.focus(); } return; }
   if (tile.mod === "wikipedia") { openWikipedia(tile, d); return; }
-  if (tile.mod === "punktkarte") { openPointMap(tile, d); return; }
+  if (tile.mod === "punktkarte" || tile.mod === "tageskarte") { openPointMap(tile, d); return; }
   if (tile.mod === "notiz") { const ta = $('#tb [data-tb="text"]'); if (ta) ta.focus(); return; }
   if (tile.mod === "karte") { S.tab = "map"; renderPanel(); return; }
   if (tile.mod === "kennzahlen") { S.tab = "sum"; renderPanel(); return; }

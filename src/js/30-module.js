@@ -160,6 +160,36 @@ function drawPin(pg, x, y, s, T) {
   P("M50 26a12 12 0 1 0 0.01 0z", { fill: "#FFFFFF" });
 }
 
+/* Gemeinsam für Karte (Punkt) und Karte (Tag): Kartenbild aus tile.ptImg im Rahmen; pin = Nadel in der Mitte (Punkt) */
+function drawPtMap(pg, c, tile, r, pin) {
+  const pt = tile.pt, { t, i, T, warns } = c;
+  if (!pt) return;
+  if (!tile.ptImg) {
+    pg.rect(r.x, r.y, r.w, r.h, { fill: T.soft, r: 8 });
+    pg.icon("pin", r.x + r.w / 2 - 12, r.y + r.h / 2 - 20, 24, T.muted, 1.4);
+    pg.text(r.x + r.w / 2, r.y + r.h / 2 + 10, fitT("Kartenbild fehlt, Position neu übernehmen", "R", 8, r.w - 12), { s: 8, c: T.muted, a: "c" });
+    warns.push(`Tag ${i + 1}: Einer Karte fehlt das Kartenbild (Position im Fenster neu übernehmen).`);
+    return;
+  }
+  const f = frameFor(pg, t, T, r.x, r.y, r.w, r.h);
+  pg.img(f.x, f.y, f.w, f.h, tile.ptImg, tile.ptW, tile.ptH, undefined, f.rad);
+  plainEdge(pg, f, T);
+  if (tile.ptW && tile.ptW < f.w * 1.6) warns.push(`Tag ${i + 1}: Eine Karte ist für eine kleinere Kachel erzeugt und wirkt unscharf (Position im Fenster neu übernehmen).`);
+  if (pin) drawPin(pg, f.x + f.w / 2, f.y + f.h / 2, clamp(Math.min(f.w, f.h) * 0.2, 18, 34), T);
+  const cs = 5.6, cr = pt.credit ? Math.min(f.w * 0.6, tw(pt.credit, "R", cs) + 8) : 0;
+  if (cr) {
+    pg.rect(f.x + f.w - cr - 3, f.y + f.h - 12, cr, 9.5, { fill: "#FFFFFF", fo: 0.85, r: 3 });
+    pg.text(f.x + f.w - cr + 1, f.y + f.h - 10.6, fitT(pt.credit, "R", cs, cr - 8), { s: cs, c: "#333333" });
+  }
+  const nm = (pt.name || "").trim(), room = f.w - cr - 22;
+  if (nm && room >= 30) {
+    const lw = Math.min(room, tw(nm, "SB", 8.5) + 14);
+    pg.rect(f.x + 5, f.y + f.h - 20, lw, 15, { fill: "#FFFFFF", fo: 0.92, r: 7.5 });
+    pg.text(f.x + 12, f.y + f.h - 16.2, fitT(nm, "SB", 8.5, lw - 14), { f: "SB", s: 8.5, c: T.ink });
+  }
+
+}
+
 /* ---------- Die Module ---------- */
 const MODULES = {
   leer: { name: "Leer (Platzhalter)", size: () => [1, 1], draw() {} },
@@ -365,33 +395,13 @@ const MODULES = {
   /* Karte um eine selbst gewählte Position (Fenster in 87-mapdialog.js): Bild aus OSM-Kacheln in tile.ptImg, Nadel, Beschriftung und Quelle als Vektoren */
   punktkarte: {
     name: "Karte (Punkt)", size: () => [2, 2],
-    draw(pg, c, tile, r) {
-      const pt = tile.pt, { t, i, T, warns } = c;
-      if (!pt) return;
-      if (!tile.ptImg) {
-        pg.rect(r.x, r.y, r.w, r.h, { fill: T.soft, r: 8 });
-        pg.icon("pin", r.x + r.w / 2 - 12, r.y + r.h / 2 - 20, 24, T.muted, 1.4);
-        pg.text(r.x + r.w / 2, r.y + r.h / 2 + 10, fitT("Kartenbild fehlt, Position neu übernehmen", "R", 8, r.w - 12), { s: 8, c: T.muted, a: "c" });
-        warns.push(`Tag ${i + 1}: Einer Punktkarte fehlt das Kartenbild (Position im Fenster neu übernehmen).`);
-        return;
-      }
-      const f = frameFor(pg, t, T, r.x, r.y, r.w, r.h);
-      pg.img(f.x, f.y, f.w, f.h, tile.ptImg, tile.ptW, tile.ptH, undefined, f.rad);
-      plainEdge(pg, f, T);
-      if (tile.ptW && tile.ptW < f.w * 1.6) warns.push(`Tag ${i + 1}: Eine Punktkarte ist für eine kleinere Kachel erzeugt und wirkt unscharf (Position im Fenster neu übernehmen).`);
-      drawPin(pg, f.x + f.w / 2, f.y + f.h / 2, clamp(Math.min(f.w, f.h) * 0.2, 18, 34), T);
-      const cs = 5.6, cr = pt.credit ? Math.min(f.w * 0.6, tw(pt.credit, "R", cs) + 8) : 0;
-      if (cr) {
-        pg.rect(f.x + f.w - cr - 3, f.y + f.h - 12, cr, 9.5, { fill: "#FFFFFF", fo: 0.85, r: 3 });
-        pg.text(f.x + f.w - cr + 1, f.y + f.h - 10.6, fitT(pt.credit, "R", cs, cr - 8), { s: cs, c: "#333333" });
-      }
-      const nm = (pt.name || "").trim(), room = f.w - cr - 22;
-      if (nm && room >= 30) {
-        const lw = Math.min(room, tw(nm, "SB", 8.5) + 14);
-        pg.rect(f.x + 5, f.y + f.h - 20, lw, 15, { fill: "#FFFFFF", fo: 0.92, r: 7.5 });
-        pg.text(f.x + 12, f.y + f.h - 16.2, fitT(nm, "SB", 8.5, lw - 14), { f: "SB", s: 8.5, c: T.ink });
-      }
-    },
+    draw(pg, c, tile, r) { drawPtMap(pg, c, tile, r, true); },
+  },
+
+  /* Karte des Tages: Orte des Tages (Start, Fotos mit GPS, Ort) als Weg mit Nummern, ins Bild eingerechnet; Fenster wie bei „Karte (Punkt)“ */
+  tageskarte: {
+    name: "Karte (Tag)", size: () => [2, 2],
+    draw(pg, c, tile, r) { drawPtMap(pg, c, tile, r, false); },
   },
 
   kennzahlen: {

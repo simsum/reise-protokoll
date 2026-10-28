@@ -32,7 +32,7 @@ const IMG = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////
 const probe = (style, mod) => page.evaluate(({ style, mod, IMG }) => {
   const t = S.trip, T = THEMES[t.theme], pg = new Pg(T), r = { x: 100, y: 100, w: 253, h: mod === "wettersymbol" ? 103 : 216 };
   t.photoStyle = style; t.mapImg = IMG; t.mapW = 2; t.mapH = 2;
-  const tile = mod === "punktkarte" ? { pt: { lat: 1, lon: 2, zoom: 5, name: "Ort", credit: "© Test" }, ptImg: IMG, ptW: 2000, ptH: 1000 } : { sym: "sun" };
+  const tile = mod === "punktkarte" || mod === "tageskarte" ? { pt: { lat: 1, lon: 2, zoom: 5, name: "Ort", credit: "© Test" }, ptImg: IMG, ptW: 2000, ptH: 1000 } : { sym: "sun" };
   MODULES[mod].draw(pg, { t, d: { weather: "sun" }, i: 0, T, warns: [], st: {} }, tile, r);
   const sh = pg.ops.filter((o) => o.k === "rect" && o.fill === "#000000" && o.fo != null && o.fo < 0.1).length;
   const white = pg.ops.filter((o) => o.k === "rect" && o.fill === "#FFFFFF" && o.fo == null && o.stroke).length;
@@ -42,7 +42,7 @@ const probe = (style, mod) => page.evaluate(({ style, mod, IMG }) => {
   return { sh, white, border, rad: inner ? inner.r : null, inset: inner ? Math.round(inner.x - r.x) : null, innerW: inner ? Math.round(inner.w) : null };
 }, { style, mod, IMG });
 
-const names = { wettersymbol: "Wettersymbol", karte: "Karte (Strecke)", punktkarte: "Karte (Punkt)" };
+const names = { wettersymbol: "Wettersymbol", karte: "Karte (Strecke)", punktkarte: "Karte (Punkt)", tageskarte: "Karte (Tag)" };
 for (const mod of Object.keys(names)) {
   console.log(names[mod]);
   const sh = await probe("shadow", mod), fr = await probe("frame", mod), pl = await probe("plain", mod);

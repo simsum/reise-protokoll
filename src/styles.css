@@ -220,3 +220,5 @@ body.brush .sheet { outline: 2px dashed color-mix(in srgb, var(--ui) 55%, transp
 #pm .btnrow b { min-width: 2ch; text-align: center; }
 #pm .btnrow button { padding: 3px 10px; }
 #pm #pmSizes button[aria-pressed="true"] { background: var(--ui); border-color: var(--ui); color: #fff; }
+
+.pmmap.day .pmpin { display: none; }

@@ -148,6 +148,7 @@ function tileRow(d, pg, x, k, over) {
   if (x.mod === "notiz") extra = `<select data-k="${base}.font" title="Schrift">${Object.entries(FAMILIES).map(([id, f]) => `<option value="${id}" ${(x.font || "serif") === id ? "selected" : ""}>${esc(f.name)}</option>`).join("")}</select>
     <textarea data-k="${base}.text" rows="4" placeholder="Freier Text. Markdown: **fett**, *kursiv*, # Überschrift, - Liste">${esc(x.text || "")}</textarea>`;
   if (x.mod === "punktkarte") extra = `<div class="btnrow"><button data-act="pmOpen" ${ids}>${x.pt ? "Position ändern …" : "Position wählen …"}</button></div>${x.pt ? `<small>${esc(x.pt.name || "ohne Beschriftung")} · ${x.pt.lat.toFixed(4)}, ${x.pt.lon.toFixed(4)} · Zoom ${x.pt.zoom}</small>` : ""}`;
+  if (x.mod === "tageskarte") extra = `<div class="btnrow"><button data-act="pmOpen" ${ids}>${x.pt ? "Ausschnitt ändern …" : "Ausschnitt wählen …"}</button></div>${x.pt ? `<small>Zoom ${x.pt.zoom} · ${dayMapPoints(t, t.days.indexOf(d)).length} Orte</small>` : ""}`;
   if (x.mod === "wikipedia") extra = `<div class="btnrow"><button data-act="wpOpen" ${ids}>${x.wp ? "Wikipedia-Eintrag bearbeiten …" : "Wikipedia-Eintrag suchen …"}</button></div>${x.wp ? `<small>${esc(x.wp.title)}${x.wp.facts && x.wp.facts.some((f) => f.on) ? " · " + x.wp.facts.filter((f) => f.on).length + " Kennzahlen" : ""}</small>` : ""}`;
   if (x.mod === "wettersymbol") extra = `<select data-k="${base}.sym" title="Symbol"><option value="auto" ${!x.sym || x.sym === "auto" ? "selected" : ""}>Wetter des Tages (automatisch)</option>${SYMBOLS.map((q) => `<option value="${q.id}" ${x.sym === q.id ? "selected" : ""}>${esc(q.name)}</option>`).join("")}</select>`;
   return `<div class="tile ${over ? "over" : ""}"><div class="th"><b>${k + 1}</b>
@@ -312,7 +313,7 @@ document.addEventListener("change", (e) => {
   const el = e.target;
   if (el.matches("[data-addtile]")) {
     const d = dayOf(el.dataset.day), pg = d && d.pages.find((x) => x.id === el.dataset.addtile);
-    if (pg && el.value) { const nt = tileOf(el.value, S.trip.cols); pg.tiles.push(nt); S.open.add(d.id); changed(); renderPanel(); if (el.value === "wikipedia") openWikipedia(nt, d); if (el.value === "punktkarte") openPointMap(nt, d); }
+    if (pg && el.value) { const nt = tileOf(el.value, S.trip.cols); pg.tiles.push(nt); S.open.add(d.id); changed(); renderPanel(); if (el.value === "wikipedia") openWikipedia(nt, d); if (el.value === "punktkarte" || el.value === "tageskarte") openPointMap(nt, d); }
     return;
   }
   if (el.matches("[data-photos]")) addPhotosToDay(el.dataset.photos, [...el.files]);
