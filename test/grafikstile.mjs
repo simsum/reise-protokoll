@@ -42,7 +42,7 @@ const probe = (style, mod) => page.evaluate(({ style, mod, IMG }) => {
   return { sh, white, border, rad: inner ? inner.r : null, inset: inner ? Math.round(inner.x - r.x) : null, innerW: inner ? Math.round(inner.w) : null };
 }, { style, mod, IMG });
 
-const names = { wettersymbol: "Wettersymbol", karte: "Karte (Strecke)", punktkarte: "Karte (Punkt)", tageskarte: "Karte (Tag)" };
+const names = { karte: "Karte (Strecke)", punktkarte: "Karte (Punkt)", tageskarte: "Karte (Tag)" };
 for (const mod of Object.keys(names)) {
   console.log(names[mod]);
   const sh = await probe("shadow", mod), fr = await probe("frame", mod), pl = await probe("plain", mod);
@@ -65,7 +65,7 @@ for (const st of ["shadow", "frame", "plain"]) {
   await sheet.scrollIntoViewIfNeeded();
   await sheet.screenshot({ path: join(out, `grafikstile-${st}.png`), clip: undefined });
 }
-ok(counts.shadow.shadow === 21 && counts.frame.shadow === 21 && counts.frame.white === 3 && counts.plain.shadow === 0, `Umschalten „Aussehen der Fotos“ wirkt auf alle drei Wettersymbole (Schatten ${counts.shadow.shadow}, Rahmen ${counts.frame.white}, schlicht ${counts.plain.shadow})`);
+ok(Object.values(counts).every(c => c.shadow === 0 && c.white === 0), "Wettersymbole bleiben in allen Fotostilen ohne Schatten und Rahmen");
 await page.selectOption('[data-k="photoStyle"]', "shadow");
 {
   const [dl] = await Promise.all([page.waitForEvent("download"), page.click("#pdfBtn")]);

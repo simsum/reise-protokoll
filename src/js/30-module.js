@@ -204,11 +204,8 @@ const MODULES = {
     draw(pg, c, tile, r) {
       const id = tile.sym && tile.sym !== "auto" ? tile.sym : c.d.weather;
       if (!id) return;
-      const T = c.T, f = frameFor(pg, c.t, T, r.x, r.y, r.w, r.h), s = Math.min(f.w, f.h), sz = s * 0.8;
-      pg.rect(f.x, f.y, f.w, f.h, { fill: T.soft, r: f.rad });
-      plainEdge(pg, f, T);
-      pg.rect(f.x + (f.w - s * 0.9) / 2, f.y + (f.h - s * 0.9) / 2, s * 0.9, s * 0.9, { fill: "#FFFFFF", fo: 0.6, r: s * 0.45 });
-      drawSymbol(pg, id, f.x + (f.w - sz) / 2, f.y + (f.h - sz) / 2, sz, T);
+      const sz = Math.min(r.w, r.h) * 0.84;
+      drawSymbol(pg, id, r.x + (r.w - sz) / 2, r.y + (r.h - sz) / 2, sz, c.T);
     },
   },
 

@@ -41,9 +41,9 @@ const draw = await page.evaluate(() => {
   return res;
 });
 const keys = Object.keys(draw);
-ok(keys.length === 50 && keys.every((k) => draw[k].n >= 3 && draw[k].inside), `alle ${keys.length} Kombinationen (10 Symbole × 5 Farbschemata): mehrteilige Vektorbilder innerhalb der Kachel`);
+ok(keys.length === 50 && keys.every((k) => draw[k].n >= 1 && draw[k].inside), `alle ${keys.length} Kombinationen (10 Symbole × 5 Farbschemata): Vektorbilder innerhalb der Kachel`);
 ok(await page.evaluate(() => SYMBOLS.length) === 10, "10 Symbole: Sonne, Heiter, Bewölkt, Regen, Gewitter, Schnee, Nebel, Mond und Sterne, Regenbogen, Wind");
-ok(await page.evaluate(() => { const T = THEMES.meer, a = new Pg(T), b = new Pg(THEMES.herbst); const r = { x: 0, y: 0, w: 121, h: 103 }; MODULES.wettersymbol.draw(a, { t: S.trip, d: {}, T: THEMES.meer }, { sym: "rain" }, r); MODULES.wettersymbol.draw(b, { t: S.trip, d: {}, T: THEMES.herbst }, { sym: "rain" }, r); return JSON.stringify(a.ops) !== JSON.stringify(b.ops); }), "Farben folgen dem Farbschema");
+ok(await page.evaluate(() => { const a = new Pg(THEMES.meer), b = new Pg(THEMES.mono); const r = { x: 0, y: 0, w: 121, h: 103 }; MODULES.wettersymbol.draw(a, { t: S.trip, d: {}, T: THEMES.meer }, { sym: "rainbow" }, r); MODULES.wettersymbol.draw(b, { t: S.trip, d: {}, T: THEMES.mono }, { sym: "rainbow" }, r); const paths = a.ops.filter(o => o.k === "path"); return JSON.stringify(a.ops) === JSON.stringify(b.ops) && new Set(paths.map(o => o.stroke).filter(Boolean)).size >= 4; }), "Regenbogen bleibt auch im Mono-Schema mehrfarbig");
 ok(await page.evaluate(() => { const T = THEMES.meer, pg = new Pg(T); MODULES.wettersymbol.draw(pg, { t: S.trip, d: { weather: "" }, T }, {}, { x: 0, y: 0, w: 121, h: 103 }); const n1 = pg.ops.length; const p2 = new Pg(T); MODULES.wettersymbol.draw(p2, { t: S.trip, d: { weather: "storm" }, T }, { sym: "auto" }, { x: 0, y: 0, w: 121, h: 103 }); return n1 === pg.ops.length && n1 === (new Pg(T)).ops.length && p2.ops.length > n1; }), "Automatisch: ohne Wetter des Tages zeichnet die Kachel nichts, mit Wetter das passende Symbol");
 
 console.log("Feste Größe 1×1");
