@@ -89,7 +89,7 @@ function embedEstimate(t) {
 }
 
 /* ---------- Reiter „Tage“ ---------- */
-const DAY_ORDER = ["place", "from", "km", "drive", "title", "weather", "lodging", "plan", "text", "highlights", "costs", "photos"];
+const DAY_ORDER = ["place", "from", "km", "drive", "title", "weather", "lodging", "plan", "text", "tips", "highlights", "costs", "photos"];
 const DAY_FIELDS = {
   place: (d) => placeFld("Ort / Ziel des Tages", `d:${d.id}.place`, d.place),
   from: (d) => fld("Start (leer = vorheriger Ort)", `d:${d.id}.from`, d.from),
@@ -99,10 +99,11 @@ const DAY_FIELDS = {
   weather: (d) => `<div class="wx">${selFld("Wetter", `d:${d.id}.weather`, d.weather, [["", "–"], ...WEATHER.map((w) => [w.id, w.name])])}${fld("Min °C", `d:${d.id}.tmin`, d.tmin, { inputmode: "decimal" })}${fld("Max °C", `d:${d.id}.tmax`, d.tmax, { inputmode: "decimal" })}</div>${fld("Wetter-Details (optional, ersetzt die Zeile aus den Fotodaten)", `d:${d.id}.wxExtra`, d.wxExtra, { ph: "z. B. Wind Ø 12 km/h aus SW, am Nachmittag Schauer" })}${wxHint(d)}`,
   lodging: (d) => `${selFld("Art der Unterkunft", `d:${d.id}.lodgingKind`, d.lodgingKind, [["unterkunft", "Unterkunft (Hotel, Pension …)"], ["stellplatz", "Stellplatz (Camper)"]])}
     ${fld(d.lodgingKind === "stellplatz" ? "Name des Stellplatzes" : "Unterkunft", `d:${d.id}.lodging`, d.lodging)}
-    ${d.lodgingKind === "stellplatz" ? `<div class="camp">${CAMP_OPTS.map(([id, n]) => chk(n, `d:${d.id}.camp.${id}`, d.camp[id])).join("")}${d.camp.sonstiges ? fld("Sonstiges (erscheint auf der Kachel)", `d:${d.id}.campNote`, d.campNote, { ph: "z. B. Hunde erlaubt" }) : ""}</div>` : ""}`,
+    ${d.lodgingKind === "stellplatz" ? `<div class="camp">${CAMP_OPTS.map(([id, n]) => chk(n, `d:${d.id}.camp.${id}`, d.camp[id])).join("")}${d.camp.sonstiges ? fld("Sonstiges (erscheint auf der Kachel)", `d:${d.id}.campNote`, d.campNote, { ph: "z. B. Schattenplätze" }) : ""}${selFld("Entsorgung", `d:${d.id}.campWaste`, d.campWaste, [["", "Keine Angabe"], ["ja", "Vorhanden"], ["nein", "Nicht vorhanden"]])}${selFld("Hunde", `d:${d.id}.campDogs`, d.campDogs, [["", "Keine Angabe"], ["ja", "Erlaubt"], ["nein", "Nicht erlaubt"]])}${fld("Preis des Stellplatzes", `d:${d.id}.campPrice`, d.campPrice, { ph: "z. B. 18 € / Nacht" })}</div>` : ""}`,
   text: (d) => fld("Tagebuch", `d:${d.id}.text`, d.text, { rows: 6, ph: "Was haben wir erlebt?" }),
   plan: (d) => fld("Tagesplan (eine Zeile pro Punkt, Uhrzeit vorn)", `d:${d.id}.plan`, d.plan, { rows: 7, ph: "09:30 Frühstück im Café, 11:00 Stadtrundgang, …" }),
   highlights: (d) => fld("Highlights (eine pro Zeile)", `d:${d.id}.highlights`, d.highlights, { rows: 3 }),
+  tips: (d) => fld("Tipps fürs nächste Mal", `d:${d.id}.tips`, d.tips, { rows: 3, ph: "Was würdest du beim nächsten Besuch anders machen?" }),
   costs: (d) => `<div class="f"><span>Ausgaben <b data-sum="${d.id}">${dayCosts(d) ? "· " + money(dayCosts(d), S.trip.currency) : ""}</b></span>${d.costs.map((c) => `<div class="cost"><input data-k="d:${d.id}.costs.${c.id}.l" value="${esc(c.l)}" placeholder="Bezeichnung"><select data-k="d:${d.id}.costs.${c.id}.cat">${CATS.map((k) => `<option value="${k.id}" ${k.id === c.cat ? "selected" : ""}>${esc(k.name)}</option>`).join("")}</select><input data-k="d:${d.id}.costs.${c.id}.a" value="${esc(c.a)}" inputmode="decimal" placeholder="0,00"><button class="ico" data-act="delCost" data-day="${d.id}" data-id="${c.id}" title="Entfernen">×</button></div>`).join("")}<button data-act="addCost" data-day="${d.id}">+ Ausgabe</button></div>`,
   photos: (d) => `<div class="f"><span>Fotos (${d.photos.length})</span>${d.photos.map((p) => photoCard(d, p)).join("")}<label class="drop" style="padding:6px;margin:0">+ Fotos wählen<input type="file" accept="image/*,.heic,.heif" multiple hidden data-photos="${d.id}"></label></div>`,
 };
@@ -328,6 +329,14 @@ document.addEventListener("toggle", (e) => {
 
 document.addEventListener("change", (e) => {
   const el = e.target;
+  if (el.dataset.k && /^d:[^.]+\.camp(?:Waste|Dogs|Price)$/.test(el.dataset.k) && el.value.trim()) {
+    const d = dayOf(el.dataset.k.split(".")[0].slice(2));
+    if (d) for (const p of d.pages) for (const tile of p.tiles) if (tile.mod === "unterkunft" && tile.h < 2) { tile.h = 2; changed(); }
+  }
+  if (el.dataset.k && /^d:[^.]+\.tips$/.test(el.dataset.k) && el.value.trim()) {
+    const d = dayOf(el.dataset.k.split(".")[0].slice(2));
+    if (d && !d.pages.some(p => p.tiles.some(x => x.mod === "tipps"))) { if (!d.pages.length) d.pages.push(newPage()); d.pages[d.pages.length - 1].tiles.push(tileOf("tipps", S.trip.cols)); changed(); }
+  }
   if (el.matches("[data-addtile]")) {
     const d = dayOf(el.dataset.day), pg = d && d.pages.find((x) => x.id === el.dataset.addtile);
     if (pg && el.value) { const nt = tileOf(el.value, S.trip.cols); pg.tiles.push(nt); S.open.add(d.id); changed(); renderPanel(); if (el.value === "wikipedia") openWikipedia(nt, d); if (el.value === "punktkarte" || el.value === "tageskarte") openPointMap(nt, d); }

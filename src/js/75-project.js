@@ -89,7 +89,7 @@ function cleanTrip(j) {
         id: cleanId(d.id, seen), date: cleanIso(d.date), place: cleanPlace(d.place), from: clipStr(d.from, 200), km: clipStr(d.km, 20), drive: clipStr(d.drive, 20),
         title: clipStr(d.title, 200), lodging: clipStr(d.lodging, 200), lodgingKind: oneOf(d.lodgingKind, ["unterkunft", "stellplatz"], "unterkunft"), campNote: clipStr(d.campNote, 100),
         camp: Object.fromEntries(CAMP_OPTS.map(([id]) => [id, !!(d.camp && typeof d.camp === "object" && d.camp[id] === true)])), weather: oneOf(d.weather, ["", ...WEATHER.map((w) => w.id)], ""), tmin: clipStr(d.tmin, 12), tmax: clipStr(d.tmax, 12), wxAuto: typeof d.wxAuto === "boolean" ? d.wxAuto : null, wxExtra: clipStr(d.wxExtra, 300),
-        text: clipStr(d.text, 20000), plan: clipStr(d.plan, 8000), highlights: clipStr(d.highlights, 4000),
+        text: clipStr(d.text, 20000), plan: clipStr(d.plan, 8000), highlights: clipStr(d.highlights, 4000), tips: clipStr(d.tips, 8000), campWaste: oneOf(d.campWaste, ["", "ja", "nein"], ""), campDogs: oneOf(d.campDogs, ["", "ja", "nein"], ""), campPrice: clipStr(d.campPrice, 100),
         costs: (Array.isArray(d.costs) ? d.costs : []).slice(0, 200).map((c) => ({ id: cleanId(c && c.id, seen), l: clipStr(c && c.l, 200), cat: oneOf(c && c.cat, CATS.map((k) => k.id), "sonstiges"), a: clipStr(c && c.a, 20) })),
         photos: (Array.isArray(d.photos) ? d.photos : []).slice(0, 500).map((g) => cleanPhotoMeta(g, photoIds)),
         pages: Array.isArray(d.pages) ? d.pages.slice(0, 40).map((pg) => cleanPage(pg, cols, seen)) : defaultPages(cols),

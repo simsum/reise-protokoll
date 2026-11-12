@@ -112,7 +112,7 @@ function applyLayout(d, page, tiles, cols) {
 
 function newDay(date = "", cols = 4) {
   return {
-    id: uid(), date, place: blankPlace(), from: "", km: "", drive: "", title: "", lodging: "", lodgingKind: "unterkunft", camp: blankCamp(), campNote: "",
+    id: uid(), date, place: blankPlace(), from: "", km: "", drive: "", title: "", lodging: "", lodgingKind: "unterkunft", camp: blankCamp(), campNote: "", campWaste: "", campDogs: "", campPrice: "", tips: "",
     weather: "", tmin: "", tmax: "", wxAuto: null, wxExtra: "", text: "", plan: "",
     highlights: "", costs: [], photos: [], pages: defaultPages(cols),
   };

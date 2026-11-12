@@ -8,6 +8,10 @@ Das Tool ist eine einzige HTML-Datei ([`dist/Reise-Protokoll.html`](dist/Reise-P
 
 ## Freies Layout aus Kacheln
 
+**Tipps fürs nächste Mal:** Im jeweiligen Tag eintragen; beim Verlassen des Feldes wird bei Bedarf eine Tipps-Kachel eingefügt. Die Kachel kann wie andere Kacheln verschoben oder vergrößert werden. Lange Texte erzeugen gegebenenfalls einen Hinweis.
+
+**Stellplatz:** Zusätzlich zur Ausstattung lassen sich Entsorgung und Hunde mit „Keine Angabe“, Ja oder Nein sowie ein Preis als Freitext erfassen. Die Angaben erscheinen in der Unterkunftskachel; bei Bedarf wird sie beim Eintragen vergrößert. Der Preis ist eine Information und wird nicht automatisch als Ausgabe verbucht.
+
 Die fünf Designs haben eigene Titelmotive: Wellen für Meer, Zweige für Herbst, Bäume für Wald, ein Sternbild für Nacht und klare Linien für Mono. Schrift und Kennzahlen greifen den Stil auf. Bei einem eigenen Titelfoto ersetzt dieses das Motiv.
 
 ### Schneller durch die Reise (v0.20)
@@ -94,8 +98,8 @@ Aufbau und Regeln stehen in [CLAUDE.md](CLAUDE.md).
 
 ## Ideen für später
 
-- **Tipps fürs nächste Mal**: Abschnitt für Erkenntnisse (je Tag und/oder als eigene Seite am Ende)
-- **Camper**: weitere Merkmale des Stellplatzes (z. B. Entsorgung, Hunde, Preis)
+**Eigene Aufbauten speichern:** Das Gerüst einer Tagesseite mit Namen sichern (Kacheltypen, Reihenfolge, Größen und Formatierung), ohne persönliche Inhalte. Gespeicherte Aufbauten in der Vorschau auswählen, umbenennen und löschen; Fotos des Zieltags wie bei Vorschlägen zuordnen und Rasterbreite anpassen. Im Browser und Projekt-PDF speichern; projektübergreifender Datei-Import und -Export als möglicher zweiter Schritt. Vor dem Ersetzen warnen, Rückgängig ermöglichen.
+
 - Weitere Aufbau-Vorschläge (Städtereise, Wanderung, Strandurlaub), eigene Aufbauten speichern
 - **Seitenformate** (A4, A5, A3, US Letter, Hoch- und Querformat)
 - **Export als HTML-Datei und als Markdown-Datei** (Text, Fotos, Karte), zusätzlich zum PDF

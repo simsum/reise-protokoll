@@ -130,7 +130,10 @@ function drawParas(pg, text, r, top, hi, lo) {
 
 /* Stellplatz (Camper): Name und alle Ausstattungsmerkmale, je mit Haken (vorhanden) oder Kreuz (nicht vorhanden) */
 function drawCamp(pg, c, r, v) {
-  const { d, i, T, warns } = c, cols = r.w >= 190 ? 2 : 1, rows = Math.ceil(CAMP_OPTS.length / cols);
+  const { d, i, T, warns } = c, cols = r.w >= 190 ? 2 : 1;
+  const extras = [["campWaste", "Entsorgung", d.campWaste], ["campDogs", "Hunde", d.campDogs]].filter(([, , v]) => v).map(([id, name, v]) => [id, name, v === "ja"]);
+  if ((d.campPrice || "").trim()) extras.push(["campPrice", "Preis: " + d.campPrice.trim(), true]);
+  const options = [...CAMP_OPTS, ...extras], rows = Math.ceil(options.length / cols);
   card(pg, r);
   pg.label(r.x + 12, r.y + 8, "Stellplatz", T.muted);
   pg.icon("camper", r.x + r.w - 12 - 17, r.y + 6, 17, T.accent, 1.5);
@@ -143,8 +146,9 @@ function drawCamp(pg, c, r, v) {
   }
   const avail = r.y + r.h - 8 - y, rowH = clamp(avail / rows, 8.5, 15), s = Math.min(9, rowH * 0.74), iw = s * 1.15, colW = (r.w - 24) / cols;
   if (avail < rows * 8.5 - 0.5) warns.push(`Tag ${i + 1}: Die Stellplatz-Angaben passen nicht in die Kachel, bitte die Kachel vergrößern.`);
-  CAMP_OPTS.forEach(([id, name], k) => {
-    const col = Math.floor(k / rows), row = k % rows, x = r.x + 12 + col * colW, yy = y + row * rowH, on = !!(d.camp && d.camp[id]);
+  options.forEach(([id, name, extra], k) => {
+    const col = Math.floor(k / rows), row = k % rows, x = r.x + 12 + col * colW, yy = y + row * rowH, on = extra === undefined ? !!(d.camp && d.camp[id]) : extra;
+    if (yy + rowH > r.y + r.h - 7) return;
     if (on) pg.icon("check", x, yy + (rowH - iw) / 2 - 0.5, iw, T.accent, 2.4);
     else pg.icon("cross", x + iw * 0.1, yy + (rowH - iw) / 2 - 0.5 + iw * 0.1, iw * 0.8, mix(T.muted, "#FFFFFF", 0.3), 2);
     const label = id === "sonstiges" && on && (d.campNote || "").trim() ? d.campNote.trim() : name;
@@ -302,6 +306,15 @@ const MODULES = {
       pg.label(r.x, r.y, "Tagebuch");
       if (!body.trim()) { for (let y = r.y + 16; y + 16 <= r.y + r.h; y += 16) pg.line(r.x, y + 14, r.x + r.w, y + 14, T.rule, 0.5); return; }
       if (!drawParas(pg, body, r, 16, 11, 7)) warns.push(`Tag ${i + 1}: Das Tagebuch ist für die Kachel zu lang und wird abgeschnitten.`);
+    },
+  },
+
+  tipps: {
+    name: "Tipps fürs nächste Mal", size: () => [2, 2],
+    draw(pg, c, tile, r) {
+      const body = String(c.d.tips || ""); if (!body.trim()) return;
+      pg.label(r.x, r.y, "Tipps fürs nächste Mal");
+      if (!drawParas(pg, body, r, 16, 11, 7)) c.warns.push(`Tag ${c.i + 1}: Die Tipps passen nicht in die Kachel und werden abgeschnitten.`);
     },
   },
 

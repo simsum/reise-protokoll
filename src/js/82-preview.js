@@ -247,7 +247,7 @@ function addFromMenu(mod) {
 }
 
 /* ---------- Doppelklick auf eine Kachel: dorthin springen, wo man sie bearbeitet ---------- */
-const TILE_FIELD = { text: "text", plan: "plan", highlights: "highlights", wetter: "weather", unterkunft: "lodging", strecke: "km", kosten: "costs" };
+const TILE_FIELD = { text: "text", tipps: "tips", plan: "plan", highlights: "highlights", wetter: "weather", unterkunft: "lodging", strecke: "km", kosten: "costs" };
 function editTile(d, tile) {
   if (tile.mod === "foto") { const p = d.photos.find((x) => x.id === tile.photo); if (p) openEditor(p); else { const sel = $('#tb [data-tb="photo"]'); if (sel) sel.focus(); } return; }
   if (tile.mod === "wikipedia") { openWikipedia(tile, d); return; }
