@@ -62,6 +62,3 @@ Reise-Protokoll ist ein eigenständiges Tool (kein Teil von Foto-Protokoll, nur 
 - **Android/Touch** (gleiche Lösung wie im Foto-Protokoll v0.7.1): Beim Tippen darf weder die Seitenleiste neu aufgebaut werden (sonst flackert die Bildschirmtastatur) noch ständig die Vorschau. Auf Geräten mit `(pointer: coarse)` zeigt `schedulePreview()` die Vorschau erst beim Verlassen des Feldes (`focusout`); Auswahlfelder, Knöpfe und Kachel-Aktionen aktualisieren sofort. Neue Eingabefelder dürfen beim Tippen kein `renderPanel()` auslösen (`test/touch.mjs`).
 - Tests: Playwright ersetzt alle Netzzugriffe durch Testantworten (`test/e2e.mjs`: Oberfläche, Karte, Kacheln; `test/projekt.mjs`: Mehrfach-Import, PDF-Roundtrip, manipulierte PDFs). PDFs lassen sich mit `pip install pymupdf` zu Bildern rendern, um das Layout zu prüfen.
 
-## Windows
-
-- Node und Git sind installiert. Playwright-Chromium liegt in `%LOCALAPPDATA%\ms-playwright` (`npx playwright install chromium`, falls es fehlt).
