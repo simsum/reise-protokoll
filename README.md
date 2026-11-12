@@ -1,10 +1,10 @@
 # Reise-Protokoll
 
-Reisetagebuch als PDF. Man baut die Seiten jedes Tages aus frei wählbaren Kacheln (Foto, Wetter, Tagesplan …), trägt Tage, Notizen, Wetter, Kosten und Fotos ein und bekommt ein gestaltetes PDF. Die **Deckseite** zeigt immer eine Übersicht: Dauer, Kennzahlen, **Karte der Fahrstrecke** und Zusammenfassung.
+Reise-Protokoll macht aus Fotos, Tagesnotizen, Strecken und Ausgaben ein gestaltetes Reisetagebuch als PDF. Die Tagesseiten lassen sich in der Vorschau mit Kacheln zusammenstellen. Eine Deckseite fasst die Reise mit Kennzahlen, Karte und Text zusammen.
 
 **Direkt ausprobieren: https://simsum.github.io/reise-protokoll/** (GitHub Pages)
 
-Das Tool ist eine einzige HTML-Datei ([`dist/Reise-Protokoll.html`](dist/Reise-Protokoll.html)) und läuft komplett im Browser. Es gibt keinen Server, Fotos werden nicht hochgeladen.
+Die Anwendung läuft im Browser, auch als lokal geöffnete [HTML-Datei](dist/Reise-Protokoll.html). Fotos und Eingaben werden lokal verarbeitet; für bestimmte Funktionen und das Laden von Bibliotheken wird eine Internetverbindung benötigt. Einzelheiten stehen unter [Datenschutz und Netzwerk](#datenschutz-und-netzwerk).
 
 ## Freies Layout aus Kacheln
 
@@ -16,22 +16,22 @@ Das Tool ist eine einzige HTML-Datei ([`dist/Reise-Protokoll.html`](dist/Reise-P
 
 Die fünf Designs haben eigene Titelmotive: Wellen für Meer, Zweige für Herbst, Bäume für Wald, ein Sternbild für Nacht und klare Linien für Mono. Schrift und Kennzahlen greifen den Stil auf. Bei einem eigenen Titelfoto ersetzt dieses das Motiv.
 
-### Schneller durch die Reise (v0.20)
+### Schneller durch die Reise
 
 - Im Reiter **Tage** springt „Direkt zu einem Tag“ zum gewünschten Eintrag. **In der Vorschau zeigen** öffnet seine erste Seite.
 - Die **Seitenauswahl** über der Vorschau führt direkt zu Deckseite, Tagesseiten und Übersichten; beim Scrollen folgt sie der angezeigten Seite.
 - **Zoom → Einpassen** zeigt eine ganze Seite und reagiert auf die Fenstergröße. Für Details bleiben die festen Zoomstufen verfügbar.
-- Nach der Auswahl einer Kachel führt **Inhalt bearbeiten** zum passenden Eingabefeld oder Foto-Editor. Der Doppelklick funktioniert weiterhin.
+- Nach der Auswahl einer Kachel führt **Inhalt bearbeiten** zu den passenden Eingaben. Bei Fotos zeigt der Knopf die Fotodetails im Reiter „Tage“; ein Doppelklick öffnet den Foto-Editor.
 - Jeder Reiter merkt sich seine Scrollposition. Kopf- und Vorschauleiste umbrechen auf schmalen Bildschirmen.
 - Oben steht, ob Änderungen **im Browser gespeichert** wurden. Bei einem Speicherfehler erscheint ein Hinweis. Eine Browserkopie ersetzt keine Datei: Zum dauerhaften Sichern **PDF erstellen** und die Bearbeitungsdaten eingebettet lassen.
 
 ### Kacheln gestalten
 
-Jede Seite eines Tages ist ein Raster aus 3 oder 4 Kacheln pro Reihe und 6 Reihen (Einstellung im Reiter „Reise“). Jede Kachel nimmt ein **Modul** auf, frei wählbar: Foto, Wetter, Unterkunft, Strecke, Tagesplan, Tagebuch, Highlights, Ausgaben, Karte (Strecke), Karte (Punkt), Kennzahlen, Notiz (freier Text mit Markdown), Wettersymbol (nur ein hübsches Symbol, immer 1×1, schmückt freie Flächen; „automatisch“ zeigt das Wetter des Tages, oder man wählt Sonne, Heiter, Bewölkt, Regen, Gewitter, Schnee, Nebel, Mond und Sterne, Regenbogen, Wind; farbige Sticker ohne Hintergrund, Rahmen oder Schatten) oder Leer (Platzhalter). Bearbeiten geht **direkt in der Vorschau** (oder im Reiter „Tage“ unter jedem Tag):
+Jede Tagesseite hat ein Raster mit 3 oder 4 Spalten und 6 Zeilen. Die Kacheln enthalten zum Beispiel Fotos, Wetter, Strecke, Unterkunft, Tagebuch, Tipps, Ausgaben, Karten oder Wikipedia-Auszüge. Außerdem gibt es freie Markdown-Notizen und farbige Wettersymbole ohne Hintergrund. Leere Kacheln dienen als Platzhalter. Den Aufbau bearbeitest du direkt in der Vorschau oder in der erweiterten Ansicht unter „Tage“.
 
 - **Anklicken** wählt eine Kachel; eine Werkzeugleiste über der Kachel bietet Modul, Foto, Größe und Reihenfolge. **Ziehen** verschiebt die Kachel an eine andere Stelle (auch auf eine andere Seite desselben Tages), die **Ecke unten rechts** ändert die Größe im Raster, ein Klick auf **freie Fläche** fügt eine Kachel ein. Escape hebt die Auswahl auf, Entf löscht die Kachel. **Doppelklick** springt dorthin, wo man den Inhalt bearbeitet (Foto-Editor, Textfeld des Tages, Reiter „Karte“ …). Beim Darüberfahren markieren gestrichelte Felder die **freien Plätze** der Seite.
 - **Rückgängig / Wiederholen** (Pfeile oben in der Vorschau, Strg+Z / Strg+Y) gelten für den Seitenaufbau, auch für Löschen und Verschieben von Kacheln und Seiten.
-- **Seitenleiste** über jeder Seite beim Darüberfahren: neue Seite danach, Seite verschieben oder löschen, **Aufbau-Vorschläge** (Tagesübersicht, Tagebuch groß, Panorama und Text, Fotoseite, zwei Panoramen) und der Pinsel.
+- **Seitenleiste** über jeder Tagesseite: neue Seite danach, Seite verschieben oder löschen, **Aufbau-Vorschläge** (Tagesübersicht, Tagebuch groß, Panorama und Text, Fotoseite, zwei Panoramen) und der Pinsel.
 - **Format übertragen** (🖌, wie in Excel): Der Aufbau einer Seite wird aufgenommen, dann klickt man Zielseiten an (oder „Auf alle Tage“: übertragen wird auf die Seite mit derselben Nummer jedes Tages). Fotokacheln bekommen die Fotos des Zieltags, Notiztexte werden nicht mitkopiert. Auch Vorschläge belegen ihre Fotoplätze sofort mit Fotos des Tages (nötigenfalls von anderen Seiten), freie Plätze der Seite werden mit noch nicht platzierten Fotos aufgefüllt, übrige Fotos kommen auf eine zusätzliche Seite, es geht keines verloren.
 - **Ein Foto steht pro Tag nur einmal:** Wird es einer zweiten Kachel zugewiesen, verschwindet es an der ersten Stelle (die Kachel bleibt leer). Neue Fotos füllen zuerst freie Plätze vorhandener Seiten. Escape beendet den Pinsel.
 
@@ -48,7 +48,7 @@ Der Seitenaufbau im Detail:
 - **Wikipedia-Auszug:** Die Kachel „Wikipedia-Auszug“ öffnet ein Fenster. Man sucht (vorgeschlagen wird der Ort des Tages), wählt einen Treffer und bearbeitet vor dem Einfügen: Überschrift, Text (auf 1, 2, 3, 4 oder 6 Sätze kürzbar, frei änderbar) und **Kennzahlen aus Wikidata**: bei Städten Einwohner (mit Jahr), Fläche, Gegründet, Erste Erwähnung, Höhe, Land, Region, bei Bauwerken Baujahr, Höhe, Architekt, Schutzstatus. Jede Kennzahl lässt sich an- und abwählen, ändern oder neu anlegen. Die Vorschau im Fenster zeigt die Kachel in ihrer echten Größe. Die Quellenzeile (Wikipedia CC BY-SA 4.0, Wikidata CC0, Abrufdatum) steht immer auf der Kachel und verlinkt im PDF den Artikel. Der Auszug wird im Projekt gespeichert und funktioniert danach offline. Doppelklick auf die Kachel öffnet das Fenster erneut.
 - **Sehenswürdigkeiten in der Nähe:** Im Fenster „In der Nähe suchen“ (Umkreis 1, 3, 5 oder 10 km) um den **Ort des Tages**, ein **Foto mit GPS** oder den **aktuellen Standort des Geräts** (das Gerät fragt nach Erlaubnis, geht nur aus einer Webseite mit https, nicht aus einer lokalen Datei). Die Liste zeigt bis zu 100 Artikel mit Kurzbeschreibung und Entfernung, **beliebteste zuerst** (Seitenaufrufe der letzten 30 Tage; so stehen Frauenkirche und Marienplatz vor Straßen und Behörden), umschaltbar auf „nächste zuerst“. Die Beliebtheit wird in Runden nachgeladen, das dauert einige Sekunden; bis dahin steht die Liste nach Entfernung. Ein Klick auf einen Treffer öffnet wie gewohnt Text und Kennzahlen zum Bearbeiten. Ist Wikipedia überlastet, wird die Suche zweimal automatisch wiederholt.
 - Ein leeres Modul (z. B. ein Tag ohne Tagesplan) zeichnet nichts. Ist der Inhalt für die Kachel zu lang, wird die Schrift kleiner und dann gekürzt; oben in der Vorschau erscheint ein Hinweis.
-- **Camper:** Beim Tag lässt sich die Unterkunft auf **Stellplatz** umschalten. Die Kachel „Unterkunft“ zeigt dann den Namen und immer alle sechs Merkmale (Wasser, WC, Duschen, Strom, WLAN, Sonstiges), je mit Haken (vorhanden) oder Kreuz (nicht vorhanden). Bei „Sonstiges“ steht der eigene Text auf der Kachel (z. B. „Hunde erlaubt“). Die Angaben bleiben beim Zurückschalten erhalten.
+- **Camper:** Für einen Stellplatz zeigt die Unterkunftskachel Name und Ausstattung sowie die zusätzlich eingetragenen Angaben zu Entsorgung, Hunden und Preis. Die Angaben bleiben beim Wechsel zurück zu „Unterkunft“ erhalten.
 - Mehrere Tage am selben Ort: Ohne Ortsangabe gilt der Ort des Vortags.
 
 Die Deckseite ist immer gleich aufgebaut: Dauer, Kennzahlen (Reiseziel oder Stationen, Strecke, Kosten, Fotos, Temperatur – was vorhanden ist), Karte der Fahrstrecke und Zusammenfassung. Dazu kommen bei Bedarf weitere Seiten je Tag sowie eine Kostenübersicht am Ende. Fünf Farbschemata (Meer, Herbst, Wald, Nacht, Mono).
@@ -62,7 +62,7 @@ Weitere Module und Farbschemata sind je ein Eintrag im Code, siehe [CLAUDE.md](C
 3. **Karte:** Die Route entsteht automatisch aus Startort, Tagesorten und Foto-GPS und lässt sich von Hand ändern. „Karte erzeugen“ setzt ein Bild aus OpenStreetMap-Kacheln mit der Route zusammen (Straßenroute über OSRM oder Luftlinie). Das Bild ist danach fest. Orte lassen sich auch „nur für die Route“ einfügen (z. B. eine Brücke oder Passstraße): Sie lenken die Straßenroute, erscheinen aber weder auf der Karte noch in der Ortsliste unter der Karte. Alternativ ein eigenes Bild (Screenshot) hochladen. Die berechneten Kilometer und Fahrzeiten lassen sich in die Tage übernehmen.
    **Wetter:** Wetter und Temperaturspanne eines Tages werden automatisch aus den Fotodaten ermittelt (Aufnahmezeit und Ort jedes Fotos, wie im Foto-Protokoll). Von Hand geänderte Werte bleiben unangetastet, „neu ermitteln“ holt sie erneut. In der Wetterkachel steht (bei genug Platz, z. B. 2 Kacheln breit) eine Detailzeile (Wind mit Richtung und Böen, Niederschlag, Bewölkung, Luftfeuchte, Luftdruck, Quelle) als Mittelwerte der Fotodaten; wer möchte, schreibt dort einen eigenen Text. Optional steht außerdem die Wetterzeile des Fotos unter dem Bild.
 4. **Zusammenfassung:** Vorschlag aus Tagen, Highlights, Kosten, Wetter und Fotos, jederzeit von Hand änderbar.
-5. **PDF erstellen.** Im PDF stecken als Anhänge alle Einstellungen und Eingaben, die Fotos (Originale oder 1600-px-Kopien, wählbar), Karte und Titelfoto. Mit **PDF öffnen** (oder das PDF auf die Seite ziehen) lässt sich das PDF jederzeit wieder bearbeiten, auch mit allen Markierungen. Der Stand wird außerdem automatisch im Browser gesichert.
+5. **PDF erstellen.** Wenn „Bearbeitungsdaten und Fotos im PDF speichern“ aktiviert ist, enthält das PDF die Projektdaten, Fotos (Originale oder verkleinerte Kopien), Kartenbilder und das Titelfoto als Anhänge. Mit **PDF öffnen** oder durch Ziehen auf die Seite lässt sich das Projekt weiterbearbeiten. Zusätzlich sichert die Anwendung den Stand automatisch im Browser.
 
 > Die Anhänge zeigen Adobe Acrobat, Foxit, PDF-XChange und Firefox an (Büroklammer neben dem Foto). Der PDF-Viewer von Chrome und Edge zeigt sie nicht an, zum Weiterbearbeiten stört das nicht. Wird das PDF in einem anderen Programm gespeichert oder gedruckt, gehen die Anhänge oft verloren. Die Bearbeitungsdaten stehen im Klartext im PDF, wer das nicht möchte, schaltet die Option „Bearbeitungsdaten und Fotos im PDF speichern“ aus.
 
@@ -93,7 +93,8 @@ Zu jedem Foto lassen sich Bildunterschrift, Ort und Wetter von Hand ändern; Han
 npm install
 npx playwright install chromium
 npm run build      # src/ → dist/Reise-Protokoll.html
-npm test           # Build + Ende-zu-Ende-Test, Bilder in test/out/
+npm test           # Build und automatisierte Tests, Bilder in test/out/
+node test/netz.mjs # optionaler manueller Test mit echten Netzwerkdiensten
 ```
 
 Aufbau und Regeln stehen in [CLAUDE.md](CLAUDE.md).
@@ -102,7 +103,7 @@ Aufbau und Regeln stehen in [CLAUDE.md](CLAUDE.md).
 
 **Eigene Aufbauten speichern:** Das Gerüst einer Tagesseite mit Namen sichern (Kacheltypen, Reihenfolge, Größen und Formatierung), ohne persönliche Inhalte. Gespeicherte Aufbauten in der Vorschau auswählen, umbenennen und löschen; Fotos des Zieltags wie bei Vorschlägen zuordnen und Rasterbreite anpassen. Im Browser und Projekt-PDF speichern; projektübergreifender Datei-Import und -Export als möglicher zweiter Schritt. Vor dem Ersetzen warnen, Rückgängig ermöglichen.
 
-- Weitere Aufbau-Vorschläge (Städtereise, Wanderung, Strandurlaub), eigene Aufbauten speichern
+- Weitere Aufbau-Vorschläge (Städtereise, Wanderung, Strandurlaub)
 - **Seitenformate** (A4, A5, A3, US Letter, Hoch- und Querformat)
 - **Export als HTML-Datei und als Markdown-Datei** (Text, Fotos, Karte), zusätzlich zum PDF
 - Eigene Schriften im PDF
