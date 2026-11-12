@@ -1,6 +1,6 @@
 {
   "name": "reise-protokoll",
-  "version": "0.20.0",
+  "version": "0.21.0",
   "description": "Reisetagebuch als PDF: Seiten aus frei wählbaren Kacheln, Deckseite mit Übersicht und Routenkarte – läuft komplett im Browser.",
   "license": "MIT",
   "private": true,

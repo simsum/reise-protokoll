@@ -8,6 +8,8 @@ Das Tool ist eine einzige HTML-Datei ([`dist/Reise-Protokoll.html`](dist/Reise-P
 
 ## Freies Layout aus Kacheln
 
+Die fünf Designs haben eigene Titelmotive: Wellen für Meer, Zweige für Herbst, Bäume für Wald, ein Sternbild für Nacht und klare Linien für Mono. Schrift und Kennzahlen greifen den Stil auf. Bei einem eigenen Titelfoto ersetzt dieses das Motiv.
+
 ### Schneller durch die Reise (v0.20)
 
 - Im Reiter **Tage** springt „Direkt zu einem Tag“ zum gewünschten Eintrag. **In der Vorschau zeigen** öffnet seine erste Seite.

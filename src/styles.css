@@ -69,6 +69,18 @@ small { color: var(--mut); font-size: 12px; }
 .theme { display: flex; align-items: center; gap: 6px; padding: 4px 10px 4px 5px; border-radius: 999px; }
 .theme i { width: 18px; height: 18px; border-radius: 50%; display: inline-block; }
 .theme.on { border-color: var(--ui); box-shadow: 0 0 0 2px color-mix(in srgb, var(--ui) 25%, transparent); }
+.themes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.theme { border-radius: 10px; text-align: left; padding: 6px; gap: 9px; min-width: 0; }
+.theme > span:last-child { font-weight: 600; }
+.theme small { display: block; font-weight: 400; }
+.theme-sample { position: relative; display: block; width: 56px; height: 52px; flex: none; overflow: hidden; border-radius: 5px; background: linear-gradient(var(--sample) 58%, var(--sample-soft) 58%); }
+.theme-sample i { position: absolute; inset: 7px 7px auto auto; width: 26px; height: 16px; opacity: .6; border-radius: 0; background: none; }
+.theme-sample b { position: absolute; left: 7px; bottom: 6px; width: 28px; height: 7px; border-top: 2px solid var(--sample); border-bottom: 1px solid var(--sample); opacity: .7; }
+.theme-meer i { background: repeating-radial-gradient(ellipse at 50% 100%, transparent 0 3px, white 4px 5px, transparent 6px 8px); }
+.theme-herbst i { background: repeating-linear-gradient(55deg, transparent 0 5px, white 6px 8px, transparent 9px 12px); }
+.theme-wald i { background: repeating-conic-gradient(from 150deg at 50% 10%, transparent 0 15deg, white 16deg 27deg, transparent 28deg 60deg); }
+.theme-nacht i { background: radial-gradient(circle at 20% 30%, white 1px, transparent 2px), radial-gradient(circle at 70% 20%, white 1px, transparent 2px), radial-gradient(circle at 55% 80%, white 1px, transparent 2px); }
+.theme-mono i { background: repeating-linear-gradient(45deg, transparent 0 4px, white 5px 6px, transparent 7px 10px); }
 
 /* Tage */
 details.day { border: 1px solid var(--line); border-radius: 10px; margin: 0 0 8px; background: #fff; }

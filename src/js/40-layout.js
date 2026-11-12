@@ -40,6 +40,35 @@ function miniHeader(pg, kicker, title) {
   return 106;
 }
 
+/* Dekor nur im freien oberen Bereich des Titelbands, hinter der Schrift. */
+function themeMotif(pg, theme, T) {
+  const c = mix(T.accent, "#FFFFFF", 0.28);
+  const line = (x1, y1, x2, y2, w = 1) => pg.line(x1, y1, x2, y2, c, w);
+  if (theme === "meer") {
+    for (let y = 77; y <= 125; y += 12) for (let x = 380; x < 550; x += 24) {
+      line(x, y, x + 12, y + 4); line(x + 12, y + 4, x + 24, y);
+    }
+  } else if (theme === "herbst") {
+    for (let i = 0; i < 5; i++) {
+      const x = 401 + i * 34, y = 72 + (i % 2) * 20;
+      line(x, y, x + 22, y + 34, 1.4); line(x + 7, y + 11, x + 18, y + 8); line(x + 13, y + 21, x + 5, y + 24);
+    }
+  } else if (theme === "wald") {
+    for (let i = 0; i < 6; i++) {
+      const x = 394 + i * 30, y = 73 + (i % 2) * 10;
+      line(x, y, x, y + 54, 1.3); line(x, y + 4, x - 10, y + 26); line(x, y + 4, x + 10, y + 26); line(x, y + 18, x - 13, y + 43); line(x, y + 18, x + 13, y + 43);
+    }
+  } else if (theme === "nacht") {
+    for (const [x, y, s] of [[395, 87, 4], [430, 117, 3], [461, 72, 5], [500, 106, 4], [541, 78, 3]]) {
+      line(x - s, y, x + s, y); line(x, y - s, x, y + s);
+    }
+    line(395, 87, 430, 117, 0.5); line(430, 117, 461, 72, 0.5); line(461, 72, 500, 106, 0.5); line(500, 106, 541, 78, 0.5);
+  } else {
+    for (let i = 0; i < 6; i++) line(395 + i * 25, 75, 445 + i * 25, 125, 1.2);
+    line(395, 131, 570, 131, 2);
+  }
+}
+
 /* ---------- Deckseite ---------- */
 function coverPage(t, st, T, warns) {
   const pg = new Pg(T);
@@ -48,7 +77,7 @@ function coverPage(t, st, T, warns) {
   if (photo) pg.img(0, 0, PW, BAND, t.coverPhoto, t.coverW, t.coverH);
   else {
     pg.rect(0, 0, PW, BAND, { fill: T.accent });
-    pg.icon("pin", PW - MX - 190, 62, 190, mix(T.accent, "#FFFFFF", 0.14), 0.9); /* Dekor */
+    themeMotif(pg, t.theme, T);
   }
   const soft = mix(T.accent, "#FFFFFF", 0.78);
   pg.text(MX, 44, "REISEPROTOKOLL", { f: "B", s: 8, c: soft, ls: 1.8 });
@@ -56,9 +85,10 @@ function coverPage(t, st, T, warns) {
 
   /* Titel so groß wie möglich (höchstens zwei Zeilen bei großer, drei bei kleiner Schrift) */
   const ttl = t.title.trim() || "Meine Reise";
-  let ts = 32, title = wrapMax(ttl, "SB", 32, CW, 3).lines;
+  const titleFont = t.theme === "mono" ? "CB" : t.theme === "nacht" ? "B" : "SB";
+  let ts = 32, title = wrapMax(ttl, titleFont, 32, CW, 3).lines;
   for (const sz of [58, 50, 44, 38]) {
-    const l = wrapAll(ttl, "SB", sz, CW);
+    const l = wrapAll(ttl, titleFont, sz, CW);
     if (l.length <= (sz >= 44 ? 2 : 3)) { ts = sz; title = l; break; }
   }
   const tl = ts * 1.1;
@@ -66,7 +96,7 @@ function coverPage(t, st, T, warns) {
   const blockH = title.length * tl + (sub.length ? 10 + sub.length * 20 : 0);
   const top = Math.max(96, 266 - blockH);
   pg.rect(MX, top - 18, 44, 3, { fill: T.accent2 });
-  title.forEach((l, k) => pg.text(MX, top + k * tl, l, { f: "SB", s: ts, c: T.onAccent }));
+  title.forEach((l, k) => pg.text(MX, top + k * tl, l, { f: titleFont, s: ts, c: T.onAccent }));
   sub.forEach((l, k) => pg.text(MX, top + title.length * tl + 10 + k * 20, l, { f: "SI", s: 16, c: soft }));
 
   /* Kennzahlen */
@@ -74,7 +104,10 @@ function coverPage(t, st, T, warns) {
   const gap = 12, cw = (CW - gap * (stats.length - 1)) / stats.length, sy = BAND + 22;
   stats.forEach((c, k) => {
     const x = MX + k * (cw + gap);
-    pg.rect(x, sy, cw, 64, { fill: T.soft, r: 8 });
+    pg.rect(x, sy, cw, 64, { fill: T.soft, r: t.theme === "mono" ? 0 : t.theme === "meer" ? 12 : 4 });
+    if (t.theme === "mono") pg.line(x, sy, x + cw, sy, T.accent, 2);
+    if (t.theme === "herbst" || t.theme === "wald") pg.rect(x, sy, 3, 64, { fill: T.accent });
+    if (t.theme === "nacht") pg.rect(x + cw - 12, sy + 10, 3, 3, { fill: T.accent2 });
     pg.text(x + 12, sy + 12, fitT(c.v, "SB", 21, cw - 24), { f: "SB", s: 21, c: T.accent });
     pg.text(x + 12, sy + 45, fitT(c.l.toUpperCase(), "B", 6.8, cw - 24, 1), { f: "B", s: 6.8, c: T.muted, ls: 1 });
   });

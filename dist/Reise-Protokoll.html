@@ -70,6 +70,18 @@ small { color: var(--mut); font-size: 12px; }
 .theme { display: flex; align-items: center; gap: 6px; padding: 4px 10px 4px 5px; border-radius: 999px; }
 .theme i { width: 18px; height: 18px; border-radius: 50%; display: inline-block; }
 .theme.on { border-color: var(--ui); box-shadow: 0 0 0 2px color-mix(in srgb, var(--ui) 25%, transparent); }
+.themes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.theme { border-radius: 10px; text-align: left; padding: 6px; gap: 9px; min-width: 0; }
+.theme > span:last-child { font-weight: 600; }
+.theme small { display: block; font-weight: 400; }
+.theme-sample { position: relative; display: block; width: 56px; height: 52px; flex: none; overflow: hidden; border-radius: 5px; background: linear-gradient(var(--sample) 58%, var(--sample-soft) 58%); }
+.theme-sample i { position: absolute; inset: 7px 7px auto auto; width: 26px; height: 16px; opacity: .6; border-radius: 0; background: none; }
+.theme-sample b { position: absolute; left: 7px; bottom: 6px; width: 28px; height: 7px; border-top: 2px solid var(--sample); border-bottom: 1px solid var(--sample); opacity: .7; }
+.theme-meer i { background: repeating-radial-gradient(ellipse at 50% 100%, transparent 0 3px, white 4px 5px, transparent 6px 8px); }
+.theme-herbst i { background: repeating-linear-gradient(55deg, transparent 0 5px, white 6px 8px, transparent 9px 12px); }
+.theme-wald i { background: repeating-conic-gradient(from 150deg at 50% 10%, transparent 0 15deg, white 16deg 27deg, transparent 28deg 60deg); }
+.theme-nacht i { background: radial-gradient(circle at 20% 30%, white 1px, transparent 2px), radial-gradient(circle at 70% 20%, white 1px, transparent 2px), radial-gradient(circle at 55% 80%, white 1px, transparent 2px); }
+.theme-mono i { background: repeating-linear-gradient(45deg, transparent 0 4px, white 5px 6px, transparent 7px 10px); }
 
 /* Tage */
 details.day { border: 1px solid var(--line); border-radius: 10px; margin: 0 0 8px; background: #fff; }
@@ -252,7 +264,7 @@ button:disabled { cursor: default; }
 
 <div id="app">
   <header class="top">
-    <div class="brand"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s6.5-5.7 6.5-11a6.5 6.5 0 1 0-13 0C5.5 15.3 12 21 12 21z"/><circle cx="12" cy="10" r="2.4"/></svg> Reise-Protokoll <span class="ver">v0.20.0</span></div>
+    <div class="brand"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s6.5-5.7 6.5-11a6.5 6.5 0 1 0-13 0C5.5 15.3 12 21 12 21z"/><circle cx="12" cy="10" r="2.4"/></svg> Reise-Protokoll <span class="ver">v0.21.0</span></div>
     <div class="grow"></div>
     <small id="saveStatus" role="status" title="Die Browserkopie ersetzt keine PDF-Datei. Zum Sichern und Weitergeben PDF erstellen.">Browserkopie · als PDF sichern</small>
     <select id="demo" title="Beispielreise laden">
@@ -1567,6 +1579,35 @@ function miniHeader(pg, kicker, title) {
   return 106;
 }
 
+/* Dekor nur im freien oberen Bereich des Titelbands, hinter der Schrift. */
+function themeMotif(pg, theme, T) {
+  const c = mix(T.accent, "#FFFFFF", 0.28);
+  const line = (x1, y1, x2, y2, w = 1) => pg.line(x1, y1, x2, y2, c, w);
+  if (theme === "meer") {
+    for (let y = 77; y <= 125; y += 12) for (let x = 380; x < 550; x += 24) {
+      line(x, y, x + 12, y + 4); line(x + 12, y + 4, x + 24, y);
+    }
+  } else if (theme === "herbst") {
+    for (let i = 0; i < 5; i++) {
+      const x = 401 + i * 34, y = 72 + (i % 2) * 20;
+      line(x, y, x + 22, y + 34, 1.4); line(x + 7, y + 11, x + 18, y + 8); line(x + 13, y + 21, x + 5, y + 24);
+    }
+  } else if (theme === "wald") {
+    for (let i = 0; i < 6; i++) {
+      const x = 394 + i * 30, y = 73 + (i % 2) * 10;
+      line(x, y, x, y + 54, 1.3); line(x, y + 4, x - 10, y + 26); line(x, y + 4, x + 10, y + 26); line(x, y + 18, x - 13, y + 43); line(x, y + 18, x + 13, y + 43);
+    }
+  } else if (theme === "nacht") {
+    for (const [x, y, s] of [[395, 87, 4], [430, 117, 3], [461, 72, 5], [500, 106, 4], [541, 78, 3]]) {
+      line(x - s, y, x + s, y); line(x, y - s, x, y + s);
+    }
+    line(395, 87, 430, 117, 0.5); line(430, 117, 461, 72, 0.5); line(461, 72, 500, 106, 0.5); line(500, 106, 541, 78, 0.5);
+  } else {
+    for (let i = 0; i < 6; i++) line(395 + i * 25, 75, 445 + i * 25, 125, 1.2);
+    line(395, 131, 570, 131, 2);
+  }
+}
+
 /* ---------- Deckseite ---------- */
 function coverPage(t, st, T, warns) {
   const pg = new Pg(T);
@@ -1575,7 +1616,7 @@ function coverPage(t, st, T, warns) {
   if (photo) pg.img(0, 0, PW, BAND, t.coverPhoto, t.coverW, t.coverH);
   else {
     pg.rect(0, 0, PW, BAND, { fill: T.accent });
-    pg.icon("pin", PW - MX - 190, 62, 190, mix(T.accent, "#FFFFFF", 0.14), 0.9); /* Dekor */
+    themeMotif(pg, t.theme, T);
   }
   const soft = mix(T.accent, "#FFFFFF", 0.78);
   pg.text(MX, 44, "REISEPROTOKOLL", { f: "B", s: 8, c: soft, ls: 1.8 });
@@ -1583,9 +1624,10 @@ function coverPage(t, st, T, warns) {
 
   /* Titel so groß wie möglich (höchstens zwei Zeilen bei großer, drei bei kleiner Schrift) */
   const ttl = t.title.trim() || "Meine Reise";
-  let ts = 32, title = wrapMax(ttl, "SB", 32, CW, 3).lines;
+  const titleFont = t.theme === "mono" ? "CB" : t.theme === "nacht" ? "B" : "SB";
+  let ts = 32, title = wrapMax(ttl, titleFont, 32, CW, 3).lines;
   for (const sz of [58, 50, 44, 38]) {
-    const l = wrapAll(ttl, "SB", sz, CW);
+    const l = wrapAll(ttl, titleFont, sz, CW);
     if (l.length <= (sz >= 44 ? 2 : 3)) { ts = sz; title = l; break; }
   }
   const tl = ts * 1.1;
@@ -1593,7 +1635,7 @@ function coverPage(t, st, T, warns) {
   const blockH = title.length * tl + (sub.length ? 10 + sub.length * 20 : 0);
   const top = Math.max(96, 266 - blockH);
   pg.rect(MX, top - 18, 44, 3, { fill: T.accent2 });
-  title.forEach((l, k) => pg.text(MX, top + k * tl, l, { f: "SB", s: ts, c: T.onAccent }));
+  title.forEach((l, k) => pg.text(MX, top + k * tl, l, { f: titleFont, s: ts, c: T.onAccent }));
   sub.forEach((l, k) => pg.text(MX, top + title.length * tl + 10 + k * 20, l, { f: "SI", s: 16, c: soft }));
 
   /* Kennzahlen */
@@ -1601,7 +1643,10 @@ function coverPage(t, st, T, warns) {
   const gap = 12, cw = (CW - gap * (stats.length - 1)) / stats.length, sy = BAND + 22;
   stats.forEach((c, k) => {
     const x = MX + k * (cw + gap);
-    pg.rect(x, sy, cw, 64, { fill: T.soft, r: 8 });
+    pg.rect(x, sy, cw, 64, { fill: T.soft, r: t.theme === "mono" ? 0 : t.theme === "meer" ? 12 : 4 });
+    if (t.theme === "mono") pg.line(x, sy, x + cw, sy, T.accent, 2);
+    if (t.theme === "herbst" || t.theme === "wald") pg.rect(x, sy, 3, 64, { fill: T.accent });
+    if (t.theme === "nacht") pg.rect(x + cw - 12, sy + 10, 3, 3, { fill: T.accent2 });
     pg.text(x + 12, sy + 12, fitT(c.v, "SB", 21, cw - 24), { f: "SB", s: 21, c: T.accent });
     pg.text(x + 12, sy + 45, fitT(c.l.toUpperCase(), "B", 6.8, cw - 24, 1), { f: "B", s: 6.8, c: T.muted, ls: 1 });
   });
@@ -3303,7 +3348,7 @@ function panelTrip() {
   ${chk("Rückreise zum Startort auf der Karte", "roundTrip", t.roundTrip)}
   <h3>Design</h3>
   <div class="btnrow"><label class="drop" style="padding:5px 10px;margin:0;display:inline-block">${t.coverPhoto ? "Titelfoto ändern …" : "Titelfoto wählen …"}<input type="file" accept="image/*" hidden id="coverFile"></label>${t.coverPhoto ? `<button data-act="delCover">Titelfoto entfernen</button>` : ""}</div>
-  <div class="themes">${Object.entries(THEMES).map(([id, th]) => `<button class="theme ${id === t.theme ? "on" : ""}" data-act="theme" data-id="${id}"><i style="background:${th.accent}"></i>${esc(th.name)}</button>`).join("")}</div>
+  <div class="themes">${Object.entries(THEMES).map(([id, th]) => `<button class="theme ${id === t.theme ? "on" : ""}" data-act="theme" data-id="${id}" aria-pressed="${id === t.theme}"><span class="theme-sample theme-${id}" style="--sample:${th.accent};--sample-soft:${th.soft}"><i></i><b></b></span><span>${esc(th.name)}<small>${({meer:"Wellen & Weite",herbst:"Blätter & Wärme",wald:"Bäume & Natur",nacht:"Sterne & Himmel",mono:"Grafisch & klar"})[id]}</small></span></button>`).join("")}</div>
   <h3>Seiten</h3>
   ${selFld("Kacheln pro Reihe (Raster der Tagesseiten)", "cols", String(t.cols), [["3", "3 Kacheln nebeneinander"], ["4", "4 Kacheln nebeneinander"]])}
   ${chk("Linien zum Handschreiben in freien Textbereichen", "ruled", t.ruled)}

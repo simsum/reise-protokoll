@@ -34,7 +34,7 @@ function panelTrip() {
   ${chk("Rückreise zum Startort auf der Karte", "roundTrip", t.roundTrip)}
   <h3>Design</h3>
   <div class="btnrow"><label class="drop" style="padding:5px 10px;margin:0;display:inline-block">${t.coverPhoto ? "Titelfoto ändern …" : "Titelfoto wählen …"}<input type="file" accept="image/*" hidden id="coverFile"></label>${t.coverPhoto ? `<button data-act="delCover">Titelfoto entfernen</button>` : ""}</div>
-  <div class="themes">${Object.entries(THEMES).map(([id, th]) => `<button class="theme ${id === t.theme ? "on" : ""}" data-act="theme" data-id="${id}"><i style="background:${th.accent}"></i>${esc(th.name)}</button>`).join("")}</div>
+  <div class="themes">${Object.entries(THEMES).map(([id, th]) => `<button class="theme ${id === t.theme ? "on" : ""}" data-act="theme" data-id="${id}" aria-pressed="${id === t.theme}"><span class="theme-sample theme-${id}" style="--sample:${th.accent};--sample-soft:${th.soft}"><i></i><b></b></span><span>${esc(th.name)}<small>${({meer:"Wellen & Weite",herbst:"Blätter & Wärme",wald:"Bäume & Natur",nacht:"Sterne & Himmel",mono:"Grafisch & klar"})[id]}</small></span></button>`).join("")}</div>
   <h3>Seiten</h3>
   ${selFld("Kacheln pro Reihe (Raster der Tagesseiten)", "cols", String(t.cols), [["3", "3 Kacheln nebeneinander"], ["4", "4 Kacheln nebeneinander"]])}
   ${chk("Linien zum Handschreiben in freien Textbereichen", "ruled", t.ruled)}
