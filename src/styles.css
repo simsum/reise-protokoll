@@ -222,3 +222,28 @@ body.brush .sheet { outline: 2px dashed color-mix(in srgb, var(--ui) 55%, transp
 #pm #pmSizes button[aria-pressed="true"] { background: var(--ui); border-color: var(--ui); color: #fff; }
 
 .pmmap.day .pmpin { display: none; }
+
+/* Navigation bleibt auch bei schmalem Fenster erreichbar. */
+.top, .viewbar { flex-wrap: wrap; }
+.viewbar { gap: 8px 12px; white-space: normal; }
+.page-nav { display: flex; align-items: center; gap: 6px; min-width: 0; }
+#pageJump { max-width: 240px; min-width: 0; }
+#saveStatus { max-width: 230px; font-size: 11px; }
+.day-nav { position: sticky; top: -14px; z-index: 2; background: var(--card); padding: 8px 0; border-bottom: 1px solid var(--line); }
+.day-preview { margin-bottom: 12px; color: var(--ui); }
+button:focus-visible, select:focus-visible, summary:focus-visible { outline: 3px solid var(--ui); outline-offset: 2px; }
+button:disabled { cursor: default; }
+@media (max-width: 900px) {
+  #app { height: 100dvh; }
+  .top { padding: 8px; gap: 6px; }
+  .brand { flex: 1 0 100%; }
+  .top > .grow { display: none; }
+  #saveStatus { max-width: none; flex: 1 0 100%; }
+  .viewbar .tip { display: none; }
+  #side { flex: 1; min-height: 180px; }
+  #view { min-height: 220px; }
+  #pageJump { max-width: 190px; }
+}
+@media (pointer: coarse) {
+  button, select { min-height: 40px; }
+}

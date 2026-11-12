@@ -52,6 +52,7 @@ function buildToolbar() {
   tb.innerHTML = `<div class="tbrow"><select data-tb="mod" title="Modul">${Object.entries(MODULES).map(([id, m]) => `<option value="${id}" ${id === tile.mod ? "selected" : ""}>${esc(m.name)}</option>`).join("")}</select>
     ${tile.mod === "foto" ? `<select data-tb="photo" title="Foto"><option value="">– Foto wählen –</option>${d.photos.map((p, n) => `<option value="${p.id}" ${p.id === tile.photo ? "selected" : ""}>${n + 1}: ${esc(p.name)}${inUse.has(p.id) ? " (schon platziert, wird verschoben)" : ""}</option>`).join("")}</select>` : ""}
     <button class="ico" data-tb="prev" title="In der Reihenfolge nach vorn" ${idx <= 0 ? "disabled" : ""}>◀</button><button class="ico" data-tb="next" title="In der Reihenfolge nach hinten" ${idx >= c.pg.tiles.length - 1 ? "disabled" : ""}>▶</button>
+    ${TILE_FIELD[tile.mod] || ["foto", "karte", "kennzahlen"].includes(tile.mod) ? `<button data-tb="edit">Inhalt bearbeiten</button>` : ""}
     <button class="ico" data-tb="del" title="Kachel entfernen">✕</button></div>
     ${fixed ? `<div class="tbrow"><small>feste Größe 1×1</small></div>` : `<div class="tbrow">${SIZES.map(sz).join("")}<button data-tb="size" data-w="${t.cols}" data-h="1" aria-pressed="${w === t.cols && h === 1}">Ganze Breite</button><small>${w}×${h}</small></div>`}
     ${tile.mod === "punktkarte" || tile.mod === "tageskarte" ? `<div class="tbrow"><button data-tb="pm">${tile.pt ? (tile.mod === "tageskarte" ? "Ausschnitt ändern …" : "Position ändern …") : (tile.mod === "tageskarte" ? "Ausschnitt wählen …" : "Position wählen …")}</button></div>` : ""}
@@ -169,6 +170,7 @@ function bindPreviewTiles() {
     if (b.dataset.tb === "wp") { const c0 = selCtx(); if (c0) openWikipedia(c0.tile, c0.d); return; }
     if (b.dataset.tb === "md") { mdApply($('#tb [data-tb="text"]'), b.dataset.md); return; }
     if (!c) return;
+    if (b.dataset.tb === "edit") { editTile(c.d, c.tile); return; }
     if (b.dataset.tb === "size") { c.tile.w = Math.min(+b.dataset.w, t.cols); c.tile.h = +b.dataset.h; }
     else if (b.dataset.tb === "prev" || b.dataset.tb === "next") moveIn(c.pg.tiles, c.pg.tiles.indexOf(c.tile), b.dataset.tb === "prev" ? -1 : 1);
     else if (b.dataset.tb === "del") { c.pg.tiles = c.pg.tiles.filter((x) => x !== c.tile); S.sel = null; }

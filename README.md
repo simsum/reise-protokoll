@@ -8,6 +8,17 @@ Das Tool ist eine einzige HTML-Datei ([`dist/Reise-Protokoll.html`](dist/Reise-P
 
 ## Freies Layout aus Kacheln
 
+### Schneller durch die Reise (v0.20)
+
+- Im Reiter **Tage** springt „Direkt zu einem Tag“ zum gewünschten Eintrag. **In der Vorschau zeigen** öffnet seine erste Seite.
+- Die **Seitenauswahl** über der Vorschau führt direkt zu Deckseite, Tagesseiten und Übersichten; beim Scrollen folgt sie der angezeigten Seite.
+- **Zoom → Einpassen** zeigt eine ganze Seite und reagiert auf die Fenstergröße. Für Details bleiben die festen Zoomstufen verfügbar.
+- Nach der Auswahl einer Kachel führt **Inhalt bearbeiten** zum passenden Eingabefeld oder Foto-Editor. Der Doppelklick funktioniert weiterhin.
+- Jeder Reiter merkt sich seine Scrollposition. Kopf- und Vorschauleiste umbrechen auf schmalen Bildschirmen.
+- Oben steht, ob Änderungen **im Browser gespeichert** wurden. Bei einem Speicherfehler erscheint ein Hinweis. Eine Browserkopie ersetzt keine Datei: Zum dauerhaften Sichern **PDF erstellen** und die Bearbeitungsdaten eingebettet lassen.
+
+### Kacheln gestalten
+
 Jede Seite eines Tages ist ein Raster aus 3 oder 4 Kacheln pro Reihe und 6 Reihen (Einstellung im Reiter „Reise“). Jede Kachel nimmt ein **Modul** auf, frei wählbar: Foto, Wetter, Unterkunft, Strecke, Tagesplan, Tagebuch, Highlights, Ausgaben, Karte (Strecke), Karte (Punkt), Kennzahlen, Notiz (freier Text mit Markdown), Wettersymbol (nur ein hübsches Symbol, immer 1×1, schmückt freie Flächen; „automatisch“ zeigt das Wetter des Tages, oder man wählt Sonne, Heiter, Bewölkt, Regen, Gewitter, Schnee, Nebel, Mond und Sterne, Regenbogen, Wind; die Farben folgen dem Farbschema) oder Leer (Platzhalter). Bearbeiten geht **direkt in der Vorschau** (oder im Reiter „Tage“ unter jedem Tag):
 
 - **Anklicken** wählt eine Kachel; eine Werkzeugleiste über der Kachel bietet Modul, Foto, Größe und Reihenfolge. **Ziehen** verschiebt die Kachel an eine andere Stelle (auch auf eine andere Seite desselben Tages), die **Ecke unten rechts** ändert die Größe im Raster, ein Klick auf **freie Fläche** fügt eine Kachel ein. Escape hebt die Auswahl auf, Entf löscht die Kachel. **Doppelklick** springt dorthin, wo man den Inhalt bearbeitet (Foto-Editor, Textfeld des Tages, Reiter „Karte“ …). Beim Darüberfahren markieren gestrichelte Felder die **freien Plätze** der Seite.

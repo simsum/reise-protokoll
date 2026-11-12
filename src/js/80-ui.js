@@ -161,11 +161,13 @@ function tileRow(d, pg, x, k, over) {
 function panelDays() {
   const t = S.trip;
   const startDefault = t.days.length ? addDays(t.days[t.days.length - 1].date || t.start || isoOf(new Date()), 1) : t.start;
-  return `<label class="drop" id="dropAll">Fotos hierher ziehen oder klicken: sie werden nach Aufnahmedatum den Tagen zugeordnet (fehlende Tage entstehen dabei)<input type="file" accept="image/*" multiple hidden id="photoAll"></label>
+  return `<label class="f day-nav"><span>Direkt zu einem Tag</span><select id="dayJump"><option value="">Tag wählen …</option>${t.days.map((d, i) => `<option value="${d.id}">${esc(dayLabel(d, i))}</option>`).join("")}</select></label>
+  <label class="drop" id="dropAll">Fotos hierher ziehen oder klicken: sie werden nach Aufnahmedatum den Tagen zugeordnet (fehlende Tage entstehen dabei)<input type="file" accept="image/*" multiple hidden id="photoAll"></label>
   <div class="btnrow"><button data-act="addDay">+ Tag hinzufügen</button>
     <span class="row" style="gap:4px">ab <input type="date" id="genStart" value="${esc(startDefault || "")}" style="border:1px solid var(--line);border-radius:8px;padding:5px"> <input type="number" id="genN" min="1" max="60" value="5" style="width:60px;border:1px solid var(--line);border-radius:8px;padding:5px"> Tage <button data-act="genDays">anlegen</button></span>
     <button data-act="sortDays" title="Nach Datum sortieren">Sortieren</button>${countDuplicates() ? `<button data-act="dedupe" title="Dasselbe Foto kommt mehrfach vor">${countDuplicates()} doppelte Fotos entfernen</button>` : ""}</div>
   ${t.days.map((d, i) => `<details class="day" data-day="${d.id}" ${S.open.has(d.id) ? "open" : ""}><summary><span class="dsum">${daySummary(i)}</span></summary><div class="body">
+    <button class="day-preview" data-act="showDay" data-day="${d.id}">In der Vorschau zeigen</button>
     ${fld("Datum", `d:${d.id}.date`, d.date, { type: "date" })}
     ${DAY_ORDER.map((k) => DAY_FIELDS[k](d)).join("")}
     ${tileEditor(d)}
@@ -211,11 +213,15 @@ function panelSum() {
 }
 
 /* ---------- Rendern ---------- */
+const panelScroll = {};
+let renderedTab = "trip";
 function renderPanel() {
-  const el = $("#panel"), top = el.scrollTop;
+  const el = $("#panel");
+  panelScroll[renderedTab] = el.scrollTop;
   el.innerHTML = { trip: panelTrip, days: panelDays, map: panelMap, sum: panelSum }[S.tab]();
-  el.scrollTop = top;
-  $$("#tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === S.tab));
+  el.scrollTop = panelScroll[S.tab] || 0;
+  renderedTab = S.tab;
+  $$("#tabs button").forEach((b) => { b.classList.toggle("on", b.dataset.tab === S.tab); b.setAttribute("aria-current", b.dataset.tab === S.tab ? "page" : "false"); });
   if (S.tab === "days") bindDrop();
 }
 
@@ -242,9 +248,20 @@ function renderPreview() {
   $("#warn").textContent = warns.length ? "⚠ " + warns[0] + (warns.length > 1 ? ` (+${warns.length - 1})` : "") : "";
   $("#warn").title = warns.join("\n");
   syncSelection();
+  updatePageNavigation();
+  fitPreview();
 }
 
-function scheduleSave() { clearTimeout(saveTimer); saveTimer = setTimeout(() => idbSet("trip", S.trip).catch(() => {}), 600); }
+let saveRevision = 0;
+function scheduleSave() {
+  clearTimeout(saveTimer);
+  const revision = ++saveRevision, status = $("#saveStatus");
+  status.textContent = "Browserkopie wird gespeichert …";
+  saveTimer = setTimeout(async () => {
+    try { await idbSet("trip", S.trip); if (revision === saveRevision) status.textContent = "Im Browser gespeichert · als PDF sichern"; }
+    catch { if (revision === saveRevision) status.textContent = "Browserkopie nicht gespeichert · bitte PDF sichern"; }
+  }, 600);
+}
 
 /* Änderung aus dem Hintergrund (Ort, Wetter): Vorschau aktualisieren, die Seitenleiste nur neu zeichnen, wenn gerade nicht getippt wird */
 let softT;
@@ -322,7 +339,9 @@ document.addEventListener("change", (e) => {
   else if (el.id === "coverFile") useCover(el.files[0]);
   else if (el.id === "openFile") openProject(el.files[0]);
   else if (el.id === "demo") { if (el.value) loadTrip(demoTrip(el.value)); el.value = ""; }
-  else if (el.id === "zoom") document.documentElement.style.setProperty("--z", el.value / 100);
+  else if (el.id === "zoom") fitPreview();
+  else if (el.id === "pageJump") showPreviewPage(+el.value);
+  else if (el.id === "dayJump" && el.value) jumpToDay(el.value);
   else if (el.dataset.k === "start" || el.dataset.k === "roundTrip" || el.dataset.k === "ruled" || el.dataset.k === "costPage") { /* nur Vorschau */ }
   if (el.dataset && el.dataset.k && /\.(weather|cat|date|mod|w|h|photo|lodgingKind|sonstiges)$/.test(el.dataset.k)) renderPanel();
 });
@@ -331,6 +350,7 @@ document.addEventListener("click", async (e) => {
   const b = e.target.closest("[data-act],[data-tab]");
   if (!b) return;
   if (b.dataset.tab) { S.tab = b.dataset.tab; renderPanel(); return; }
+  if (b.dataset.act === "showDay") { renderPreview(); showPreviewPage(S.pages.findIndex((pg) => pg.meta && pg.meta.dayId === b.dataset.day)); return; }
   const t = S.trip, id = b.dataset.id, dayId = b.dataset.day;
   switch (b.dataset.act) {
     case "theme": t.theme = id; changed(); renderPanel(); break;

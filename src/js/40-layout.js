@@ -33,6 +33,7 @@ class Pg {
 
 /* ---------- Kopf für Folgeseiten (Fortsetzung, Fotos, Kosten) ---------- */
 function miniHeader(pg, kicker, title) {
+  pg.navigationLabel = title;
   pg.label(MX, 40, kicker);
   pg.text(MX, 54, fitT(title, "SB", 20, CW), { f: "SB", s: 20 });
   pg.line(MX, 86, PW - MX, 86, pg.T.rule, 0.8);
