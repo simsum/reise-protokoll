@@ -40,7 +40,7 @@ function tileChanged() { changed(); clearTimeout(prevTimer); renderPreview(); if
 function select(sel) {
   S.sel = sel; ia = null;
   $$("#pages .tl.sel").forEach((e) => e.classList.remove("sel"));
-  if (sel) { const e = $(`#pages .tl[data-id="${sel.tileId}"]`); if (e) e.classList.add("sel"); buildToolbar(); } else hideToolbar();
+  if (sel) { const e = $(`#pages .tl[data-id="${sel.tileId}"]`); if (e) e.classList.add("sel"); buildToolbar(); const c = selCtx(); if (c && c.tile.mod === "foto" && c.tile.photo) { S.photoPick.set(c.d.id, c.tile.photo); S.open.add(c.d.id); if (S.tab === "days") renderPanel(); } } else hideToolbar();
 }
 
 /* ---------- Werkzeugleiste ---------- */
@@ -105,6 +105,19 @@ function showGhost(r, ok) {
 /* ---------- Bedienung ---------- */
 function bindPreviewTiles() {
   const pages = $("#pages");
+  document.addEventListener("dragstart", e => { const b = e.target.closest(".photo-choice"); if (!b || !e.dataTransfer) return; e.dataTransfer.setData("application/x-reise-foto", JSON.stringify({dayId: b.dataset.day, photoId: b.dataset.id})); e.dataTransfer.effectAllowed = "copyMove"; });
+  pages.addEventListener("dragover", e => { if (e.dataTransfer && [...e.dataTransfer.types].includes("application/x-reise-foto")) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; } });
+  pages.addEventListener("drop", e => {
+    const raw = e.dataTransfer && e.dataTransfer.getData("application/x-reise-foto"); if (!raw) return;
+    e.preventDefault(); let data; try { data = JSON.parse(raw); } catch { return; }
+    const p = pagePoint(e), m = p && p.pg.meta, d = m && dayOf(m.dayId);
+    if (!d || data.dayId !== d.id || !d.photos.some(x => x.id === data.photoId)) { toast("Fotos lassen sich nur auf Seiten desselben Tages platzieren."); return; }
+    const target = e.target.closest(".tl"), current = target && d.pages.flatMap(pg => pg.tiles.map(tile => ({pg, tile}))).find(x => x.tile.id === target.dataset.id);
+    if (current && current.tile.mod !== "foto") { toast("Bitte auf eine Fotokachel oder eine freie Stelle ziehen."); return; }
+    let pg = current && current.pg, tile = current && current.tile;
+    if (!tile) { pg = d.pages.find(q => q.id === m.pageId); if (!pg) { pg = newPage(); d.pages.push(pg); } tile = tileOf("foto", S.trip.cols); const cell = cellAt(m, p.x, p.y); pg.tiles.splice(insertIndex(pg.tiles, m, cell.r * m.cols + cell.c, null), 0, tile); }
+    setTilePhoto(d, tile, data.photoId); S.photoPick.set(d.id, data.photoId); S.sel = {dayId:d.id, pageId:pg.id, tileId:tile.id}; tileChanged();
+  });
   pages.addEventListener("pointerdown", (e) => {
     if (e.button > 0) return;
     const sh = e.target.closest(".sheet"); if (!sh) return;
@@ -170,7 +183,7 @@ function bindPreviewTiles() {
     if (b.dataset.tb === "wp") { const c0 = selCtx(); if (c0) openWikipedia(c0.tile, c0.d); return; }
     if (b.dataset.tb === "md") { mdApply($('#tb [data-tb="text"]'), b.dataset.md); return; }
     if (!c) return;
-    if (b.dataset.tb === "edit") { editTile(c.d, c.tile); return; }
+    if (b.dataset.tb === "edit") { if (c.tile.mod === "foto" && c.tile.photo) { S.photoPick.set(c.d.id, c.tile.photo); S.tab = "days"; S.open.add(c.d.id); renderPanel(); const card = $(`details.day[data-day="${c.d.id}"] .photo-gallery`); if (card) card.scrollIntoView({block:"start"}); } else editTile(c.d, c.tile); return; }
     if (b.dataset.tb === "size") { c.tile.w = Math.min(+b.dataset.w, t.cols); c.tile.h = +b.dataset.h; }
     else if (b.dataset.tb === "prev" || b.dataset.tb === "next") moveIn(c.pg.tiles, c.pg.tiles.indexOf(c.tile), b.dataset.tb === "prev" ? -1 : 1);
     else if (b.dataset.tb === "del") { c.pg.tiles = c.pg.tiles.filter((x) => x !== c.tile); S.sel = null; }

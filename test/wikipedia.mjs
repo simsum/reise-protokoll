@@ -166,7 +166,7 @@ await page.evaluate(() => { document.activeElement && document.activeElement.blu
 
 console.log("Sidebar, Projekt, PDF");
 await page.click('[data-tab="days"]');
-await page.evaluate(() => { S.open.add(S.trip.days[0].id); renderPanel(); });
+await page.evaluate(() => { S.open.add(S.trip.days[0].id); S.advanced.add(S.trip.days[0].id); renderPanel(); });
 ok(await page.locator('details.day[open] [data-act="wpOpen"]').count() === 1 && (await page.locator("details.day[open] .tile small").allInnerTexts()).some((t) => t.includes("München") && t.includes("6 Kennzahlen")), "Seitenleiste: Knopf und Zusammenfassung der Kachel");
 await page.locator('details.day[open] [data-act="wpOpen"]').click();
 ok(await page.locator("#wp").isVisible(), "Knopf in der Seitenleiste öffnet das Fenster");

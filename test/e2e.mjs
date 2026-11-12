@@ -158,7 +158,7 @@ console.log("Kacheln");
   ok(await page.evaluate(() => { const d = S.trip.days[0], pk = packTiles(d.pages[0].tiles, 4, 6); return pk.rest.length === 0; }), "Standardseite füllt das 4×6-Raster ohne Überlauf");
   /* Bedienung: Kachel hinzufügen, Größe wählen, verschieben, löschen */
   await page.click('[data-tab="days"]');
-  await page.evaluate(() => { S.open.add(S.trip.days[1].id); renderPanel(); });
+  await page.evaluate(() => { S.open.add(S.trip.days[1].id); S.advanced.add(S.trip.days[1].id); renderPanel(); });
   const day1 = await page.evaluate(() => S.trip.days[1].id);
   const before = await page.evaluate(() => S.trip.days[1].pages[0].tiles.length);
   await page.selectOption(`[data-addtile][data-day="${day1}"]`, "notiz");

@@ -134,7 +134,7 @@ await page.mouse.dblclick(bb.x + bb.width / 2, bb.y + bb.height / 2);
 await page.keyboard.press("Escape");
 ok(await page.locator("#pm").isHidden() && await page.evaluate(() => S.trip.days[0].pages[0].tiles.some((x) => x.mod === "punktkarte")), "Escape schließt das Fenster, die Kachel bleibt");
 await page.click('[data-tab="days"]');
-await page.evaluate(() => { S.open.add(S.trip.days[0].id); renderPanel(); });
+await page.evaluate(() => { S.open.add(S.trip.days[0].id); S.advanced.add(S.trip.days[0].id); renderPanel(); });
 ok(await page.locator('details.day[open] [data-act="pmOpen"]').count() === 1 && (await page.locator("details.day[open] .tile small").allInnerTexts()).some((t) => t.includes("Salzburg") && t.includes("Zoom")), "Seitenleiste: Knopf und Zusammenfassung");
 
 console.log("Projekt und PDF");

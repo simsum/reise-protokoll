@@ -8,6 +8,8 @@ Das Tool ist eine einzige HTML-Datei ([`dist/Reise-Protokoll.html`](dist/Reise-P
 
 ## Freies Layout aus Kacheln
 
+**Fotos und Seiten bearbeiten:** Im geöffneten Tag zeigt eine kompakte Fotoauswahl alle Bilder; ✓ bedeutet platziert, + bedeutet noch nicht platziert. Ein Klick zeigt die Angaben des Fotos, „Auf Seite platzieren“ belegt eine ausgewählte Fotokachel oder fügt eine Fotokachel hinzu. Auf dem Computer lässt sich ein Foto auch auf eine Fotokachel oder freie Stelle in der Vorschau ziehen. „Von Seite entfernen“ behält das Foto im Tag; „Aus Tag löschen“ fragt vor dem Entfernen nach. Die bisherige Liste für Seiten und Kacheln ist unter „erweiterte Ansicht“ erreichbar.
+
 **Tipps fürs nächste Mal:** Im jeweiligen Tag eintragen; beim Verlassen des Feldes wird bei Bedarf eine Tipps-Kachel eingefügt. Die Kachel kann wie andere Kacheln verschoben oder vergrößert werden. Lange Texte erzeugen gegebenenfalls einen Hinweis.
 
 **Stellplatz:** Zusätzlich zur Ausstattung lassen sich Entsorgung und Hunde mit „Keine Angabe“, Ja oder Nein sowie ein Preis als Freitext erfassen. Die Angaben erscheinen in der Unterkunftskachel; bei Bedarf wird sie beim Eintragen vergrößert. Der Preis ist eine Information und wird nicht automatisch als Ausgabe verbucht.

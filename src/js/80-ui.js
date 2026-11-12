@@ -1,5 +1,7 @@
 /* ---------- Oberfläche ---------- */
 const S = { trip: newTrip(), tab: "trip", open: new Set(), newPoint: blankPlace(), busy: false };
+S.advanced = new Set();
+S.photoPick = new Map();
 
 /* ---------- Zugriff auf Felder über Schlüssel ----------
    "title", "startPlace.name", "d:<tagId>.place.name", "d:<tagId>.costs.<id>.l", "route.points.<id>.name" */
@@ -105,7 +107,7 @@ const DAY_FIELDS = {
   highlights: (d) => fld("Highlights (eine pro Zeile)", `d:${d.id}.highlights`, d.highlights, { rows: 3 }),
   tips: (d) => fld("Tipps fürs nächste Mal", `d:${d.id}.tips`, d.tips, { rows: 3, ph: "Was würdest du beim nächsten Besuch anders machen?" }),
   costs: (d) => `<div class="f"><span>Ausgaben <b data-sum="${d.id}">${dayCosts(d) ? "· " + money(dayCosts(d), S.trip.currency) : ""}</b></span>${d.costs.map((c) => `<div class="cost"><input data-k="d:${d.id}.costs.${c.id}.l" value="${esc(c.l)}" placeholder="Bezeichnung"><select data-k="d:${d.id}.costs.${c.id}.cat">${CATS.map((k) => `<option value="${k.id}" ${k.id === c.cat ? "selected" : ""}>${esc(k.name)}</option>`).join("")}</select><input data-k="d:${d.id}.costs.${c.id}.a" value="${esc(c.a)}" inputmode="decimal" placeholder="0,00"><button class="ico" data-act="delCost" data-day="${d.id}" data-id="${c.id}" title="Entfernen">×</button></div>`).join("")}<button data-act="addCost" data-day="${d.id}">+ Ausgabe</button></div>`,
-  photos: (d) => `<div class="f"><span>Fotos (${d.photos.length})</span>${d.photos.map((p) => photoCard(d, p)).join("")}<label class="drop" style="padding:6px;margin:0">+ Fotos wählen<input type="file" accept="image/*,.heic,.heif" multiple hidden data-photos="${d.id}"></label></div>`,
+  photos: (d) => photoGallery(d),
 };
 
 /* Hinweis unter dem Wetter eines Tages: automatisch aus Fotodaten oder Knopf zum Ermitteln */
@@ -126,9 +128,9 @@ function daySummary(i) {
 const SIZES = [[1, 1], [2, 1], [1, 2], [2, 2]];
 function tileEditor(d) {
   const t = S.trip;
-  return `<h3>Seiten und Kacheln</h3><small>Jede Seite ist ein Raster aus ${t.cols} × ${GRID_ROWS} Kacheln. Die Kacheln werden der Reihe nach auf freie Plätze gesetzt, was nicht mehr passt, kommt auf eine weitere Seite.</small>
+  return `<details class="advanced-layout" data-adv-day="${d.id}" ${S.advanced.has(d.id) ? "open" : ""}><summary>Seiten und Kacheln – erweiterte Ansicht</summary><small>Jede Seite ist ein Raster aus ${t.cols} × ${GRID_ROWS} Kacheln. Die Kacheln werden der Reihe nach auf freie Plätze gesetzt, was nicht mehr passt, kommt auf eine weitere Seite.</small>
   ${d.pages.map((pg, pi) => pageEditor(d, pg, pi)).join("")}
-  <div class="btnrow"><button data-act="addPage" data-day="${d.id}">+ Seite</button><button data-act="resetPages" data-day="${d.id}" title="Ersetzt den Seitenaufbau dieses Tages durch den Standard (Fotokacheln bleiben nicht erhalten)">Standardaufbau</button></div>`;
+  <div class="btnrow"><button data-act="addPage" data-day="${d.id}">+ Seite</button><button data-act="resetPages" data-day="${d.id}" title="Ersetzt den Seitenaufbau dieses Tages durch den Standard (Fotokacheln bleiben nicht erhalten)">Standardaufbau</button></div></details>`;
 }
 function pageEditor(d, pg, pi) {
   const t = S.trip, cols = t.cols, { placed, rest } = packTiles(pg.tiles, cols, GRID_ROWS), over = new Set(rest.map((x) => x.id));
@@ -325,6 +327,7 @@ function t_resetRoute() { S.trip.route.auto = true; rebuildRoute(S.trip); render
 document.addEventListener("toggle", (e) => {
   const d = e.target;
   if (d.matches && d.matches("details.day")) d.open ? S.open.add(d.dataset.day) : S.open.delete(d.dataset.day);
+  if (d.matches && d.matches("details.advanced-layout")) d.open ? S.advanced.add(d.dataset.advDay) : S.advanced.delete(d.dataset.advDay);
 }, true);
 
 document.addEventListener("change", (e) => {
@@ -390,7 +393,10 @@ document.addEventListener("click", async (e) => {
     }
     case "addCost": dayOf(dayId).costs.push({ id: uid(), l: "", cat: "sonstiges", a: "" }); S.open.add(dayId); renderPanel(); break;
     case "delCost": { const d = dayOf(dayId); d.costs = d.costs.filter((c) => c.id !== id); changed(); renderPanel(); break; }
-    case "delPhoto": { const d = dayOf(dayId); d.photos = d.photos.filter((p) => p.id !== id); pruneTiles(d); changed(); renderPanel(); break; }
+    case "delPhoto": { const d = dayOf(dayId); if (!confirm("Dieses Foto aus dem Tag und allen seinen Seiten entfernen?")) break; d.photos = d.photos.filter((p) => p.id !== id); pruneTiles(d); S.photoPick.delete(dayId); changed(); renderPanel(); break; }
+    case "photoChoose": { const d = dayOf(dayId); S.photoPick.set(dayId, id); const match = d.pages.flatMap(p => p.tiles.map(x => ({p, x}))).find(q => q.x.mod === "foto" && q.x.photo === id); if (match) { select({dayId, pageId: match.p.id, tileId: match.x.id}); const index = S.pages.findIndex(pg => pg.meta && pg.meta.tiles.some(q => q.id === match.x.id)); if (index >= 0) showPreviewPage(index); } renderPanel(); break; }
+    case "photoPlace": { const d = dayOf(dayId), ctx = selCtx(); if (ctx && ctx.d === d && ctx.tile.mod === "foto") setTilePhoto(d, ctx.tile, id); else { if (!d.pages.length) d.pages.push(newPage()); const pg = d.pages[d.pages.length - 1], tile = tileOf("foto", t.cols); setTilePhoto(d, tile, id); pg.tiles.push(tile); S.sel = {dayId, pageId: pg.id, tileId: tile.id}; } changed(); renderPreview(); renderPanel(); break; }
+    case "photoUnplace": { const d = dayOf(dayId); d.pages.forEach(pg => { pg.tiles = pg.tiles.filter(x => !(x.mod === "foto" && x.photo === id)); }); S.sel = null; changed(); renderPreview(); renderPanel(); break; }
     case "pmOpen": { const d = dayOf(dayId), pg = d.pages.find((q) => q.id === b.dataset.page), tl = pg && pg.tiles.find((q) => q.id === id); if (tl) openPointMap(tl, d); break; }
     case "wpOpen": { const d = dayOf(dayId), pg = d.pages.find((q) => q.id === b.dataset.page), tl = pg && pg.tiles.find((q) => q.id === id); if (tl) openWikipedia(tl, d); break; }
     case "addPage": { const d = dayOf(dayId); d.pages.push(newPage()); S.open.add(dayId); changed(); renderPanel(); break; }
@@ -546,7 +552,12 @@ async function addPhotos(files) {
   }
 }
 
-/* ---------- Foto-Karten im Tages-Editor ---------- */
+/* ---------- Kompakte Fotoauswahl und Details des ausgewählten Fotos ---------- */
+function photoGallery(d) {
+  const placed = photosInUse(d), current = d.photos.find(p => p.id === S.photoPick.get(d.id)) || d.photos[0];
+  const thumbs = d.photos.map((p, i) => `<button type="button" class="photo-choice ${current && current.id === p.id ? "on" : ""}" data-act="photoChoose" data-day="${d.id}" data-id="${p.id}" draggable="true" aria-label="Foto ${i + 1}: ${esc(p.name)}${placed.has(p.id) ? ", platziert" : ", nicht platziert"}" aria-pressed="${!!current && current.id === p.id}"><img src="${p.vsrc || p.src}" alt=""><span>${placed.has(p.id) ? "✓" : "+"}</span></button>`).join("");
+  return `<div class="f photo-gallery"><span>Fotos (${d.photos.length})</span><small>✓ auf einer Seite · + noch nicht platziert. Foto auswählen oder in die Vorschau ziehen.</small><div class="photo-choices">${thumbs}</div>${current ? photoCard(d, current) : "<p><small>Noch keine Fotos für diesen Tag.</small></p>"}<label class="drop" style="padding:6px;margin:0">+ Fotos wählen<input type="file" accept="image/*,.heic,.heif" multiple hidden data-photos="${d.id}"></label></div>`;
+}
 function photoCard(d, p) {
   const nm = NUMS(p).length, info = [p.day ? fmtDate(p.day, { day: "numeric", month: "short" }) + (p.time ? " " + p.time.slice(0, 5) : "") : "", p.gps ? "GPS" : "", nm ? `${nm} Nummern` : "", p.marks.length - nm > 0 ? "Markierungen" : ""].filter(Boolean).join(" · ");
   const k = `d:${d.id}.photos.${p.id}`;
@@ -555,7 +566,8 @@ function photoCard(d, p) {
     <input data-k="${k}.place" value="${esc(p.place)}" placeholder="Ort (aus GPS, änderbar)" style="margin-top:3px">
     <input data-k="${k}.weather" value="${esc(p.weather)}" placeholder="Wetter (aus Aufnahmezeit und GPS, änderbar)" style="margin-top:3px">
     <small>${esc(p.name)}${info ? " · " + esc(info) : ""}</small>
-    <div class="btnrow" style="margin:4px 0 0"><button data-act="photoMark" data-day="${d.id}" data-id="${p.id}">Markieren …</button><button class="ico" data-act="photoRotL" data-day="${d.id}" data-id="${p.id}" title="Links drehen">⟲</button><button class="ico" data-act="photoRotR" data-day="${d.id}" data-id="${p.id}" title="Rechts drehen">⟳</button><button class="ico" data-act="photoUp" data-day="${d.id}" data-id="${p.id}" title="Früher">↑</button><button class="ico" data-act="photoDown" data-day="${d.id}" data-id="${p.id}" title="Später">↓</button><button class="ico" data-act="delPhoto" data-day="${d.id}" data-id="${p.id}" title="Entfernen">×</button></div></div></div>`;
+    <div class="btnrow" style="margin:4px 0 0"><button data-act="photoMark" data-day="${d.id}" data-id="${p.id}">Ausschnitt / Markieren …</button><button class="ico" data-act="photoRotL" data-day="${d.id}" data-id="${p.id}" title="Links drehen" aria-label="Links drehen">⟲</button><button class="ico" data-act="photoRotR" data-day="${d.id}" data-id="${p.id}" title="Rechts drehen" aria-label="Rechts drehen">⟳</button><button class="ico" data-act="photoUp" data-day="${d.id}" data-id="${p.id}" title="Früher" aria-label="Foto früher">↑</button><button class="ico" data-act="photoDown" data-day="${d.id}" data-id="${p.id}" title="Später" aria-label="Foto später">↓</button></div>
+    <div class="btnrow"><button data-act="photoPlace" data-day="${d.id}" data-id="${p.id}">Auf Seite platzieren</button>${photosInUse(d).has(p.id) ? `<button data-act="photoUnplace" data-day="${d.id}" data-id="${p.id}">Von Seite entfernen</button>` : ""}<button data-act="delPhoto" data-day="${d.id}" data-id="${p.id}">Aus Tag löschen …</button></div></div></div>`;
 }
 
 /* ---------- Editor: Markieren, Drehen, Ausschnitt (wie im Foto-Protokoll) ---------- */
@@ -729,7 +741,7 @@ function applyLegs() {
 
 /* ---------- Projekt: öffnen und PDF erstellen ---------- */
 function loadTrip(t, fresh) {
-  S.trip = normalizeTrip(t); S.open = new Set(); S.newPoint = blankPlace();
+  S.trip = normalizeTrip(t); S.open = new Set(); S.advanced.clear(); S.photoPick.clear(); S.newPoint = blankPlace();
   if (!fresh && S.trip.days[0]) S.open.add(S.trip.days[0].id);
   refreshDerived(S.trip);
   S.tab = "trip"; S.sel = null; if (S.brush) endBrush();
